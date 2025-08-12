@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { ArrowLeft, Upload, Plus, Trash2 } from "lucide-react"
+import Layout from "@/components/Layout"
 
 interface Account {
   id: string
@@ -81,23 +82,8 @@ const Settings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card shadow-sm">
-        <div className="flex h-16 items-center justify-between px-6">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Button>
-            <h1 className="text-2xl font-bold text-primary">Configurações</h1>
-          </div>
-          
-          <ThemeToggle />
-        </div>
-      </header>
-
-      <main className="p-6 max-w-4xl mx-auto">
+    <Layout>
+      <div className="p-6 max-w-4xl mx-auto">
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profile">Perfil</TabsTrigger>
@@ -302,8 +288,8 @@ const Settings = () => {
             </Card>
           </TabsContent>
         </Tabs>
-      </main>
-    </div>
+      </div>
+    </Layout>
   )
 }
 

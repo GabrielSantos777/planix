@@ -2,19 +2,17 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { 
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
   CreditCard,
   PlusCircle,
-  Settings,
-  LogOut,
   Wallet
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
+import Layout from "@/components/Layout"
 
 interface Transaction {
   id: string
@@ -67,15 +65,6 @@ const Dashboard = () => {
     }
   }, [navigate])
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated")
-    localStorage.removeItem("userName")
-    toast({
-      title: "Logout realizado",
-      description: "Você foi desconectado com sucesso",
-    })
-    navigate("/login")
-  }
 
   const totalIncome = transactions
     .filter(t => t.type === "income")
@@ -88,35 +77,8 @@ const Dashboard = () => {
   const balance = totalIncome - totalExpenses
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card shadow-sm">
-        <div className="flex h-16 items-center justify-between px-6">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-primary">FinanceTracker</h1>
-            <Badge variant="secondary">Dashboard</Badge>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-muted-foreground">Olá, {userName}</span>
-            <ThemeToggle />
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate("/settings")}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Configurações
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="p-6 space-y-6">
+    <Layout>
+      <div className="p-6 space-y-6">
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -255,8 +217,8 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </div>
+    </Layout>
   )
 }
 
