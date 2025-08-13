@@ -12,51 +12,14 @@ import {
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
+import { useApp } from "@/context/AppContext"
 import Layout from "@/components/Layout"
-
-interface Transaction {
-  id: string
-  description: string
-  amount: number
-  type: "income" | "expense" | "transfer"
-  category: string
-  date: string
-  account: string
-}
 
 const Dashboard = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { transactions, accounts } = useApp()
   const [userName] = useState(localStorage.getItem("userName") || "Usuário")
-  const [transactions] = useState<Transaction[]>([
-    {
-      id: "1",
-      description: "Salário",
-      amount: 5000,
-      type: "income",
-      category: "Trabalho",
-      date: "2024-01-15",
-      account: "Conta Principal"
-    },
-    {
-      id: "2",
-      description: "Supermercado",
-      amount: -250,
-      type: "expense",
-      category: "Alimentação",
-      date: "2024-01-14",
-      account: "Cartão de Crédito"
-    },
-    {
-      id: "3",
-      description: "Freelance",
-      amount: 800,
-      type: "income",
-      category: "Extra",
-      date: "2024-01-13",
-      account: "Conta Principal"
-    }
-  ])
 
   useEffect(() => {
     const isAuth = localStorage.getItem("isAuthenticated")
@@ -132,9 +95,9 @@ const Dashboard = () => {
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
+              <div className="text-2xl font-bold">{accounts.length}</div>
               <p className="text-xs text-muted-foreground">
-                Cartões ativos
+                Contas ativas
               </p>
             </CardContent>
           </Card>
@@ -150,19 +113,34 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="flex gap-4 flex-wrap">
-              <Button className="flex items-center gap-2">
+              <Button 
+                className="flex items-center gap-2"
+                onClick={() => navigate("/transacoes?type=income")}
+              >
                 <PlusCircle className="h-4 w-4" />
                 Nova Receita
               </Button>
-              <Button variant="destructive" className="flex items-center gap-2">
+              <Button 
+                variant="destructive" 
+                className="flex items-center gap-2"
+                onClick={() => navigate("/transacoes?type=expense")}
+              >
                 <PlusCircle className="h-4 w-4" />
                 Nova Despesa
               </Button>
-              <Button variant="secondary" className="flex items-center gap-2">
+              <Button 
+                variant="secondary" 
+                className="flex items-center gap-2"
+                onClick={() => navigate("/transacoes?type=transfer")}
+              >
                 <PlusCircle className="h-4 w-4" />
                 Transferência
               </Button>
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                className="flex items-center gap-2"
+                onClick={() => navigate("/contas")}
+              >
                 <CreditCard className="h-4 w-4" />
                 Gerenciar Contas
               </Button>
