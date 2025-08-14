@@ -81,14 +81,14 @@ const Transacoes = () => {
     if (editingTransaction) {
       updateTransaction(editingTransaction.id, transactionData)
       toast({
-        title: "Transação atualizada",
-        description: "A transação foi atualizada com sucesso",
+        title: "✅ Transação Atualizada",
+        description: `${transactionData.description} foi atualizada com sucesso`,
       })
     } else {
       addTransaction(transactionData)
       toast({
-        title: "Transação adicionada",
-        description: "A transação foi adicionada com sucesso",
+        title: "✅ Transação Adicionada",
+        description: `${transactionData.description} - R$ ${Math.abs(transactionData.amount).toLocaleString('pt-BR')}`,
       })
     }
 
@@ -105,10 +105,11 @@ const Transacoes = () => {
   }
 
   const handleDeleteTransaction = (id: string) => {
+    const transaction = transactions.find(t => t.id === id)
     deleteTransaction(id)
     toast({
-      title: "Transação removida",
-      description: "A transação foi removida com sucesso",
+      title: "🗑️ Transação Excluída",
+      description: transaction ? `${transaction.description} foi removida` : "Transação excluída com sucesso",
     })
   }
 

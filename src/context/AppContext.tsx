@@ -108,6 +108,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       id: Date.now().toString()
     }
     setTransactions(prev => [newTransaction, ...prev])
+    
+    // Atualizar saldo da conta se existir
+    if (transaction.type === "income" || transaction.type === "expense") {
+      const accountToUpdate = accounts.find(acc => acc.name === transaction.account)
+      if (accountToUpdate) {
+        const balanceChange = transaction.type === "income" ? transaction.amount : -Math.abs(transaction.amount)
+        updateAccount(accountToUpdate.id, { 
+          balance: accountToUpdate.balance + balanceChange 
+        })
+      }
+    }
   }
 
   const updateTransaction = (id: string, updatedTransaction: Partial<Transaction>) => {
@@ -121,6 +132,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   }
 
   const deleteTransaction = (id: string) => {
+    const transactionToDelete = transactions.find(t => t.id === id)
+    if (transactionToDelete) {
+      // Reverter saldo da conta
+      const accountToUpdate = accounts.find(acc => acc.name === transactionToDelete.account)
+      if (accountToUpdate) {
+        const balanceChange = transactionToDelete.type === "income" ? -transactionToDelete.amount : Math.abs(transactionToDelete.amount)
+        updateAccount(accountToUpdate.id, { 
+          balance: accountToUpdate.balance + balanceChange 
+        })
+      }
+    }
     setTransactions(prev => prev.filter(transaction => transaction.id !== id))
   }
 

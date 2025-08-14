@@ -66,14 +66,14 @@ const Contas = () => {
     if (editingAccount) {
       updateAccount(editingAccount.id, newAccount)
       toast({
-        title: "Conta atualizada",
-        description: "A conta foi atualizada com sucesso",
+        title: "✅ Conta Atualizada",
+        description: `${newAccount.name} foi atualizada com sucesso`,
       })
     } else {
       addAccount(newAccount)
       toast({
-        title: "Conta adicionada",
-        description: "Nova conta foi criada com sucesso",
+        title: "✅ Nova Conta Criada",
+        description: `${newAccount.name} - R$ ${newAccount.balance.toLocaleString('pt-BR')}`,
       })
     }
 
@@ -83,10 +83,11 @@ const Contas = () => {
   }
 
   const handleDeleteAccount = (accountId: string) => {
+    const account = accounts.find(a => a.id === accountId)
     deleteAccount(accountId)
     toast({
-      title: "Conta removida",
-      description: "A conta foi removida com sucesso",
+      title: "🗑️ Conta Excluída",
+      description: account ? `${account.name} foi removida` : "Conta excluída com sucesso",
     })
   }
 
