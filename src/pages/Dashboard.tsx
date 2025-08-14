@@ -13,12 +13,16 @@ import {
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
 import { useApp } from "@/context/AppContext"
+import { useInvestments } from "@/context/InvestmentsContext"
+import { useCurrency } from "@/context/CurrencyContext"
 import Layout from "@/components/Layout"
 
 const Dashboard = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { transactions, accounts } = useApp()
+  const { getTotalValue: getInvestmentValue } = useInvestments()
+  const { formatCurrency } = useCurrency()
   const [userName] = useState(localStorage.getItem("userName") || "Usuário")
 
   useEffect(() => {
@@ -50,8 +54,8 @@ const Dashboard = () => {
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">
-                R$ {balance.toLocaleString('pt-BR')}
+              <div className={`text-2xl font-bold ${balance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {formatCurrency(balance)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Seu saldo atual
@@ -66,7 +70,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-success">
-                R$ {totalIncome.toLocaleString('pt-BR')}
+                {formatCurrency(totalIncome)}
               </div>
               <p className="text-xs text-muted-foreground">
                 +12% em relação ao mês passado
@@ -81,7 +85,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-destructive">
-                R$ {totalExpenses.toLocaleString('pt-BR')}
+                {formatCurrency(totalExpenses)}
               </div>
               <p className="text-xs text-muted-foreground">
                 -5% em relação ao mês passado
@@ -91,13 +95,15 @@ const Dashboard = () => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Cartões</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Investimentos</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{accounts.length}</div>
+              <div className="text-2xl font-bold text-success">
+                {formatCurrency(getInvestmentValue())}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Contas ativas
+                Valor total investido
               </p>
             </CardContent>
           </Card>
@@ -184,7 +190,7 @@ const Dashboard = () => {
                       transaction.type === "income" ? "text-success" : "text-destructive"
                     }`}>
                       {transaction.type === "income" ? "+" : ""}
-                      R$ {Math.abs(transaction.amount).toLocaleString('pt-BR')}
+                      {formatCurrency(Math.abs(transaction.amount))}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {new Date(transaction.date).toLocaleDateString('pt-BR')}

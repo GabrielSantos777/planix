@@ -1,26 +1,28 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useApp } from "@/context/AppContext"
+import { useCategories } from "@/context/CategoriesContext"
+import { useCurrency } from "@/context/CurrencyContext"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
-import { ArrowLeft, Upload, Plus, Trash2 } from "lucide-react"
+import { Upload, Plus, Trash2, Palette } from "lucide-react"
 import Layout from "@/components/Layout"
+import { CurrencyInput } from "@/components/ui/currency-input"
 
-interface Account {
-  id: string
-  name: string
-  type: "bank" | "credit"
-  balance: number
-}
+// Account interface is now imported from context
 
 const Settings = () => {
-  const navigate = useNavigate()
   const { toast } = useToast()
+  const { accounts, addAccount, deleteAccount } = useApp()
+  const { categories, addCategory, deleteCategory, getCategoryIcon } = useCategories()
+  const { currencies, selectedCurrency, setSelectedCurrency, formatCurrency } = useCurrency()
   
   const [profile, setProfile] = useState({
     name: localStorage.getItem("userName") || "",
@@ -30,17 +32,26 @@ const Settings = () => {
     phone: "(11) 99999-9999"
   })
 
-  const [accounts, setAccounts] = useState<Account[]>([
-    { id: "1", name: "Conta Principal", type: "bank", balance: 5000 },
-    { id: "2", name: "Poupança", type: "bank", balance: 10000 },
-    { id: "3", name: "Cartão Visa", type: "credit", balance: -1500 }
-  ])
-
   const [newAccount, setNewAccount] = useState({
     name: "",
     type: "bank" as "bank" | "credit",
     balance: 0
   })
+
+  const [newCategory, setNewCategory] = useState({
+    name: "",
+    type: "expense" as "income" | "expense",
+    icon: "Home",
+    color: "#FF6B6B"
+  })
+
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+
+  const iconOptions = [
+    'Home', 'Car', 'ShoppingCart', 'Utensils', 'GamepadIcon', 'Shirt', 
+    'Heart', 'GraduationCap', 'Plane', 'Gift', 'Briefcase', 'Coins', 
+    'PiggyBank', 'TrendingUp'
+  ]
 
   const handleSaveProfile = () => {
     localStorage.setItem("userName", profile.name)
@@ -53,31 +64,53 @@ const Settings = () => {
   const handleAddAccount = () => {
     if (!newAccount.name) {
       toast({
-        title: "Erro",
+        title: "❌ Erro",
         description: "Por favor, preencha o nome da conta",
         variant: "destructive"
       })
       return
     }
 
-    const account: Account = {
-      id: Date.now().toString(),
-      ...newAccount
-    }
-
-    setAccounts([...accounts, account])
+    addAccount(newAccount)
     setNewAccount({ name: "", type: "bank", balance: 0 })
     toast({
-      title: "Conta adicionada",
+      title: "✅ Conta adicionada",
       description: "Nova conta foi adicionada com sucesso",
     })
   }
 
   const handleRemoveAccount = (accountId: string) => {
-    setAccounts(accounts.filter(acc => acc.id !== accountId))
+    deleteAccount(accountId)
     toast({
-      title: "Conta removida",
+      title: "🗑️ Conta removida",
       description: "A conta foi removida com sucesso",
+    })
+  }
+
+  const handleAddCategory = () => {
+    if (!newCategory.name) {
+      toast({
+        title: "❌ Erro",
+        description: "Por favor, preencha o nome da categoria",
+        variant: "destructive"
+      })
+      return
+    }
+
+    addCategory(newCategory)
+    setNewCategory({ name: "", type: "expense", icon: "Home", color: "#FF6B6B" })
+    setIsCategoryDialogOpen(false)
+    toast({
+      title: "✅ Categoria adicionada",
+      description: "Nova categoria foi adicionada com sucesso",
+    })
+  }
+
+  const handleRemoveCategory = (categoryId: string) => {
+    deleteCategory(categoryId)
+    toast({
+      title: "🗑️ Categoria removida",
+      description: "A categoria foi removida com sucesso",
     })
   }
 
@@ -187,7 +220,7 @@ const Settings = () => {
                         <span className={`font-bold ${
                           account.balance >= 0 ? "text-success" : "text-destructive"
                         }`}>
-                          R$ {account.balance.toLocaleString('pt-BR')}
+                          {formatCurrency(account.balance)}
                         </span>
                         <Button
                           variant="outline"
@@ -228,12 +261,9 @@ const Settings = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="accountBalance">Saldo Inicial</Label>
-                      <Input
-                        id="accountBalance"
-                        type="number"
-                        placeholder="0"
+                      <CurrencyInput
                         value={newAccount.balance}
-                        onChange={(e) => setNewAccount({...newAccount, balance: Number(e.target.value)})}
+                        onChange={(value) => setNewAccount({...newAccount, balance: value})}
                       />
                     </div>
                   </div>
@@ -249,7 +279,7 @@ const Settings = () => {
           <TabsContent value="preferences" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Preferências</CardTitle>
+                <CardTitle>Preferências Gerais</CardTitle>
                 <CardDescription>
                   Configure suas preferências do sistema
                 </CardDescription>
@@ -267,22 +297,160 @@ const Settings = () => {
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-medium">Notificações por Email</h3>
+                    <h3 className="font-medium">Moeda Principal</h3>
                     <p className="text-sm text-muted-foreground">
-                      Receba notificações sobre suas transações
+                      Escolha a moeda padrão para exibição
                     </p>
                   </div>
-                  <input type="checkbox" className="toggle" defaultChecked />
+                  <Select value={selectedCurrency.code} onValueChange={(value) => {
+                    const currency = currencies.find(c => c.code === value)
+                    if (currency) setSelectedCurrency(currency)
+                  }}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencies.map(currency => (
+                        <SelectItem key={currency.code} value={currency.code}>
+                          {currency.symbol} {currency.code} - {currency.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Categorias</CardTitle>
+                <CardDescription>
+                  Gerencie as categorias de receitas e despesas
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Lista de categorias existentes */}
+                <div className="space-y-4">
+                  <h4 className="font-medium">Categorias Existentes</h4>
+                  <div className="grid gap-3 max-h-64 overflow-y-auto">
+                    {categories.map((category) => {
+                      const IconComponent = getCategoryIcon(category.icon)
+                      return (
+                        <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-8 h-8 rounded-full flex items-center justify-center"
+                              style={{ backgroundColor: category.color + '20', color: category.color }}
+                            >
+                              <IconComponent className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <h5 className="font-medium">{category.name}</h5>
+                              <p className="text-sm text-muted-foreground">
+                                {category.type === 'income' ? 'Receita' : 'Despesa'}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveCategory(category.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Relatórios Mensais</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Receba relatórios automáticos todo mês
-                    </p>
-                  </div>
-                  <input type="checkbox" className="toggle" defaultChecked />
+                {/* Adicionar nova categoria */}
+                <div className="border-t pt-6">
+                  <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Adicionar Categoria
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Adicionar Nova Categoria</DialogTitle>
+                        <DialogDescription>
+                          Crie uma nova categoria para organizar suas transações
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="categoryName">Nome da Categoria</Label>
+                            <Input
+                              id="categoryName"
+                              placeholder="Ex: Alimentação"
+                              value={newCategory.name}
+                              onChange={(e) => setNewCategory({...newCategory, name: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="categoryType">Tipo</Label>
+                            <Select value={newCategory.type} onValueChange={(value: any) => setNewCategory({...newCategory, type: value})}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="income">Receita</SelectItem>
+                                <SelectItem value="expense">Despesa</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="categoryIcon">Ícone</Label>
+                          <Select value={newCategory.icon} onValueChange={(value) => setNewCategory({...newCategory, icon: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {iconOptions.map(iconName => {
+                                const IconComponent = getCategoryIcon(iconName)
+                                return (
+                                  <SelectItem key={iconName} value={iconName}>
+                                    <div className="flex items-center gap-2">
+                                      <IconComponent className="h-4 w-4" />
+                                      {iconName}
+                                    </div>
+                                  </SelectItem>
+                                )
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="categoryColor">Cor</Label>
+                          <div className="flex gap-2 flex-wrap">
+                            {['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#FF7675', '#74B9FF'].map(color => (
+                              <button
+                                key={color}
+                                type="button"
+                                className={`w-8 h-8 rounded-full border-2 ${newCategory.color === color ? 'border-gray-800' : 'border-gray-300'}`}
+                                style={{ backgroundColor: color }}
+                                onClick={() => setNewCategory({...newCategory, color})}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button type="submit" onClick={handleAddCategory}>
+                          Adicionar Categoria
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardContent>
             </Card>

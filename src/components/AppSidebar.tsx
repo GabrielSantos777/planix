@@ -5,7 +5,8 @@ import {
   ArrowUpDown, 
   BarChart3, 
   Settings,
-  TrendingUp
+  TrendingUp,
+  PieChart
 } from "lucide-react"
 
 import {
@@ -30,6 +31,11 @@ const items = [
     title: "Contas", 
     url: "/contas", 
     icon: Wallet 
+  },
+  { 
+    title: "Investimentos", 
+    url: "/investimentos", 
+    icon: PieChart 
   },
   { 
     title: "Transações", 
