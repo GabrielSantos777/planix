@@ -14,7 +14,361 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      accounts: {
+        Row: {
+          created_at: string
+          currency: string | null
+          current_balance: number | null
+          id: string
+          initial_balance: number | null
+          is_active: boolean | null
+          name: string
+          type: Database["public"]["Enums"]["account_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          current_balance?: number | null
+          id?: string
+          initial_balance?: number | null
+          is_active?: boolean | null
+          name: string
+          type: Database["public"]["Enums"]["account_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          current_balance?: number | null
+          id?: string
+          initial_balance?: number | null
+          is_active?: boolean | null
+          name?: string
+          type?: Database["public"]["Enums"]["account_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          type?: Database["public"]["Enums"]["transaction_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      credit_cards: {
+        Row: {
+          best_purchase_day: number | null
+          card_type: Database["public"]["Enums"]["card_type"]
+          closing_day: number
+          created_at: string
+          currency: string | null
+          current_balance: number | null
+          due_day: number
+          id: string
+          is_active: boolean | null
+          limit_amount: number
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          best_purchase_day?: number | null
+          card_type: Database["public"]["Enums"]["card_type"]
+          closing_day: number
+          created_at?: string
+          currency?: string | null
+          current_balance?: number | null
+          due_day: number
+          id?: string
+          is_active?: boolean | null
+          limit_amount: number
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          best_purchase_day?: number | null
+          card_type?: Database["public"]["Enums"]["card_type"]
+          closing_day?: number
+          created_at?: string
+          currency?: string | null
+          current_balance?: number | null
+          due_day?: number
+          id?: string
+          is_active?: boolean | null
+          limit_amount?: number
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      goals: {
+        Row: {
+          created_at: string
+          currency: string | null
+          current_amount: number | null
+          description: string | null
+          id: string
+          status: Database["public"]["Enums"]["goal_status"] | null
+          target_amount: number
+          target_date: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          current_amount?: number | null
+          description?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["goal_status"] | null
+          target_amount: number
+          target_date?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          current_amount?: number | null
+          description?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["goal_status"] | null
+          target_amount?: number
+          target_date?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      investments: {
+        Row: {
+          average_price: number
+          created_at: string
+          currency: string | null
+          current_price: number | null
+          id: string
+          name: string
+          quantity: number
+          symbol: string
+          type: Database["public"]["Enums"]["investment_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          average_price: number
+          created_at?: string
+          currency?: string | null
+          current_price?: number | null
+          id?: string
+          name: string
+          quantity: number
+          symbol: string
+          type: Database["public"]["Enums"]["investment_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          average_price?: number
+          created_at?: string
+          currency?: string | null
+          current_price?: number | null
+          id?: string
+          name?: string
+          quantity?: number
+          symbol?: string
+          type?: Database["public"]["Enums"]["investment_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          is_admin: boolean | null
+          phone: string | null
+          subscription_end: string | null
+          subscription_plan:
+            | Database["public"]["Enums"]["subscription_plan"]
+            | null
+          subscription_start: string | null
+          trial_end: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          is_admin?: boolean | null
+          phone?: string | null
+          subscription_end?: string | null
+          subscription_plan?:
+            | Database["public"]["Enums"]["subscription_plan"]
+            | null
+          subscription_start?: string | null
+          trial_end?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          is_admin?: boolean | null
+          phone?: string | null
+          subscription_end?: string | null
+          subscription_plan?:
+            | Database["public"]["Enums"]["subscription_plan"]
+            | null
+          subscription_start?: string | null
+          trial_end?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          account_id: string | null
+          amount: number
+          category_id: string | null
+          created_at: string
+          credit_card_id: string | null
+          currency: string | null
+          date: string
+          description: string
+          id: string
+          notes: string | null
+          type: Database["public"]["Enums"]["transaction_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          credit_card_id?: string | null
+          currency?: string | null
+          date?: string
+          description: string
+          id?: string
+          notes?: string | null
+          type: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          credit_card_id?: string | null
+          currency?: string | null
+          date?: string
+          description?: string
+          id?: string
+          notes?: string | null
+          type?: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_credit_card_id_fkey"
+            columns: ["credit_card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_integrations: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          phone_number: string
+          user_id: string
+          webhook_token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          phone_number: string
+          user_id: string
+          webhook_token: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          phone_number?: string
+          user_id?: string
+          webhook_token?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +377,12 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      account_type: "bank" | "savings" | "investment"
+      card_type: "visa" | "mastercard" | "elo" | "amex"
+      goal_status: "active" | "completed" | "paused"
+      investment_type: "stocks" | "crypto" | "bonds" | "funds"
+      subscription_plan: "basic" | "premium" | "enterprise"
+      transaction_type: "income" | "expense" | "transfer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +509,13 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      account_type: ["bank", "savings", "investment"],
+      card_type: ["visa", "mastercard", "elo", "amex"],
+      goal_status: ["active", "completed", "paused"],
+      investment_type: ["stocks", "crypto", "bonds", "funds"],
+      subscription_plan: ["basic", "premium", "enterprise"],
+      transaction_type: ["income", "expense", "transfer"],
+    },
   },
 } as const
