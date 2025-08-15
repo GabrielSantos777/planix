@@ -31,12 +31,12 @@ const Index = () => {
             Controle receitas, despesas e acompanhe seu patrimônio em tempo real.
           </p>
           <div className="space-x-4">
-            <Button size="lg" onClick={() => navigate("/signup")}>
-              Começar Agora
-            </Button>
-            <Button variant="outline" size="lg" onClick={() => navigate("/login")}>
-              Fazer Login
-            </Button>
+              <Button size="lg" onClick={() => navigate("/auth")}>
+                Começar Agora
+              </Button>
+              <Button variant="outline" size="lg" onClick={() => navigate("/plans")}>
+                Ver Planos
+              </Button>
           </div>
         </div>
 

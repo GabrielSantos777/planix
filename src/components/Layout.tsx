@@ -2,28 +2,34 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/AppSidebar"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { LogOut, User } from "lucide-react"
-import { useNavigate } from "react-router-dom"
-import { useToast } from "@/hooks/use-toast"
-import { useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { LogOut, Crown } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
 
 interface LayoutProps {
   children: React.ReactNode
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const navigate = useNavigate()
-  const { toast } = useToast()
-  const [userName] = useState(localStorage.getItem("userName") || "Usuário")
-
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated")
-    localStorage.removeItem("userName")
-    toast({
-      title: "Logout realizado",
-      description: "Você foi desconectado com sucesso",
-    })
-    navigate("/login")
+  const { user, profile, signOut, isTrialExpired, hasActiveSubscription } = useAuth()
+  
+  const getSubscriptionBadge = () => {
+    if (!profile) return null
+    
+    if (profile.subscription_plan === 'basic' && !isTrialExpired) {
+      return <Badge variant="outline">Trial</Badge>
+    }
+    
+    if (hasActiveSubscription) {
+      return (
+        <Badge className="bg-primary text-primary-foreground">
+          <Crown className="w-3 h-3 mr-1" />
+          {profile.subscription_plan === 'premium' ? 'Premium' : 'Enterprise'}
+        </Badge>
+      )
+    }
+    
+    return <Badge variant="destructive">Expirado</Badge>
   }
 
   return (
@@ -36,18 +42,20 @@ export default function Layout({ children }: LayoutProps) {
           <header className="h-14 flex items-center justify-between border-b bg-card px-4 shadow-sm">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="hover:bg-accent hover:text-accent-foreground" />
+              <div className="flex items-center gap-2 ml-2">
+                <span className="text-sm font-medium">
+                  Olá, {profile?.full_name || user?.email || 'Usuário'}! 👋
+                </span>
+                {getSubscriptionBadge()}
+              </div>
             </div>
             
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline">Olá, {userName}</span>
-              </div>
               <ThemeToggle />
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={handleLogout}
+                onClick={signOut}
                 className="gap-2"
               >
                 <LogOut className="h-4 w-4" />
@@ -57,7 +65,7 @@ export default function Layout({ children }: LayoutProps) {
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto p-4 md:p-6">
             {children}
           </main>
         </div>

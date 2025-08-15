@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom"
+import { NavLink } from "react-router-dom"
 import { 
   LayoutDashboard, 
   Wallet, 
@@ -6,7 +6,8 @@ import {
   BarChart3, 
   Settings,
   TrendingUp,
-  PieChart
+  Target,
+  MessageSquare
 } from "lucide-react"
 
 import {
@@ -28,6 +29,11 @@ const items = [
     icon: LayoutDashboard 
   },
   { 
+    title: "Transações", 
+    url: "/transacoes", 
+    icon: ArrowUpDown 
+  },
+  { 
     title: "Contas", 
     url: "/contas", 
     icon: Wallet 
@@ -35,17 +41,22 @@ const items = [
   { 
     title: "Investimentos", 
     url: "/investimentos", 
-    icon: PieChart 
+    icon: TrendingUp 
   },
   { 
-    title: "Transações", 
-    url: "/transacoes", 
-    icon: ArrowUpDown 
+    title: "Metas", 
+    url: "/metas", 
+    icon: Target 
   },
   { 
     title: "Relatórios", 
     url: "/relatorios", 
     icon: BarChart3 
+  },
+  { 
+    title: "Conexão", 
+    url: "/conexao", 
+    icon: MessageSquare 
   },
   { 
     title: "Configurações", 
@@ -56,13 +67,7 @@ const items = [
 
 export function AppSidebar() {
   const { state } = useSidebar()
-  const location = useLocation()
-  const currentPath = location.pathname
   const collapsed = state === "collapsed"
-
-  const isActive = (path: string) => currentPath === path
-  const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "hover:bg-sidebar-accent/50"
 
   return (
     <Sidebar 
@@ -98,7 +103,9 @@ export function AppSidebar() {
                       to={item.url} 
                       end 
                       className={({ isActive }) => 
-                        `flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${getNavCls({ isActive })}`
+                        `flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                          isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "hover:bg-sidebar-accent/50"
+                        }`
                       }
                     >
                       <item.icon className="h-5 w-5" />
