@@ -18,6 +18,7 @@ import Goals from "./pages/Goals";
 import Relatorios from "./pages/Relatorios";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import WhatsAppConnection from "./pages/WhatsAppConnection";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,11 @@ const App = () => (
               <Route path="/settings" element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              } />
+              <Route path="/conexao" element={
+                <ProtectedRoute requireSubscription>
+                  <WhatsAppConnection />
                 </ProtectedRoute>
               } />
               <Route path="*" element={<NotFound />} />

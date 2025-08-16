@@ -8,10 +8,7 @@ const Index = () => {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const isAuth = localStorage.getItem("isAuthenticated")
-    if (isAuth) {
-      navigate("/dashboard")
-    }
+    // Remove old localStorage check and use proper auth
   }, [navigate])
 
   return (
@@ -21,27 +18,27 @@ const Index = () => {
       </div>
       
       {/* Hero Section */}
-      <div className="container mx-auto px-4 py-16">
+      <div className="container mx-auto px-4 py-8 sm:py-16">
         <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-success bg-clip-text text-transparent">
-            FinanceTracker
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-success bg-clip-text text-transparent">
+            FinanceFlow
           </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Gerencie suas finanças pessoais de forma inteligente e eficiente. 
             Controle receitas, despesas e acompanhe seu patrimônio em tempo real.
           </p>
-          <div className="space-x-4">
-              <Button size="lg" onClick={() => navigate("/auth")}>
+          <div className="flex flex-col sm:flex-row gap-4 sm:space-x-4 justify-center">
+              <Button size="lg" onClick={() => navigate("/auth")} className="w-full sm:w-auto">
                 Começar Agora
               </Button>
-              <Button variant="outline" size="lg" onClick={() => navigate("/plans")}>
+              <Button variant="outline" size="lg" onClick={() => navigate("/plans")} className="w-full sm:w-auto">
                 Ver Planos
               </Button>
           </div>
         </div>
 
         {/* Features Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
           <div className="bg-card p-6 rounded-lg shadow-lg text-center">
             <TrendingUp className="h-12 w-12 text-success mx-auto mb-4" />
             <h3 className="font-semibold mb-2">Controle Total</h3>
@@ -76,17 +73,17 @@ const Index = () => {
         </div>
 
         {/* CTA Section */}
-        <div className="bg-primary text-primary-foreground rounded-lg p-8 text-center">
-          <h2 className="text-3xl font-bold mb-4">
+        <div className="bg-primary text-primary-foreground rounded-lg p-6 sm:p-8 text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4">
             Pronto para transformar suas finanças?
           </h2>
-          <p className="text-lg mb-6">
+          <p className="text-base sm:text-lg mb-6">
             Junte-se a milhares de usuários que já estão no controle de suas finanças
           </p>
           <Button 
             size="lg" 
             variant="secondary"
-            onClick={() => navigate("/signup")}
+            onClick={() => navigate("/auth")}
           >
             Criar Conta Gratuita
           </Button>

@@ -25,6 +25,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/auth" replace />
   }
 
+  // For admin users, always allow access
+  if (profile?.is_admin) {
+    return <>{children}</>
+  }
+
   if (requireSubscription && profile) {
     const hasAccess = !isTrialExpired || hasActiveSubscription
     if (!hasAccess) {
