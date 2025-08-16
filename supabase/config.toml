@@ -1,1 +1,24 @@
 project_id = "zdaoeuthpztxonytbcww"
+
+[auth]
+enabled = true
+external_url = "https://zdaoeuthpztxonytbcww.supabase.co"
+
+[db]
+shadow_database_url = ""
+database_url = "postgresql://postgres:postgres@localhost:54322/postgres"
+
+[analytics]
+enabled = false
+
+[functions.check-subscription]
+verify_jwt = true
+
+[functions.create-checkout]
+verify_jwt = true
+
+[functions.customer-portal]
+verify_jwt = true
+
+[functions.whatsapp-webhook]
+verify_jwt = false

@@ -12,36 +12,57 @@ import {
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
-import { useApp } from "@/context/AppContext"
+import { useAuth } from "@/context/AuthContext"
 import { useInvestments } from "@/context/InvestmentsContext"
 import { useCurrency } from "@/context/CurrencyContext"
+import { supabase } from "@/integrations/supabase/client"
 import Layout from "@/components/Layout"
 
 const Dashboard = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { transactions, accounts } = useApp()
+  const { user } = useAuth()
+  const [transactions, setTransactions] = useState([])
+  const [accounts, setAccounts] = useState([])
   const { getTotalValue: getInvestmentValue } = useInvestments()
   const { formatCurrency } = useCurrency()
-  const [userName] = useState(localStorage.getItem("userName") || "Usuário")
 
   useEffect(() => {
-    const isAuth = localStorage.getItem("isAuthenticated")
-    if (!isAuth) {
-      navigate("/login")
+    if (user) {
+      // Fetch transactions from Supabase
+      const fetchData = async () => {
+        try {
+          const { data: transactionData } = await supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+          
+          const { data: accountData } = await supabase
+            .from('accounts')
+            .select('*')
+            .eq('user_id', user.id);
+          
+          setTransactions(transactionData || []);
+          setAccounts(accountData || []);
+        } catch (error) {
+          console.error('Error fetching data:', error);
+        }
+      };
+      fetchData();
     }
-  }, [navigate])
-
+  }, [user]);
 
   const totalIncome = transactions
     .filter(t => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
 
   const totalExpenses = transactions
     .filter(t => t.type === "expense")
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+    .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
 
-  const balance = totalIncome - totalExpenses
+  const balance = totalIncome - totalExpenses;
 
   return (
     <Layout>

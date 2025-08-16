@@ -5,6 +5,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "./context/AuthContext";
+import { AppProvider } from "./context/AppContext";
+import { CurrencyProvider } from "./context/CurrencyContext";
+import { CategoriesProvider } from "./context/CategoriesContext";
+import { InvestmentsProvider } from "./context/InvestmentsContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import Index from "./pages/Index";
@@ -26,58 +30,66 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="system" storageKey="finance-tracker-theme">
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/plans" element={<Plans />} />
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/transacoes" element={
-                <ProtectedRoute requireSubscription>
-                  <Transacoes />
-                </ProtectedRoute>
-              } />
-              <Route path="/contas" element={
-                <ProtectedRoute requireSubscription>
-                  <Contas />
-                </ProtectedRoute>
-              } />
-              <Route path="/investimentos" element={
-                <ProtectedRoute requireSubscription>
-                  <Investimentos />
-                </ProtectedRoute>
-              } />
-              <Route path="/metas" element={
-                <ProtectedRoute requireSubscription>
-                  <Goals />
-                </ProtectedRoute>
-              } />
-              <Route path="/relatorios" element={
-                <ProtectedRoute requireSubscription>
-                  <Relatorios />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              <Route path="/conexao" element={
-                <ProtectedRoute requireSubscription>
-                  <WhatsAppConnection />
-                </ProtectedRoute>
-              } />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+        <CurrencyProvider>
+          <CategoriesProvider>
+            <InvestmentsProvider>
+              <AppProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/plans" element={<Plans />} />
+                      <Route path="/dashboard" element={
+                        <ProtectedRoute>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/transacoes" element={
+                        <ProtectedRoute requireSubscription>
+                          <Transacoes />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/contas" element={
+                        <ProtectedRoute requireSubscription>
+                          <Contas />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/investimentos" element={
+                        <ProtectedRoute requireSubscription>
+                          <Investimentos />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/metas" element={
+                        <ProtectedRoute>
+                          <Goals />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/relatorios" element={
+                        <ProtectedRoute requireSubscription>
+                          <Relatorios />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/settings" element={
+                        <ProtectedRoute>
+                          <Settings />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/conexao" element={
+                        <ProtectedRoute requireSubscription>
+                          <WhatsAppConnection />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </BrowserRouter>
+                </TooltipProvider>
+              </AppProvider>
+            </InvestmentsProvider>
+          </CategoriesProvider>
+        </CurrencyProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
