@@ -20,11 +20,18 @@ import Contas from "./pages/Contas";
 import Investimentos from "./pages/Investimentos";
 import GoalsImproved from "./pages/GoalsImproved";
 import Relatorios from "./pages/Relatorios";
-import Settings from "./pages/Settings";
+import SettingsImproved from "./pages/SettingsImproved";
 import NotFound from "./pages/NotFound";
 import WhatsAppConnection from "./pages/WhatsAppConnection";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -72,9 +79,9 @@ const App = () => (
                           <Relatorios />
                         </ProtectedRoute>
                       } />
-                      <Route path="/settings" element={
+                       <Route path="/settings" element={
                         <ProtectedRoute>
-                          <Settings />
+                          <SettingsImproved />
                         </ProtectedRoute>
                       } />
                       <Route path="/conexao" element={
