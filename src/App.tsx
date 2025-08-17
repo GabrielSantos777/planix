@@ -15,10 +15,10 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Plans from "./pages/Plans";
 import Dashboard from "./pages/Dashboard";
-import Transacoes from "./pages/Transacoes";
+import TransacoesImproved from "./pages/TransacoesImproved";
 import Contas from "./pages/Contas";
 import Investimentos from "./pages/Investimentos";
-import Goals from "./pages/Goals";
+import GoalsImproved from "./pages/GoalsImproved";
 import Relatorios from "./pages/Relatorios";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -49,7 +49,7 @@ const App = () => (
                       } />
                       <Route path="/transacoes" element={
                         <ProtectedRoute requireSubscription>
-                          <Transacoes />
+                          <TransacoesImproved />
                         </ProtectedRoute>
                       } />
                       <Route path="/contas" element={
@@ -64,7 +64,7 @@ const App = () => (
                       } />
                       <Route path="/metas" element={
                         <ProtectedRoute>
-                          <Goals />
+                          <GoalsImproved />
                         </ProtectedRoute>
                       } />
                       <Route path="/relatorios" element={

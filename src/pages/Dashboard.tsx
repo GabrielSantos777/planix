@@ -34,7 +34,11 @@ const Dashboard = () => {
         try {
           const { data: transactionData } = await supabase
             .from('transactions')
-            .select('*')
+            .select(`
+              *,
+              categories(name, icon, color),
+              accounts(name)
+            `)
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
             .limit(10);
@@ -42,7 +46,8 @@ const Dashboard = () => {
           const { data: accountData } = await supabase
             .from('accounts')
             .select('*')
-            .eq('user_id', user.id);
+            .eq('user_id', user.id)
+            .eq('is_active', true);
           
           setTransactions(transactionData || []);
           setAccounts(accountData || []);
@@ -51,6 +56,28 @@ const Dashboard = () => {
         }
       };
       fetchData();
+
+      // Set up real-time subscriptions
+      const transactionChannel = supabase
+        .channel('dashboard-transactions')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.id}` },
+          () => fetchData()
+        )
+        .subscribe();
+
+      const accountChannel = supabase
+        .channel('dashboard-accounts')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'accounts', filter: `user_id=eq.${user.id}` },
+          () => fetchData()
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(transactionChannel);
+        supabase.removeChannel(accountChannel);
+      };
     }
   }, [user]);
 
@@ -62,7 +89,8 @@ const Dashboard = () => {
     .filter(t => t.type === "expense")
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
 
-  const balance = totalIncome - totalExpenses;
+  const accountsBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0);
+  const balance = accountsBalance;
 
   return (
     <Layout>
@@ -202,7 +230,7 @@ const Dashboard = () => {
                     <div>
                       <p className="font-medium">{transaction.description}</p>
                       <p className="text-sm text-muted-foreground">
-                        {transaction.category} • {transaction.account}
+                        {transaction.categories?.name || 'Sem categoria'} • {transaction.accounts?.name || 'Conta removida'}
                       </p>
                     </div>
                   </div>
