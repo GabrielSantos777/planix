@@ -119,14 +119,18 @@ const Investimentos = () => {
               Gerencie seu portfólio de investimentos
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={handleUpdatePrices} variant="outline">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+              <span className="text-xs text-muted-foreground">Preços atualizados automaticamente</span>
+            </div>
+            <Button onClick={handleUpdatePrices} variant="outline" size="sm">
               <RefreshCw className="h-4 w-4 mr-2" />
               Atualizar Preços
             </Button>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Adicionar Investimento
                 </Button>
@@ -226,7 +230,7 @@ const Investimentos = () => {
         </div>
 
         {/* Resumo */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">

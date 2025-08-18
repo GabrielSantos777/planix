@@ -58,7 +58,7 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true)
-    await signInWithGoogle()
+    const { error } = await signInWithGoogle()
     setIsLoading(false)
   }
 
