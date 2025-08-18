@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 import { 
   Plus, 
   Eye, 
@@ -584,12 +585,10 @@ const ContasImproved = () => {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="account-balance">Saldo Inicial</Label>
-                <Input 
-                  id="account-balance" 
-                  type="number" 
-                  placeholder="0,00" 
+                <CurrencyInput 
                   value={newAccount.initial_balance}
-                  onChange={(e) => setNewAccount({...newAccount, initial_balance: Number(e.target.value)})}
+                  onChange={(value) => setNewAccount({...newAccount, initial_balance: value})}
+                  placeholder="0,00"
                 />
               </div>
             </div>
@@ -630,12 +629,10 @@ const ContasImproved = () => {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="card-limit">Limite</Label>
-                <Input 
-                  id="card-limit" 
-                  type="number" 
-                  placeholder="0,00" 
+                <CurrencyInput 
                   value={newCreditCard.limit_amount}
-                  onChange={(e) => setNewCreditCard({...newCreditCard, limit_amount: Number(e.target.value)})}
+                  onChange={(value) => setNewCreditCard({...newCreditCard, limit_amount: value})}
+                  placeholder="0,00"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
