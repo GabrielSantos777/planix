@@ -17,7 +17,8 @@ import {
   List
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useApp } from "@/context/AppContext"
+import { useSupabaseData } from "@/hooks/useSupabaseData"
+import { useCurrency } from "@/context/CurrencyContext"
 import Layout from "@/components/Layout"
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts"
 import jsPDF from 'jspdf'
@@ -48,7 +49,8 @@ interface MonthlyData {
 
 const Relatorios = () => {
   const { toast } = useToast()
-  const { transactions } = useApp()
+  const { transactions } = useSupabaseData()
+  const { formatCurrency } = useCurrency()
   const [selectedPeriod, setSelectedPeriod] = useState("current-month")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [expenseViewType, setExpenseViewType] = useState<"list" | "chart">("list")
@@ -88,7 +90,7 @@ const Relatorios = () => {
 
     return transactions.filter(t => {
       const transactionDate = new Date(t.date)
-      const categoryMatch = selectedCategory === "all" || t.category.toLowerCase() === selectedCategory.toLowerCase()
+      const categoryMatch = selectedCategory === "all" || t.category?.name?.toLowerCase() === selectedCategory.toLowerCase()
       return transactionDate >= startDate && categoryMatch
     })
   }, [transactions, selectedPeriod, selectedCategory])
@@ -97,7 +99,7 @@ const Relatorios = () => {
   const expenseCategories: CategoryData[] = useMemo(() => {
     const expenses = filteredTransactions.filter(t => t.type === "expense")
     const categoryTotals = expenses.reduce((acc, transaction) => {
-      const category = transaction.category
+      const category = transaction.category?.name || 'Sem categoria'
       acc[category] = (acc[category] || 0) + Math.abs(transaction.amount)
       return acc
     }, {} as Record<string, number>)
@@ -118,7 +120,7 @@ const Relatorios = () => {
   const incomeCategories: CategoryData[] = useMemo(() => {
     const incomes = filteredTransactions.filter(t => t.type === "income")
     const categoryTotals = incomes.reduce((acc, transaction) => {
-      const category = transaction.category
+      const category = transaction.category?.name || 'Sem categoria'
       acc[category] = (acc[category] || 0) + transaction.amount
       return acc
     }, {} as Record<string, number>)
@@ -263,7 +265,7 @@ const Relatorios = () => {
     const transactionsWS = XLSX.utils.json_to_sheet(filteredTransactions.map(item => ({
       'Data': new Date(item.date).toLocaleDateString('pt-BR'),
       'Descrição': item.description,
-      'Categoria': item.category,
+      'Categoria': item.category?.name || 'Sem categoria',
       'Tipo': item.type === 'income' ? 'Receita' : 'Despesa',
       'Valor': `R$ ${Math.abs(item.amount).toLocaleString('pt-BR')}`
     })))
@@ -293,7 +295,7 @@ const Relatorios = () => {
 
   // Obter categorias únicas para o filtro
   const availableCategories = useMemo(() => {
-    const categories = new Set(transactions.map(t => t.category))
+    const categories = new Set(transactions.map(t => t.category?.name).filter(Boolean))
     return Array.from(categories)
   }, [transactions])
 
@@ -370,7 +372,7 @@ const Relatorios = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              R$ {totalIncome.toLocaleString('pt-BR')}
+              {formatCurrency(totalIncome)}
             </div>
             <p className="text-xs text-muted-foreground">
               Últimos 6 meses
@@ -385,7 +387,7 @@ const Relatorios = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">
-              R$ {totalExpenses.toLocaleString('pt-BR')}
+              {formatCurrency(totalExpenses)}
             </div>
             <p className="text-xs text-muted-foreground">
               Últimos 6 meses
@@ -400,7 +402,7 @@ const Relatorios = () => {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-              R$ {totalBalance.toLocaleString('pt-BR')}
+              {formatCurrency(totalBalance)}
             </div>
             <p className="text-xs text-muted-foreground">
               Últimos 6 meses

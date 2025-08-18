@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,74 +11,17 @@ import {
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/context/AuthContext"
 import { useInvestments } from "@/context/InvestmentsContext"
 import { useCurrency } from "@/context/CurrencyContext"
-import { supabase } from "@/integrations/supabase/client"
+import { useSupabaseData } from "@/hooks/useSupabaseData"
 import Layout from "@/components/Layout"
 
 const Dashboard = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { user } = useAuth()
-  const [transactions, setTransactions] = useState([])
-  const [accounts, setAccounts] = useState([])
+  const { accounts, transactions } = useSupabaseData()
   const { getTotalValue: getInvestmentValue } = useInvestments()
   const { formatCurrency } = useCurrency()
-
-  useEffect(() => {
-    if (user) {
-      // Fetch transactions from Supabase
-      const fetchData = async () => {
-        try {
-          const { data: transactionData } = await supabase
-            .from('transactions')
-            .select(`
-              *,
-              categories(name, icon, color),
-              accounts(name)
-            `)
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
-          
-          const { data: accountData } = await supabase
-            .from('accounts')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('is_active', true);
-          
-          setTransactions(transactionData || []);
-          setAccounts(accountData || []);
-        } catch (error) {
-          console.error('Error fetching data:', error);
-        }
-      };
-      fetchData();
-
-      // Set up real-time subscriptions
-      const transactionChannel = supabase
-        .channel('dashboard-transactions')
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.id}` },
-          () => fetchData()
-        )
-        .subscribe();
-
-      const accountChannel = supabase
-        .channel('dashboard-accounts')
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'accounts', filter: `user_id=eq.${user.id}` },
-          () => fetchData()
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(transactionChannel);
-        supabase.removeChannel(accountChannel);
-      };
-    }
-  }, [user]);
 
   const totalIncome = transactions
     .filter(t => t.type === "income")
@@ -232,12 +174,12 @@ const Dashboard = () => {
                         <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
                       )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm sm:text-base truncate">{transaction.description}</p>
-                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                        {transaction.categories?.name || 'Sem categoria'} • {transaction.accounts?.name || 'Conta removida'}
-                      </p>
-                    </div>
+                     <div className="min-w-0 flex-1">
+                       <p className="font-medium text-sm sm:text-base truncate">{transaction.description}</p>
+                       <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                         {transaction.category?.name || 'Sem categoria'} • {transaction.account?.name || 'Conta removida'}
+                       </p>
+                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className={`font-bold text-sm sm:text-base ${

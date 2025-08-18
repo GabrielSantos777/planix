@@ -193,13 +193,23 @@ export const useSupabaseData = () => {
 
   const deleteAccount = async (id: string) => {
     try {
+      // First, delete all transactions related to this account
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('account_id', id)
+
+      // Then, completely delete the account from the database
       const { error } = await supabase
         .from('accounts')
-        .update({ is_active: false })
+        .delete()
         .eq('id', id)
 
       if (error) throw error
       setAccounts(prev => prev.filter(acc => acc.id !== id))
+      
+      // Refresh transactions to reflect the changes
+      await fetchTransactions()
     } catch (error) {
       console.error('Error deleting account:', error)
       throw error
