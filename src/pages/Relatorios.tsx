@@ -22,6 +22,7 @@ import Layout from "@/components/Layout"
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts"
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
+import { WealthEvolutionChart } from '@/components/WealthEvolutionChart'
 
 const periodOptions = [
   { value: "current-month", label: "Mês Atual" },
@@ -373,11 +374,11 @@ const Relatorios = () => {
 
       {/* Report Tabs */}
       <Tabs defaultValue="dashboard" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="categories">Categorias</TabsTrigger>
-          <TabsTrigger value="monthly">Mensal</TabsTrigger>
-          <TabsTrigger value="comparison">Comparativo</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+          <TabsTrigger value="dashboard" className="text-xs sm:text-sm">Dashboard</TabsTrigger>
+          <TabsTrigger value="categories" className="text-xs sm:text-sm">Categorias</TabsTrigger>
+          <TabsTrigger value="monthly" className="text-xs sm:text-sm">Mensal</TabsTrigger>
+          <TabsTrigger value="comparison" className="text-xs sm:text-sm">Evolução</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
@@ -658,69 +659,7 @@ const Relatorios = () => {
         </TabsContent>
 
         <TabsContent value="comparison" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparativo de Períodos</CardTitle>
-              <CardDescription>Análise comparativa entre diferentes períodos</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Período Atual</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Receitas:</span>
-                      <span className="font-medium text-success">R$ 6.250</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Despesas:</span>
-                      <span className="font-medium text-destructive">R$ 3.400</span>
-                    </div>
-                    <div className="flex justify-between border-t pt-2">
-                      <span className="font-medium">Saldo:</span>
-                      <span className="font-bold text-success">R$ 2.850</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Período Anterior</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Receitas:</span>
-                      <span className="font-medium text-success">R$ 6.100</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Despesas:</span>
-                      <span className="font-medium text-destructive">R$ 3.200</span>
-                    </div>
-                    <div className="flex justify-between border-t pt-2">
-                      <span className="font-medium">Saldo:</span>
-                      <span className="font-bold text-success">R$ 2.900</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 pt-6 border-t">
-                <h4 className="font-semibold mb-4">Variações</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Receitas:</span>
-                    <span className="font-medium text-success">+R$ 150 (+2.5%)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Despesas:</span>
-                    <span className="font-medium text-destructive">+R$ 200 (+6.3%)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Saldo:</span>
-                    <span className="font-medium text-destructive">-R$ 50 (-1.7%)</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <WealthEvolutionChart />
         </TabsContent>
       </Tabs>
       </div>

@@ -96,7 +96,7 @@ const Dashboard = () => {
     <Layout>
       <div className="p-6 space-y-6">
         {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
@@ -167,37 +167,41 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 flex-wrap">
+            <div className="flex gap-2 sm:gap-4 flex-wrap">
               <Button 
-                className="flex items-center gap-2"
+                className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none"
                 onClick={() => navigate("/transacoes?type=income")}
+                size="sm"
               >
-                <PlusCircle className="h-4 w-4" />
-                Nova Receita
+                <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="text-xs sm:text-sm">Nova Receita</span>
               </Button>
               <Button 
                 variant="destructive" 
-                className="flex items-center gap-2"
+                className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none"
                 onClick={() => navigate("/transacoes?type=expense")}
+                size="sm"
               >
-                <PlusCircle className="h-4 w-4" />
-                Nova Despesa
+                <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="text-xs sm:text-sm">Nova Despesa</span>
               </Button>
               <Button 
                 variant="secondary" 
-                className="flex items-center gap-2"
+                className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none"
                 onClick={() => navigate("/transacoes?type=transfer")}
+                size="sm"
               >
-                <PlusCircle className="h-4 w-4" />
-                Transferência
+                <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="text-xs sm:text-sm">Transferência</span>
               </Button>
               <Button 
                 variant="outline" 
-                className="flex items-center gap-2"
+                className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none"
                 onClick={() => navigate("/contas")}
+                size="sm"
               >
-                <CreditCard className="h-4 w-4" />
-                Gerenciar Contas
+                <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="text-xs sm:text-sm">Gerenciar Contas</span>
               </Button>
             </div>
           </CardContent>
@@ -214,34 +218,34 @@ const Dashboard = () => {
           <CardContent>
             <div className="space-y-4">
               {transactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className={`p-2 rounded-full ${
+                <div key={transaction.id} className="flex items-center justify-between p-3 sm:p-4 border rounded-lg">
+                  <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
+                    <div className={`p-1.5 sm:p-2 rounded-full flex-shrink-0 ${
                       transaction.type === "income" 
                         ? "bg-success/10 text-success" 
                         : "bg-destructive/10 text-destructive"
                     }`}>
                       {transaction.type === "income" ? (
-                        <TrendingUp className="h-4 w-4" />
+                        <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
                       ) : (
-                        <TrendingDown className="h-4 w-4" />
+                        <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
                       )}
                     </div>
-                    <div>
-                      <p className="font-medium">{transaction.description}</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm sm:text-base truncate">{transaction.description}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
                         {transaction.categories?.name || 'Sem categoria'} • {transaction.accounts?.name || 'Conta removida'}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-bold ${
+                  <div className="text-right flex-shrink-0">
+                    <p className={`font-bold text-sm sm:text-base ${
                       transaction.type === "income" ? "text-success" : "text-destructive"
                     }`}>
                       {transaction.type === "income" ? "+" : ""}
                       {formatCurrency(Math.abs(transaction.amount))}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       {new Date(transaction.date).toLocaleDateString('pt-BR')}
                     </p>
                   </div>

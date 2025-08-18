@@ -2,13 +2,35 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Check, ArrowRight, Star, Shield, Zap } from 'lucide-react'
+import { Check, ArrowRight, Star, Shield, Zap, Settings } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/integrations/supabase/client'
 
 const Plans = () => {
   const [isYearly, setIsYearly] = useState(false)
   const { profile, user } = useAuth()
+  const { toast } = useToast()
+
+  const handleManageSubscription = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('customer-portal')
+      
+      if (error) throw error
+      
+      if (data?.url) {
+        window.open(data.url, '_blank')
+      }
+    } catch (error) {
+      console.error('Error opening customer portal:', error)
+      toast({
+        title: "Erro",
+        description: "Erro ao abrir portal de gerenciamento. Tente novamente.",
+        variant: "destructive"
+      })
+    }
+  }
 
   const plans = [
     {
@@ -74,15 +96,40 @@ const Plans = () => {
     }
   ]
 
-  const handleChoosePlan = (planName: string) => {
+  const handleChoosePlan = async (planName: string) => {
     if (planName === 'Básico') {
-      // Já é o plano atual por padrão
       return
     }
     
-    // Aqui implementaremos a integração com Stripe
-    console.log(`Selecionando plano: ${planName}`)
-    // TODO: Implementar Stripe Checkout
+    if (!user) {
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para assinar um plano",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    try {
+      const planType = planName === 'Premium' ? 'premium' : 'enterprise'
+      
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { planType }
+      })
+      
+      if (error) throw error
+      
+      if (data?.url) {
+        window.open(data.url, '_blank')
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error)
+      toast({
+        title: "Erro",
+        description: "Erro ao processar pagamento. Tente novamente.",
+        variant: "destructive"
+      })
+    }
   }
 
   const formatPrice = (monthly: number, yearly: number) => {
@@ -215,21 +262,34 @@ const Plans = () => {
                   </div>
                 )}
 
-                <Button 
-                  className="w-full mt-6"
-                  variant={plan.popular ? "default" : plan.current ? "secondary" : "outline"}
-                  onClick={() => handleChoosePlan(plan.name)}
-                  disabled={plan.current}
-                >
-                  {plan.current ? (
-                    'Plano Atual'
-                  ) : (
-                    <>
-                      Escolher este plano
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
+                <div className="space-y-2 mt-6">
+                  <Button 
+                    className="w-full"
+                    variant={plan.popular ? "default" : plan.current ? "secondary" : "outline"}
+                    onClick={() => handleChoosePlan(plan.name)}
+                    disabled={plan.current}
+                  >
+                    {plan.current ? (
+                      'Plano Atual'
+                    ) : (
+                      <>
+                        Escolher este plano
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                  
+                  {plan.current && plan.name !== 'Básico' && (
+                    <Button 
+                      className="w-full"
+                      variant="outline"
+                      onClick={handleManageSubscription}
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Gerenciar Assinatura
+                    </Button>
                   )}
-                </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

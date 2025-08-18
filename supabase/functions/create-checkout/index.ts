@@ -33,15 +33,21 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
-    // Define preços para cada plano
     const plans = {
-      basic: { amount: 1990, name: "Plano Básico" }, // R$ 19,90
-      premium: { amount: 3990, name: "Plano Premium" }, // R$ 39,90
-      enterprise: { amount: 9990, name: "Plano Enterprise" } // R$ 99,90
+      premium: {
+        amount: 1990,
+        name: "Premium Plan"
+      },
+      enterprise: {
+        amount: 4990,
+        name: "Enterprise Plan"
+      }
     };
 
-    const selectedPlan = plans[planType as keyof typeof plans];
-    if (!selectedPlan) throw new Error("Invalid plan type");
+    const plan = plans[planType as keyof typeof plans];
+    if (!plan) {
+      throw new Error("Invalid plan type");
+    }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -50,8 +56,11 @@ serve(async (req) => {
         {
           price_data: {
             currency: "brl",
-            product_data: { name: selectedPlan.name },
-            unit_amount: selectedPlan.amount,
+            product_data: { 
+              name: plan.name,
+              description: `Assinatura ${planType} - FinanceFlow`
+            },
+            unit_amount: plan.amount,
             recurring: { interval: "month" },
           },
           quantity: 1,
@@ -60,6 +69,8 @@ serve(async (req) => {
       mode: "subscription",
       success_url: `${req.headers.get("origin")}/dashboard?success=true`,
       cancel_url: `${req.headers.get("origin")}/plans?canceled=true`,
+      allow_promotion_codes: true,
+      billing_address_collection: "required",
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
@@ -67,6 +78,7 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
+    console.error("Error creating checkout session:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
