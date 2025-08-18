@@ -2,19 +2,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
+import type { Database } from '@/integrations/supabase/types'
 
-interface Profile {
-  id: string
-  user_id: string
-  email: string
-  full_name?: string
-  phone?: string
-  avatar_url?: string
-  subscription_plan: 'basic' | 'premium' | 'enterprise'
-  subscription_end?: string
-  trial_end?: string
-  is_admin: boolean
-}
+type Profile = Database['public']['Tables']['profiles']['Row']
 
 interface AuthContextType {
   user: User | null

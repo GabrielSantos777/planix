@@ -1,75 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/context/AuthContext'
+import type { Database } from '@/integrations/supabase/types'
 
-export interface Account {
-  id: string
-  name: string
-  type: 'bank' | 'savings' | 'investment'
-  initial_balance: number
-  current_balance: number
-  currency: string
-  is_active: boolean
-}
+export type Account = Database['public']['Tables']['accounts']['Row']
+export type CreditCard = Database['public']['Tables']['credit_cards']['Row']
+export type Category = Database['public']['Tables']['categories']['Row']
+export type Transaction = Database['public']['Tables']['transactions']['Row']
+export type Investment = Database['public']['Tables']['investments']['Row']
+export type Goal = Database['public']['Tables']['goals']['Row']
 
-export interface CreditCard {
-  id: string
-  name: string
-  card_type: 'visa' | 'mastercard' | 'elo' | 'amex'
-  limit_amount: number
-  current_balance: number
-  closing_day: number
-  due_day: number
-  best_purchase_day?: number
-  currency: string
-  is_active: boolean
-}
-
-export interface Category {
-  id: string
-  name: string
-  icon: string
-  color: string
-  type: 'income' | 'expense' | 'transfer'
-  is_default: boolean
-}
-
-export interface Transaction {
-  id: string
-  description: string
-  amount: number
-  type: 'income' | 'expense' | 'transfer'
-  category_id?: string
-  account_id?: string
-  credit_card_id?: string
-  date: string
-  currency: string
-  notes?: string
+export interface TransactionWithRelations extends Transaction {
   category?: Category
   account?: Account
   credit_card?: CreditCard
-}
-
-export interface Investment {
-  id: string
-  symbol: string
-  name: string
-  type: 'stocks' | 'crypto' | 'bonds' | 'funds'
-  quantity: number
-  average_price: number
-  current_price: number
-  currency: string
-}
-
-export interface Goal {
-  id: string
-  title: string
-  description?: string
-  target_amount: number
-  current_amount: number
-  target_date?: string
-  status: 'active' | 'completed' | 'paused'
-  currency: string
 }
 
 export const useSupabaseData = () => {
@@ -77,7 +21,7 @@ export const useSupabaseData = () => {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [creditCards, setCreditCards] = useState<CreditCard[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [transactions, setTransactions] = useState<TransactionWithRelations[]>([])
   const [investments, setInvestments] = useState<Investment[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
@@ -211,7 +155,7 @@ export const useSupabaseData = () => {
   }, [user])
 
   // CRUD operations for accounts
-  const addAccount = async (account: Omit<Account, 'id'>) => {
+  const addAccount = async (account: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return
     try {
       const { data, error } = await supabase
@@ -263,7 +207,7 @@ export const useSupabaseData = () => {
   }
 
   // Similar CRUD operations for other entities...
-  const addCreditCard = async (card: Omit<CreditCard, 'id'>) => {
+  const addCreditCard = async (card: Omit<CreditCard, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return
     try {
       const { data, error } = await supabase
@@ -281,7 +225,7 @@ export const useSupabaseData = () => {
     }
   }
 
-  const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
+  const addTransaction = async (transaction: Database['public']['Tables']['transactions']['Insert']) => {
     if (!user) return
     try {
       const { data, error } = await supabase
@@ -304,7 +248,7 @@ export const useSupabaseData = () => {
     }
   }
 
-  const addGoal = async (goal: Omit<Goal, 'id'>) => {
+  const addGoal = async (goal: Omit<Goal, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return
     try {
       const { data, error } = await supabase
