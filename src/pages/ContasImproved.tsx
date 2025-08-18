@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
+import { banks } from "@/data/banks"
 import { 
   Plus, 
   Eye, 
@@ -71,11 +72,13 @@ export default function ContasImproved() {
     type: 'bank' | 'savings' | 'investment'
     initial_balance: number
     current_balance: number
+    bank_id?: string
   }>({
     name: '',
     type: 'bank',
     initial_balance: 0,
-    current_balance: 0
+    current_balance: 0,
+    bank_id: ''
   })
   
   const [newCreditCard, setNewCreditCard] = useState<{
@@ -138,7 +141,7 @@ export default function ContasImproved() {
       }
 
       // Reset form and close dialog
-      setNewAccount({ name: '', type: 'bank', initial_balance: 0, current_balance: 0 })
+      setNewAccount({ name: '', type: 'bank', initial_balance: 0, current_balance: 0, bank_id: '' })
       setEditingAccount(null)
       setIsAccountDialogOpen(false)
     } catch (error) {
@@ -230,7 +233,8 @@ export default function ContasImproved() {
       name: account.name,
       type: account.type,
       initial_balance: account.initial_balance || 0,
-      current_balance: account.current_balance || 0
+      current_balance: account.current_balance || 0,
+      bank_id: account.bank_id || ''
     })
     setIsAccountDialogOpen(true)
   }
@@ -378,7 +382,13 @@ export default function ContasImproved() {
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="flex items-center gap-2">
-                          <Building2 className="h-5 w-5" />
+                          {(account as any).bank_id ? (
+                            <span className="text-lg">
+                              {banks.find(b => b.id === (account as any).bank_id)?.icon || '🏦'}
+                            </span>
+                          ) : (
+                            <Building2 className="h-5 w-5" />
+                          )}
                           {account.name}
                         </CardTitle>
                         <CardDescription>
@@ -580,6 +590,24 @@ export default function ContasImproved() {
                   <SelectItem value="bank">Conta Corrente</SelectItem>
                   <SelectItem value="savings">Poupança</SelectItem>
                   <SelectItem value="investment">Investimento</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="bank-select">Banco</Label>
+              <Select value={newAccount.bank_id} onValueChange={(value) => setNewAccount({...newAccount, bank_id: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  {banks.map((bank) => (
+                    <SelectItem key={bank.id} value={bank.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{bank.icon}</span>
+                        <span>{bank.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

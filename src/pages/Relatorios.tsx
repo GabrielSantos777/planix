@@ -167,42 +167,79 @@ const Relatorios = () => {
   const handleExportPDF = () => {
     const doc = new jsPDF()
     
-    doc.setFontSize(20)
-    doc.text('Relatório Financeiro', 20, 30)
+    // Header with gradient background effect
+    doc.setFillColor(59, 130, 246) // Blue color
+    doc.rect(0, 0, 210, 40, 'F')
     
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(24)
+    doc.text('Relatório Financeiro', 20, 25)
+    
+    doc.setTextColor(0, 0, 0)
     doc.setFontSize(12)
-    doc.text(`Período: ${periodOptions.find(p => p.value === selectedPeriod)?.label || 'Atual'}`, 20, 50)
-    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 20, 60)
+    doc.text(`Período: ${periodOptions.find(p => p.value === selectedPeriod)?.label || 'Atual'}`, 20, 55)
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 20, 65)
     
-    // Resumo financeiro
+    // Summary section with background
+    doc.setFillColor(248, 250, 252) // Light gray
+    doc.rect(15, 75, 180, 50, 'F')
+    doc.setDrawColor(203, 213, 225)
+    doc.rect(15, 75, 180, 50, 'S')
+    
     doc.setFontSize(16)
-    doc.text('Resumo Financeiro', 20, 80)
-    doc.setFontSize(12)
-    doc.text(`Total de Receitas: R$ ${totalIncome.toLocaleString('pt-BR')}`, 20, 100)
-    doc.text(`Total de Despesas: R$ ${totalExpenses.toLocaleString('pt-BR')}`, 20, 110)
-    doc.text(`Saldo Líquido: R$ ${totalBalance.toLocaleString('pt-BR')}`, 20, 120)
+    doc.setTextColor(15, 23, 42)
+    doc.text('💰 Resumo Financeiro', 20, 90)
     
-    // Categorias de despesas
+    doc.setFontSize(12)
+    doc.setTextColor(22, 163, 74) // Green for income
+    doc.text(`📈 Total de Receitas: R$ ${totalIncome.toLocaleString('pt-BR')}`, 25, 105)
+    
+    doc.setTextColor(239, 68, 68) // Red for expenses
+    doc.text(`📉 Total de Despesas: R$ ${totalExpenses.toLocaleString('pt-BR')}`, 25, 115)
+    
+    doc.setTextColor(totalBalance >= 0 ? 22 : 239, totalBalance >= 0 ? 163 : 68, totalBalance >= 0 ? 74 : 68)
+    doc.text(`💳 Saldo Líquido: R$ ${totalBalance.toLocaleString('pt-BR')}`, 25, 125)
+    
+    let yPosition = 145
+    
+    // Expense categories section
     if (expenseCategories.length > 0) {
+      doc.setTextColor(0, 0, 0)
       doc.setFontSize(16)
-      doc.text('Despesas por Categoria', 20, 140)
-      let yPos = 160
-      expenseCategories.forEach((category) => {
-        if (yPos > 250) {
+      doc.text('📊 Despesas por Categoria', 20, yPosition)
+      yPosition += 15
+      
+      expenseCategories.forEach((category, index) => {
+        if (yPosition > 260) {
           doc.addPage()
-          yPos = 30
+          yPosition = 30
         }
+        
+        // Category bar visualization
+        const barWidth = (category.percentage / 100) * 100
+        doc.setFillColor(239, 68, 68) // Red color for expense bars
+        doc.rect(25, yPosition - 5, barWidth, 8, 'F')
+        
         doc.setFontSize(10)
-        doc.text(`${category.category}: R$ ${category.amount.toLocaleString('pt-BR')} (${category.percentage}%)`, 20, yPos)
-        yPos += 10
+        doc.setTextColor(0, 0, 0)
+        doc.text(`${category.category}`, 25, yPosition + 8)
+        doc.text(`R$ ${category.amount.toLocaleString('pt-BR')} (${category.percentage}%)`, 130, yPosition + 8)
+        
+        yPosition += 18
       })
     }
+    
+    // Footer
+    doc.setFontSize(8)
+    doc.setTextColor(100, 100, 100)
+    doc.text('Relatório gerado automaticamente pelo sistema', 20, 285)
+    doc.text(`Página 1`, 180, 285)
     
     doc.save(`relatorio-financeiro-${new Date().toISOString().split('T')[0]}.pdf`)
     
     toast({
-      title: "Relatório exportado!",
-      description: "O arquivo PDF foi baixado com sucesso.",
+      title: "📄 Relatório Exportado!",
+      description: "Seu relatório em PDF foi baixado com sucesso.",
     })
   }
 

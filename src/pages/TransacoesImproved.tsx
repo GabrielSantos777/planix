@@ -286,15 +286,16 @@ const TransacoesImproved = () => {
     <Layout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Lançamentos</h1>
-            <p className="text-muted-foreground">
-              Gerencie suas transações financeiras
-            </p>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold">Lançamentos</h1>
+              <p className="text-muted-foreground">
+                Gerencie suas transações financeiras
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="file"
               accept=".csv"
@@ -330,6 +331,20 @@ const TransacoesImproved = () => {
             }} className="gap-2">
               <Plus className="h-4 w-4" />
               Nova Transação
+            </Button>
+            </div>
+          </div>
+          
+          {/* Category Management Quick Access */}
+          <div className="bg-muted/30 p-4 rounded-lg">
+            <h3 className="font-medium mb-2">Configurações Rápidas</h3>
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.href = '/categorias'}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Gerenciar Categorias
             </Button>
           </div>
         </div>

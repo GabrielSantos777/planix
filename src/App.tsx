@@ -23,6 +23,7 @@ import Relatorios from "./pages/Relatorios";
 import SettingsImproved from "./pages/SettingsImproved";
 import NotFound from "./pages/NotFound";
 import WhatsAppConnection from "./pages/WhatsAppConnection";
+import Categorias from "./pages/Categorias";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,9 +85,14 @@ const App = () => (
                           <SettingsImproved />
                         </ProtectedRoute>
                       } />
-                      <Route path="/conexao" element={
+                       <Route path="/conexao" element={
                         <ProtectedRoute requireSubscription>
                           <WhatsAppConnection />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/categorias" element={
+                        <ProtectedRoute>
+                          <Categorias />
                         </ProtectedRoute>
                       } />
                       <Route path="*" element={<NotFound />} />
