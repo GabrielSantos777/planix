@@ -20,6 +20,16 @@ import { useToast } from "@/hooks/use-toast"
 import { useApp } from "@/context/AppContext"
 import Layout from "@/components/Layout"
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts"
+import jsPDF from 'jspdf'
+import * as XLSX from 'xlsx'
+
+const periodOptions = [
+  { value: "current-month", label: "Mês Atual" },
+  { value: "last-month", label: "Mês Passado" },
+  { value: "last-3-months", label: "Últimos 3 Meses" },
+  { value: "last-6-months", label: "Últimos 6 Meses" },
+  { value: "current-year", label: "Ano Atual" }
+]
 
 interface CategoryData {
   category: string
@@ -154,16 +164,78 @@ const Relatorios = () => {
   }, [filteredTransactions])
 
   const handleExportPDF = () => {
+    const doc = new jsPDF()
+    
+    doc.setFontSize(20)
+    doc.text('Relatório Financeiro', 20, 30)
+    
+    doc.setFontSize(12)
+    doc.text(`Período: ${periodOptions.find(p => p.value === selectedPeriod)?.label || 'Atual'}`, 20, 50)
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 20, 60)
+    
+    // Resumo financeiro
+    doc.setFontSize(16)
+    doc.text('Resumo Financeiro', 20, 80)
+    doc.setFontSize(12)
+    doc.text(`Total de Receitas: R$ ${totalIncome.toLocaleString('pt-BR')}`, 20, 100)
+    doc.text(`Total de Despesas: R$ ${totalExpenses.toLocaleString('pt-BR')}`, 20, 110)
+    doc.text(`Saldo Líquido: R$ ${totalBalance.toLocaleString('pt-BR')}`, 20, 120)
+    
+    // Categorias de despesas
+    if (expenseCategories.length > 0) {
+      doc.setFontSize(16)
+      doc.text('Despesas por Categoria', 20, 140)
+      let yPos = 160
+      expenseCategories.forEach((category) => {
+        if (yPos > 250) {
+          doc.addPage()
+          yPos = 30
+        }
+        doc.setFontSize(10)
+        doc.text(`${category.category}: R$ ${category.amount.toLocaleString('pt-BR')} (${category.percentage}%)`, 20, yPos)
+        yPos += 10
+      })
+    }
+    
+    doc.save(`relatorio-financeiro-${new Date().toISOString().split('T')[0]}.pdf`)
+    
     toast({
-      title: "Relatório PDF",
-      description: "Relatório em PDF será baixado em breve",
+      title: "Relatório exportado!",
+      description: "O arquivo PDF foi baixado com sucesso.",
     })
   }
 
   const handleExportExcel = () => {
+    const wb = XLSX.utils.book_new()
+    
+    // Aba de resumo
+    const summaryData = [
+      ['Resumo Financeiro', ''],
+      ['Total de Receitas', `R$ ${totalIncome.toLocaleString('pt-BR')}`],
+      ['Total de Despesas', `R$ ${totalExpenses.toLocaleString('pt-BR')}`],
+      ['Saldo Líquido', `R$ ${totalBalance.toLocaleString('pt-BR')}`],
+      [''],
+      ['Despesas por Categoria', ''],
+      ...expenseCategories.map(cat => [cat.category, `R$ ${cat.amount.toLocaleString('pt-BR')}`])
+    ]
+    const summaryWS = XLSX.utils.aoa_to_sheet(summaryData)
+    XLSX.utils.book_append_sheet(wb, summaryWS, 'Resumo')
+    
+    // Aba de transações detalhadas
+    const transactionsWS = XLSX.utils.json_to_sheet(filteredTransactions.map(item => ({
+      'Data': new Date(item.date).toLocaleDateString('pt-BR'),
+      'Descrição': item.description,
+      'Categoria': item.category,
+      'Tipo': item.type === 'income' ? 'Receita' : 'Despesa',
+      'Valor': `R$ ${Math.abs(item.amount).toLocaleString('pt-BR')}`
+    })))
+    XLSX.utils.book_append_sheet(wb, transactionsWS, 'Transações')
+    
+    XLSX.writeFile(wb, `relatorio-financeiro-${new Date().toISOString().split('T')[0]}.xlsx`)
+    
     toast({
-      title: "Relatório Excel",
-      description: "Planilha Excel será baixada em breve",
+      title: "Relatório exportado!",
+      description: "O arquivo Excel foi baixado com sucesso.",
     })
   }
 

@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/AppSidebar"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogOut, Crown } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 
@@ -12,6 +13,15 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user, profile, signOut, isTrialExpired, hasActiveSubscription } = useAuth()
+  
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
   
   const getSubscriptionBadge = () => {
     if (!profile) return null
@@ -51,6 +61,22 @@ export default function Layout({ children }: LayoutProps) {
             </div>
             
             <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-medium leading-none">
+                    {profile?.full_name || 'Usuário'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {profile?.email}
+                  </p>
+                </div>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile?.avatar_url || ''} />
+                  <AvatarFallback className="text-xs">
+                    {profile?.full_name ? getInitials(profile.full_name) : 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
               <ThemeToggle />
               <Button 
                 variant="outline" 

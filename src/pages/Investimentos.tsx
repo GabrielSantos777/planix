@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw } from "lucide-react"
-import { CurrencyInput } from "@/components/ui/currency-input"
+import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 
 const Investimentos = () => {
   const { investments, addInvestment, deleteInvestment, getTotalValue, getTotalProfit, updatePrices } = useInvestments()
