@@ -8,6 +8,8 @@ interface Profile {
   user_id: string
   email: string
   full_name?: string
+  phone?: string
+  avatar_url?: string
   subscription_plan: 'basic' | 'premium' | 'enterprise'
   subscription_end?: string
   trial_end?: string
