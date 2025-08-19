@@ -34,8 +34,8 @@ const RelatoriosImproved = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [transactionFilter, setTransactionFilter] = useState("")
-  const [accountFilter, setAccountFilter] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState("")
+  const [accountFilter, setAccountFilter] = useState("all")
+  const [categoryFilter, setCategoryFilter] = useState("all")
 
   // Filter transactions based on period and additional filters
   const filteredTransactions = useMemo(() => {
@@ -53,9 +53,9 @@ const RelatoriosImproved = () => {
       const descriptionMatch = !transactionFilter || 
         transaction.description.toLowerCase().includes(transactionFilter.toLowerCase())
       
-      const accountMatch = !accountFilter || transaction.account_id === accountFilter
+      const accountMatch = accountFilter === "all" || transaction.account_id === accountFilter
       
-      const categoryMatch = !categoryFilter || transaction.category_id === categoryFilter
+      const categoryMatch = categoryFilter === "all" || transaction.category_id === categoryFilter
 
       return dateMatch && descriptionMatch && accountMatch && categoryMatch
     })
@@ -294,7 +294,7 @@ const RelatoriosImproved = () => {
                       <SelectValue placeholder="Todas as contas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as contas</SelectItem>
+                      <SelectItem value="all">Todas as contas</SelectItem>
                       {accounts.map((account) => (
                         <SelectItem key={account.id} value={account.id}>
                           {account.name}
@@ -311,7 +311,7 @@ const RelatoriosImproved = () => {
                       <SelectValue placeholder="Todas as categorias" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as categorias</SelectItem>
+                      <SelectItem value="all">Todas as categorias</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
@@ -327,8 +327,8 @@ const RelatoriosImproved = () => {
                     variant="outline" 
                     onClick={() => {
                       setTransactionFilter("")
-                      setAccountFilter("")
-                      setCategoryFilter("")
+                      setAccountFilter("all")
+                      setCategoryFilter("all")
                     }}
                     className="w-full"
                   >
