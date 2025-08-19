@@ -55,18 +55,17 @@ const TransacoesImproved = () => {
   const [newTransaction, setNewTransaction] = useState({
     description: "",
     amount: 0,
-    type: "expense" as "income" | "expense" | "transfer",
+    type: "expense" as "income" | "expense",
     category_id: "",
     date: new Date().toISOString().split('T')[0],
     account_id: "",
-    account_to_id: "", // Para transferências
     notes: ""
   })
 
   // Handle quick action from dashboard
   useEffect(() => {
     const type = searchParams.get('type')
-    if (type && ['income', 'expense', 'transfer'].includes(type)) {
+    if (type && ['income', 'expense'].includes(type)) {
       setNewTransaction(prev => ({ ...prev, type: type as any }))
       setIsDialogOpen(true)
     }
@@ -90,15 +89,6 @@ const TransacoesImproved = () => {
       toast({
         title: "Erro",
         description: "Por favor, preencha todos os campos obrigatórios",
-        variant: "destructive"
-      })
-      return
-    }
-
-    if (newTransaction.type === "transfer" && !newTransaction.account_to_id) {
-      toast({
-        title: "Erro",
-        description: "Para transferências, selecione a conta de destino",
         variant: "destructive"
       })
       return
@@ -134,7 +124,6 @@ const TransacoesImproved = () => {
         category_id: "",
         date: new Date().toISOString().split('T')[0],
         account_id: "",
-        account_to_id: "",
         notes: ""
       })
       setEditingTransaction(null)
@@ -174,7 +163,6 @@ const TransacoesImproved = () => {
       category_id: transaction.category_id || "",
       date: transaction.date,
       account_id: transaction.account_id || "",
-      account_to_id: transaction.account_to_id || "",
       notes: transaction.notes || ""
     })
     setIsDialogOpen(true)
@@ -260,8 +248,6 @@ const TransacoesImproved = () => {
         return <TrendingUp className="h-4 w-4 text-success" />
       case "expense":
         return <TrendingDown className="h-4 w-4 text-destructive" />
-      case "transfer":
-        return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
       default:
         return null
     }
@@ -273,8 +259,6 @@ const TransacoesImproved = () => {
         return <Badge className="bg-success/10 text-success hover:bg-success/20">Receita</Badge>
       case "expense":
         return <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/20">Despesa</Badge>
-      case "transfer":
-        return <Badge className="bg-muted text-muted-foreground">Transferência</Badge>
       default:
         return null
     }
@@ -333,7 +317,6 @@ const TransacoesImproved = () => {
                 category_id: "",
                 date: new Date().toISOString().split('T')[0],
                 account_id: "",
-                account_to_id: "",
                 notes: ""
               })
               setIsDialogOpen(true)
@@ -373,7 +356,6 @@ const TransacoesImproved = () => {
                     <SelectItem value="all">Todos os tipos</SelectItem>
                     <SelectItem value="income">Receitas</SelectItem>
                     <SelectItem value="expense">Despesas</SelectItem>
-                    <SelectItem value="transfer">Transferências</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -529,7 +511,6 @@ const TransacoesImproved = () => {
                     <SelectContent>
                       <SelectItem value="income">Receita</SelectItem>
                       <SelectItem value="expense">Despesa</SelectItem>
-                      <SelectItem value="transfer">Transferência</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -583,24 +564,6 @@ const TransacoesImproved = () => {
                   </Select>
                 </div>
               </div>
-              
-              {newTransaction.type === "transfer" && (
-                <div className="space-y-2">
-                  <Label htmlFor="accountTo">Conta de Destino</Label>
-                  <Select value={newTransaction.account_to_id} onValueChange={(value) => setNewTransaction({...newTransaction, account_to_id: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a conta de destino" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(acc => acc.id !== newTransaction.account_id).map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
               
               <div className="space-y-2">
                 <Label htmlFor="notes">Observações (opcional)</Label>

@@ -134,15 +134,6 @@ const Dashboard = () => {
                 <span className="text-xs sm:text-sm">Nova Despesa</span>
               </Button>
               <Button 
-                variant="secondary" 
-                className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none"
-                onClick={() => navigate("/transacoes?type=transfer")}
-                size="sm"
-              >
-                <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm">Transferência</span>
-              </Button>
-              <Button 
                 variant="outline" 
                 className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none"
                 onClick={() => navigate("/contas")}
