@@ -278,6 +278,65 @@ export const useSupabaseData = () => {
     }
   }
 
+  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .update({
+          ...updates,
+          amount: updates.type === "expense" && updates.amount ? -Math.abs(updates.amount) : updates.amount
+        })
+        .eq('id', id)
+        .select(`
+          *,
+          category:categories(*),
+          account:accounts(*),
+          credit_card:credit_cards(*)
+        `)
+        .single()
+
+      if (error) throw error
+      
+      setTransactions(prev => prev.map(transaction => 
+        transaction.id === id ? data : transaction
+      ))
+      await fetchAllData() // Refresh all data to ensure sync
+      return data
+    } catch (error) {
+      console.error('Error updating transaction:', error)
+      throw error
+    }
+  }
+
+  const deleteTransaction = async (id: string) => {
+    try {
+      // Get the transaction before deleting to update account balance
+      const transaction = transactions.find(t => t.id === id)
+      
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      
+      // Update account balance if transaction had an account
+      if (transaction?.account_id) {
+        const account = accounts.find(acc => acc.id === transaction.account_id)
+        if (account) {
+          const newBalance = (account.current_balance || 0) - (transaction.amount || 0)
+          await updateAccount(transaction.account_id, { current_balance: newBalance })
+        }
+      }
+      
+      setTransactions(prev => prev.filter(transaction => transaction.id !== id))
+      await fetchAllData() // Refresh all data to ensure sync
+    } catch (error) {
+      console.error('Error deleting transaction:', error)
+      throw error
+    }
+  }
+
   const addGoal = async (goal: Omit<Goal, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return
     try {
@@ -346,6 +405,8 @@ export const useSupabaseData = () => {
     deleteAccount,
     addCreditCard,
     addTransaction,
+    updateTransaction,
+    deleteTransaction,
     addGoal,
     updateGoal,
     deleteGoal

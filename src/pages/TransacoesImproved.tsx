@@ -40,7 +40,9 @@ const TransacoesImproved = () => {
     transactions, 
     accounts, 
     categories,
-    addTransaction
+    addTransaction,
+    updateTransaction,
+    deleteTransaction
   } = useSupabaseData()
   const [searchParams] = useSearchParams()
   
@@ -103,8 +105,7 @@ const TransacoesImproved = () => {
       }
 
       if (editingTransaction) {
-        // Update functionality to be implemented
-        console.log('Update:', transactionData)
+        await updateTransaction(editingTransaction.id, transactionData)
         toast({
           title: "✅ Transação Atualizada",
           description: `${transactionData.description} foi atualizada com sucesso`,
@@ -139,11 +140,11 @@ const TransacoesImproved = () => {
 
   const handleDeleteTransaction = async (id: string) => {
     try {
-      // Delete functionality to be implemented
-      console.log('Delete:', id)
+      const transaction = transactions.find(t => t.id === id)
+      await deleteTransaction(id)
       toast({
         title: "🗑️ Transação Excluída",
-        description: "Transação excluída com sucesso",
+        description: transaction ? `${transaction.description} foi removida` : "Transação excluída com sucesso",
       })
     } catch (error) {
       toast({
