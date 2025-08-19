@@ -19,7 +19,7 @@ import TransacoesImproved from "./pages/TransacoesImproved";
 import Contas from "./pages/Contas";
 import Investimentos from "./pages/Investimentos";
 import GoalsImproved from "./pages/GoalsImproved";
-import Relatorios from "./pages/Relatorios";
+import RelatoriosImproved from "./pages/RelatoriosImproved";
 import SettingsImproved from "./pages/SettingsImproved";
 import NotFound from "./pages/NotFound";
 import WhatsAppConnection from "./pages/WhatsAppConnection";
@@ -75,11 +75,11 @@ const App = () => (
                           <GoalsImproved />
                         </ProtectedRoute>
                       } />
-                      <Route path="/relatorios" element={
-                        <ProtectedRoute requireSubscription>
-                          <Relatorios />
-                        </ProtectedRoute>
-                      } />
+                       <Route path="/relatorios" element={
+                         <ProtectedRoute requireSubscription>
+                           <RelatoriosImproved />
+                         </ProtectedRoute>
+                       } />
                        <Route path="/settings" element={
                         <ProtectedRoute>
                           <SettingsImproved />

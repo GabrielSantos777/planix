@@ -488,94 +488,109 @@ const TransacoesImproved = () => {
 
         {/* Add/Edit Transaction Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingTransaction ? "Editar Transação" : "Nova Transação"}
               </DialogTitle>
               <DialogDescription>
                 {editingTransaction 
-                  ? "Edite os dados da transação selecionada" 
-                  : "Adicione uma nova transação às suas finanças"
+                  ? "Edite os dados da transação"
+                  : "Adicione uma nova transação financeira"
                 }
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="type">Tipo</Label>
-                <Select 
-                  value={newTransaction.type} 
-                  onValueChange={(value) => setNewTransaction({...newTransaction, type: value as any})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="income">Receita</SelectItem>
-                    <SelectItem value="expense">Despesa</SelectItem>
-                    <SelectItem value="transfer">Transferência</SelectItem>
-                  </SelectContent>
-                </Select>
+            
+            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrição</Label>
+                  <Input
+                    id="description"
+                    placeholder="Ex: Compra no supermercado"
+                    value={newTransaction.description}
+                    onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Valor</Label>
+                  <CurrencyInput
+                    value={newTransaction.amount}
+                    onChange={(value) => setNewTransaction({...newTransaction, amount: value})}
+                    placeholder="0,00"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="description">Descrição</Label>
-                <Input 
-                  id="description" 
-                  placeholder="Descrição da transação" 
-                  value={newTransaction.description}
-                  onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
-                />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="type">Tipo</Label>
+                  <Select value={newTransaction.type} onValueChange={(value: any) => setNewTransaction({...newTransaction, type: value})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="income">Receita</SelectItem>
+                      <SelectItem value="expense">Despesa</SelectItem>
+                      <SelectItem value="transfer">Transferência</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="date">Data</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={newTransaction.date}
+                    onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})}
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="amount">Valor</Label>
-                <CurrencyInput
-                  value={newTransaction.amount}
-                  onChange={(value) => setNewTransaction({...newTransaction, amount: value})}
-                />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Categoria</Label>
+                  <Select value={newTransaction.category_id} onValueChange={(value) => setNewTransaction({...newTransaction, category_id: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {newTransaction.type === "income" 
+                        ? incomeCategories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        : expenseCategories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                      }
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account">Conta</Label>
+                  <Select value={newTransaction.account_id} onValueChange={(value) => setNewTransaction({...newTransaction, account_id: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="category">Categoria</Label>
-                <Select 
-                  value={newTransaction.category_id} 
-                  onValueChange={(value) => setNewTransaction({...newTransaction, category_id: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(newTransaction.type === "income" ? incomeCategories : expenseCategories).map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="account">Conta {newTransaction.type === "transfer" ? "de Origem" : ""}</Label>
-                <Select 
-                  value={newTransaction.account_id} 
-                  onValueChange={(value) => setNewTransaction({...newTransaction, account_id: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma conta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              
               {newTransaction.type === "transfer" && (
-                <div className="grid gap-2">
-                  <Label htmlFor="account_to">Conta de Destino</Label>
-                  <Select 
-                    value={newTransaction.account_to_id} 
-                    onValueChange={(value) => setNewTransaction({...newTransaction, account_to_id: value})}
-                  >
+                <div className="space-y-2">
+                  <Label htmlFor="accountTo">Conta de Destino</Label>
+                  <Select value={newTransaction.account_to_id} onValueChange={(value) => setNewTransaction({...newTransaction, account_to_id: value})}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a conta de destino" />
                     </SelectTrigger>
@@ -589,31 +604,31 @@ const TransacoesImproved = () => {
                   </Select>
                 </div>
               )}
-              <div className="grid gap-2">
-                <Label htmlFor="date">Data</Label>
-                <Input 
-                  id="date" 
-                  type="date" 
-                  value={newTransaction.date}
-                  onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Observações</Label>
-                <Textarea 
-                  id="notes" 
-                  placeholder="Observações opcionais"
+              
+              <div className="space-y-2">
+                <Label htmlFor="notes">Observações (opcional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Observações adicionais..."
                   value={newTransaction.notes}
                   onChange={(e) => setNewTransaction({...newTransaction, notes: e.target.value})}
+                  rows={3}
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDialogOpen(false)
+                  setEditingTransaction(null)
+                }}
+              >
                 Cancelar
               </Button>
               <Button onClick={handleAddTransaction}>
-                {editingTransaction ? "Atualizar Transação" : "Adicionar Transação"}
+                {editingTransaction ? "Salvar Alterações" : "Adicionar Transação"}
               </Button>
             </div>
           </DialogContent>

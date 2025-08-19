@@ -31,8 +31,13 @@ const Dashboard = () => {
     .filter(t => t.type === "expense")
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
 
-  // Calculate balance considering only account transactions, not credit card
+  // Calculate balance from accounts
   const accountsBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0);
+  
+  // Calculate net balance (income - expenses)
+  const netBalance = totalIncome - totalExpenses;
+  
+  // Show the total balance from accounts
   const balance = accountsBalance;
 
   return (

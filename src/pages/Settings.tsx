@@ -15,6 +15,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { Upload, Plus, Trash2, Palette } from "lucide-react"
 import Layout from "@/components/Layout"
 import { CurrencyInput } from "@/components/ui/currency-input"
+import { formatPhoneNumber } from "@/utils/phoneFormatter"
 
 // Account interface is now imported from context
 
@@ -169,7 +170,11 @@ const Settings = () => {
                     <Input
                       id="phone"
                       value={profile.phone}
-                      onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                      onChange={(e) => {
+                        const formatted = formatPhoneNumber(e.target.value)
+                        setProfile({...profile, phone: formatted})
+                      }}
+                      placeholder="(11) 99999-9999"
                     />
                   </div>
                   <div className="space-y-2">
