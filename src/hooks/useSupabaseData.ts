@@ -259,7 +259,18 @@ export const useSupabaseData = () => {
         .single()
 
       if (error) throw error
+      
+      // Update account balance
+      if (transaction.account_id) {
+        const account = accounts.find(acc => acc.id === transaction.account_id)
+        if (account) {
+          const newBalance = (account.current_balance || 0) + (transaction.amount || 0)
+          await updateAccount(transaction.account_id, { current_balance: newBalance })
+        }
+      }
+      
       setTransactions(prev => [data, ...prev])
+      await fetchAllData() // Refresh all data to ensure sync
       return data
     } catch (error) {
       console.error('Error adding transaction:', error)
