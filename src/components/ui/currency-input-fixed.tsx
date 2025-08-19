@@ -29,27 +29,31 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
       }
     }, [value])
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const inputValue = e.target.value
-      
-      // Remove tudo que não é número ou vírgula
-      const numericValue = inputValue.replace(/[^\d,]/g, '')
-      
-      // Se vazio, define como 0
-      if (!numericValue) {
-        setDisplayValue('')
-        onChange(0)
-        return
-      }
-      
-      // Converte vírgula para ponto e transforma em número
-      const numberValue = parseFloat(numericValue.replace(',', '.'))
-      
-      if (!isNaN(numberValue)) {
-        setDisplayValue(numericValue)
-        onChange(numberValue)
-      }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let inputValue = e.target.value
+    
+    // Remove tudo que não é número
+    const numericValue = inputValue.replace(/\D/g, '')
+    
+    // Se vazio, define como 0
+    if (!numericValue) {
+      setDisplayValue('')
+      onChange(0)
+      return
     }
+    
+    // Converte para número (em centavos) e depois para reais
+    const numberValue = parseInt(numericValue) / 100
+    
+    // Formata para exibição
+    const formatted = numberValue.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+    
+    setDisplayValue(formatted)
+    onChange(numberValue)
+  }
 
     const currencySymbol = currency 
       ? currency 

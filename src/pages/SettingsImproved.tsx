@@ -22,6 +22,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/integrations/supabase/client'
 import Layout from '@/components/Layout'
+import { formatPhoneNumber } from '@/utils/phoneFormatter'
 
 const SettingsImproved = () => {
   const { user, profile, refreshProfile } = useAuth()
@@ -256,7 +257,10 @@ const SettingsImproved = () => {
                     <Input
                       id="phone"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={(e) => {
+                        const formatted = formatPhoneNumber(e.target.value)
+                        setFormData({ ...formData, phone: formatted })
+                      }}
                       placeholder="(11) 99999-9999"
                     />
                   </div>
@@ -279,12 +283,6 @@ const SettingsImproved = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label className="text-sm font-medium">ID do Usuário</Label>
-                    <p className="text-sm text-muted-foreground font-mono">
-                      {user?.id}
-                    </p>
-                  </div>
                   
                   <div>
                     <Label className="text-sm font-medium">Data de Criação</Label>

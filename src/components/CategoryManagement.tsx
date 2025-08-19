@@ -11,9 +11,24 @@ import { useCategories } from '@/context/CategoriesContext'
 import { Plus, Edit, Trash2 } from 'lucide-react'
 
 const iconOptions = [
-  'utensils', 'car', 'home', 'heart', 'book', 'gamepad-2', 'briefcase', 
-  'laptop', 'trending-up', 'shopping-cart', 'coffee', 'fuel', 'plane',
-  'music', 'gift', 'camera', 'dumbbell', 'stethoscope', 'graduation-cap'
+  // Categorias básicas
+  'Home', 'Car', 'ShoppingCart', 'Utensils', 'GamepadIcon', 'Shirt', 
+  'Heart', 'GraduationCap', 'Plane', 'Gift', 'Briefcase', 'Coins', 
+  'PiggyBank', 'TrendingUp',
+  
+  // Símbolos de teclado comuns
+  'AtSign', 'Hash', 'Percent', 'DollarSign', 'Euro', 'Pound',
+  'Plus', 'Minus', 'X', 'Equal', 'Star', 'Circle',
+  'Square', 'Triangle', 'Diamond', 'Hexagon',
+  
+  // Ícones adicionais úteis
+  'Coffee', 'Pizza', 'Fuel', 'Zap', 'Wifi', 'Smartphone',
+  'Laptop', 'Camera', 'Music', 'Video', 'Book', 'Pen',
+  'Clock', 'Calendar', 'MapPin', 'Globe', 'Shield', 'Key',
+  'Lock', 'Unlock', 'Eye', 'EyeOff', 'Bell', 'Mail',
+  'Phone', 'MessageCircle', 'Users', 'User', 'Settings', 'Tool',
+  'Wrench', 'Hammer', 'Scissors', 'Paperclip', 'Flag', 'Tag',
+  'Bookmark', 'Archive', 'Download', 'Upload', 'Share', 'Copy'
 ]
 
 const colorOptions = [

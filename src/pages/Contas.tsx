@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useApp } from "@/context/AppContext"
 import Layout from "@/components/Layout"
+import { CurrencyInput } from "@/components/ui/currency-input"
 
 const Contas = () => {
   const { toast } = useToast()
@@ -166,8 +167,8 @@ const Contas = () => {
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${getBalanceColor(totalBalance)}`}>
-                R$ {totalBalance.toLocaleString('pt-BR')}
+              <div className="text-2xl font-bold text-muted-foreground">
+                R$ {totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <p className="text-xs text-muted-foreground">
                 Soma de todas as contas
@@ -304,12 +305,10 @@ const Contas = () => {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="balance">Saldo Inicial</Label>
-                <Input 
-                  id="balance" 
-                  type="number" 
-                  placeholder="0,00" 
+                <CurrencyInput 
                   value={newAccount.balance}
-                  onChange={(e) => setNewAccount({...newAccount, balance: Number(e.target.value)})}
+                  onChange={(value) => setNewAccount({...newAccount, balance: value})}
+                  placeholder="0,00"
                 />
               </div>
             </div>

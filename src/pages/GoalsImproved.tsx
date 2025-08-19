@@ -13,7 +13,7 @@ import { formatCurrency, formatDate } from '@/utils/formatters'
 import { Plus, Target, Calendar, TrendingUp, Edit, Trash2, Wallet } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import Layout from '@/components/Layout'
-import { CurrencyInput } from '@/components/ui/currency-input-fixed'
+import { CurrencyInput } from '@/components/ui/currency-input'
 
 const GoalsImproved = () => {
   const { goals, accounts, addGoal, updateGoal, deleteGoal } = useSupabaseData()

@@ -26,7 +26,7 @@ import { useAuth } from "@/context/AuthContext"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import { useSearchParams } from "react-router-dom"
 import Layout from "@/components/Layout"
-import { CurrencyInput } from "@/components/ui/currency-input-fixed"
+import { CurrencyInput } from "@/components/ui/currency-input"
 import { useCurrency } from "@/context/CurrencyContext"
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
@@ -303,6 +303,14 @@ const TransacoesImproved = () => {
               className="hidden"
               id="csv-import"
             />
+            <Button 
+              onClick={() => window.location.href = '/categorias'}
+              variant="outline" 
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Gerenciar Categorias
+            </Button>
             <Button onClick={() => document.getElementById('csv-import')?.click()} variant="outline" className="gap-2">
               <Upload className="h-4 w-4" />
               Importar CSV
