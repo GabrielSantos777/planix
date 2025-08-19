@@ -160,12 +160,17 @@ export const useSupabaseData = () => {
     try {
       const { data, error } = await supabase
         .from('accounts')
-        .insert([{ ...account, user_id: user.id }])
+        .insert([{ 
+          ...account, 
+          user_id: user.id,
+          current_balance: account.initial_balance || 0
+        }])
         .select()
         .single()
 
       if (error) throw error
       setAccounts(prev => [data, ...prev])
+      await fetchAllData() // Refresh all data to ensure sync
       return data
     } catch (error) {
       console.error('Error adding account:', error)
@@ -177,13 +182,17 @@ export const useSupabaseData = () => {
     try {
       const { data, error } = await supabase
         .from('accounts')
-        .update(updates)
+        .update({
+          ...updates,
+          current_balance: updates.initial_balance || updates.current_balance
+        })
         .eq('id', id)
         .select()
         .single()
 
       if (error) throw error
       setAccounts(prev => prev.map(acc => acc.id === id ? data : acc))
+      await fetchAllData() // Refresh all data to ensure sync
       return data
     } catch (error) {
       console.error('Error updating account:', error)

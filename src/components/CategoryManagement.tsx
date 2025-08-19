@@ -180,7 +180,7 @@ export const CategoryManagement = () => {
               
               <div className="grid gap-2">
                 <Label>Ícone</Label>
-                <div className="grid grid-cols-6 gap-2">
+                <div className="grid grid-cols-8 gap-2 max-h-40 overflow-y-auto p-2 border rounded-lg bg-background">
                   {iconOptions.map((icon) => {
                     const IconComponent = getCategoryIcon(icon)
                     return (
@@ -189,7 +189,7 @@ export const CategoryManagement = () => {
                         variant={formData.icon === icon ? "default" : "outline"}
                         size="sm"
                         onClick={() => setFormData({ ...formData, icon })}
-                        className="aspect-square p-0"
+                        className="aspect-square p-2 h-10 w-10 border hover:border-primary transition-colors"
                       >
                         <IconComponent className="h-4 w-4" />
                       </Button>
