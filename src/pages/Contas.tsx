@@ -20,13 +20,13 @@ import {
   TrendingDown
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { useApp } from "@/context/AppContext"
 import Layout from "@/components/Layout"
 import { CurrencyInput } from "@/components/ui/currency-input"
+import { useSupabaseData } from "@/hooks/useSupabaseData"
 
 const Contas = () => {
   const { toast } = useToast()
-  const { accounts, addAccount, updateAccount, deleteAccount, transactions } = useApp()
+  const { accounts, addAccount, updateAccount, deleteAccount, transactions } = useSupabaseData()
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<any | null>(null)
@@ -35,23 +35,23 @@ const Contas = () => {
   
   const [newAccount, setNewAccount] = useState({
     name: "",
-    type: "bank" as "bank" | "credit",
-    balance: 0
+    type: "bank" as "bank" | "savings" | "investment",
+    initial_balance: 0,
+    currency: "BRL",
+    current_balance: 0,
+    is_active: true
   })
 
-  // Calculate account balance based on transactions
-  const getAccountBalance = (accountName: string) => {
-    const accountTransactions = transactions.filter(t => t.account === accountName)
-    const transactionTotal = accountTransactions.reduce((sum, t) => sum + t.amount, 0)
-    const baseAccount = accounts.find(a => a.name === accountName)
-    return (baseAccount?.balance || 0) + transactionTotal
+  // Calculate account balance from current_balance
+  const getAccountBalance = (account: any) => {
+    return account.current_balance || 0
   }
 
-  const getAccountTransactions = (accountName: string) => {
-    return transactions.filter(t => t.account === accountName)
+  const getAccountTransactions = (accountId: string) => {
+    return transactions.filter(t => t.account_id === accountId)
   }
 
-  const totalBalance = accounts.reduce((sum, account) => sum + getAccountBalance(account.name), 0)
+  const totalBalance = accounts.reduce((sum, account) => sum + getAccountBalance(account), 0)
   const activeAccounts = accounts.length
 
   const handleAddAccount = () => {
@@ -74,11 +74,11 @@ const Contas = () => {
       addAccount(newAccount)
       toast({
         title: "✅ Nova Conta Criada",
-        description: `${newAccount.name} - R$ ${newAccount.balance.toLocaleString('pt-BR')}`,
+        description: `${newAccount.name} - R$ ${newAccount.initial_balance.toLocaleString('pt-BR')}`,
       })
     }
 
-    setNewAccount({ name: "", type: "bank", balance: 0 })
+    setNewAccount({ name: "", type: "bank", initial_balance: 0, currency: "BRL", current_balance: 0, is_active: true })
     setEditingAccount(null)
     setIsDialogOpen(false)
   }
@@ -97,7 +97,10 @@ const Contas = () => {
     setNewAccount({
       name: account.name,
       type: account.type,
-      balance: account.balance
+      initial_balance: account.initial_balance || 0,
+      currency: account.currency || "BRL",
+      current_balance: account.current_balance || 0,
+      is_active: account.is_active || true
     })
     setIsDialogOpen(true)
   }
@@ -111,8 +114,10 @@ const Contas = () => {
     switch (type) {
       case "bank":
         return <Wallet className="h-5 w-5" />
-      case "credit":
-        return <CreditCard className="h-5 w-5" />
+      case "savings":
+        return <PiggyBank className="h-5 w-5" />
+      case "investment":
+        return <TrendingUp className="h-5 w-5" />
       default:
         return <Wallet className="h-5 w-5" />
     }
@@ -122,8 +127,10 @@ const Contas = () => {
     switch (type) {
       case "bank":
         return "Conta Bancária"
-      case "credit":
-        return "Cartão de Crédito"
+      case "savings":
+        return "Conta Poupança"
+      case "investment":
+        return "Conta Investimento"
       default:
         return "Conta"
     }
@@ -135,7 +142,7 @@ const Contas = () => {
     return "text-muted-foreground"
   }
 
-  const maxBalance = accounts.length > 0 ? Math.max(...accounts.map(a => getAccountBalance(a.name))) : 0
+  const maxBalance = accounts.length > 0 ? Math.max(...accounts.map(a => getAccountBalance(a))) : 0
 
   return (
     <Layout>
@@ -151,7 +158,7 @@ const Contas = () => {
           
           <Button onClick={() => {
             setEditingAccount(null)
-            setNewAccount({ name: "", type: "bank", balance: 0 })
+            setNewAccount({ name: "", type: "bank", initial_balance: 0, currency: "BRL", current_balance: 0, is_active: true })
             setIsDialogOpen(true)
           }} className="gap-2">
             <Plus className="h-4 w-4" />
@@ -208,7 +215,7 @@ const Contas = () => {
         {/* Accounts Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {accounts.map((account) => {
-            const currentBalance = getAccountBalance(account.name)
+            const currentBalance = getAccountBalance(account)
             return (
               <Card key={account.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -299,15 +306,16 @@ const Contas = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="bank">Conta Bancária</SelectItem>
-                    <SelectItem value="credit">Cartão de Crédito</SelectItem>
+                    <SelectItem value="savings">Conta Poupança</SelectItem>
+                    <SelectItem value="investment">Conta Investimento</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="balance">Saldo Inicial</Label>
                 <CurrencyInput 
-                  value={newAccount.balance}
-                  onChange={(value) => setNewAccount({...newAccount, balance: value})}
+                  value={newAccount.initial_balance}
+                  onChange={(value) => setNewAccount({...newAccount, initial_balance: value})}
                   placeholder="0,00"
                 />
               </div>
@@ -336,8 +344,8 @@ const Contas = () => {
               <div className="flex justify-between items-center p-4 bg-muted rounded-lg">
                 <div>
                   <p className="text-sm text-muted-foreground">Saldo Atual</p>
-                  <p className={`text-xl font-bold ${getBalanceColor(selectedAccount ? getAccountBalance(selectedAccount.name) : 0)}`}>
-                    R$ {selectedAccount ? getAccountBalance(selectedAccount.name).toLocaleString('pt-BR') : '0'}
+                  <p className={`text-xl font-bold ${getBalanceColor(selectedAccount ? getAccountBalance(selectedAccount) : 0)}`}>
+                    R$ {selectedAccount ? getAccountBalance(selectedAccount).toLocaleString('pt-BR') : '0'}
                   </p>
                 </div>
                 <div className="text-right">
@@ -356,7 +364,7 @@ const Contas = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {selectedAccount && getAccountTransactions(selectedAccount.name).map((transaction) => (
+                  {selectedAccount && getAccountTransactions(selectedAccount.id).map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell>
                         {new Date(transaction.date).toLocaleDateString('pt-BR')}
@@ -371,7 +379,7 @@ const Contas = () => {
                           {transaction.description}
                         </div>
                       </TableCell>
-                      <TableCell>{transaction.category}</TableCell>
+                      <TableCell>{transaction.category?.name || 'Sem categoria'}</TableCell>
                       <TableCell className={`text-right font-medium ${
                         transaction.type === "income" ? "text-success" : "text-destructive"
                       }`}>
@@ -380,7 +388,7 @@ const Contas = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {selectedAccount && getAccountTransactions(selectedAccount.name).length === 0 && (
+                  {selectedAccount && getAccountTransactions(selectedAccount.id).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-muted-foreground">
                         Nenhuma transação encontrada para esta conta

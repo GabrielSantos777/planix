@@ -24,7 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/context/AuthContext"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
-import { useSearchParams } from "react-router-dom"
+import { useSearchParams, useNavigate } from "react-router-dom"
 import Layout from "@/components/Layout"
 import { CurrencyInput } from "@/components/ui/currency-input"
 import { useCurrency } from "@/context/CurrencyContext"
@@ -35,6 +35,7 @@ const TransacoesImproved = () => {
   const { toast } = useToast()
   const { user } = useAuth()
   const { formatCurrency } = useCurrency()
+  const navigate = useNavigate()
   const { 
     transactions, 
     accounts, 
@@ -304,7 +305,7 @@ const TransacoesImproved = () => {
               id="csv-import"
             />
             <Button 
-              onClick={() => window.location.href = '/categorias'}
+              onClick={() => navigate('/categorias')}
               variant="outline" 
               className="gap-2"
             >
@@ -343,18 +344,6 @@ const TransacoesImproved = () => {
             </div>
           </div>
           
-          {/* Category Management Quick Access */}
-          <div className="bg-muted/30 p-4 rounded-lg">
-            <h3 className="font-medium mb-2">Configurações Rápidas</h3>
-            <Button 
-              variant="outline" 
-              onClick={() => window.location.href = '/categorias'}
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Gerenciar Categorias
-            </Button>
-          </div>
         </div>
 
         {/* Filters */}

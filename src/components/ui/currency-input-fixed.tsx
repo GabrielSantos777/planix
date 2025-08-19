@@ -29,31 +29,31 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
       }
     }, [value])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let inputValue = e.target.value
-    
-    // Remove tudo que não é número
-    const numericValue = inputValue.replace(/\D/g, '')
-    
-    // Se vazio, define como 0
-    if (!numericValue) {
-      setDisplayValue('')
-      onChange(0)
-      return
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let inputValue = e.target.value
+      
+      // Remove tudo que não é número
+      const numericValue = inputValue.replace(/\D/g, '')
+      
+      // Se vazio, define como 0
+      if (!numericValue) {
+        setDisplayValue('')
+        onChange(0)
+        return
+      }
+      
+      // Converte para número (em centavos) e depois para reais
+      const numberValue = parseInt(numericValue) / 100
+      
+      // Formata para exibição
+      const formatted = numberValue.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })
+      
+      setDisplayValue(formatted)
+      onChange(numberValue)
     }
-    
-    // Converte para número (em centavos) e depois para reais
-    const numberValue = parseInt(numericValue) / 100
-    
-    // Formata para exibição
-    const formatted = numberValue.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })
-    
-    setDisplayValue(formatted)
-    onChange(numberValue)
-  }
 
     const currencySymbol = currency 
       ? currency 
@@ -61,7 +61,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
 
     return (
       <div className="relative">
-        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none">
+        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-10">
           {currencySymbol}
         </div>
         <Input
