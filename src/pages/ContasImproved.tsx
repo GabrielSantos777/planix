@@ -55,6 +55,8 @@ export default function ContasImproved() {
     updateAccount, 
     deleteAccount, 
     addCreditCard,
+    updateCreditCard,
+    deleteCreditCard,
     loading
   } = useSupabaseData()
   
@@ -166,8 +168,20 @@ export default function ContasImproved() {
 
     try {
       if (editingCreditCard) {
-        // Update existing credit card - TODO: implement updateCreditCard in useSupabaseData
-        console.log('Update credit card functionality needed')
+        // Update existing credit card
+        await updateCreditCard(editingCreditCard.id, {
+          name: newCreditCard.name,
+          card_type: newCreditCard.card_type,
+          limit_amount: newCreditCard.limit_amount,
+          due_day: newCreditCard.due_day,
+          closing_day: newCreditCard.closing_day,
+          best_purchase_day: newCreditCard.best_purchase_day
+        })
+
+        toast({
+          title: "Sucesso",
+          description: "Cartão atualizado com sucesso!"
+        })
       } else {
         // Create new credit card
         await addCreditCard({
@@ -222,6 +236,23 @@ export default function ContasImproved() {
       toast({
         title: "Erro",
         description: "Erro ao remover conta. Tente novamente.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDeleteCreditCard = async (cardId) => {
+    try {
+      await deleteCreditCard(cardId)
+      toast({
+        title: "Sucesso",
+        description: "Cartão removido com sucesso!"
+      })
+    } catch (error) {
+      console.error('Error deleting credit card:', error)
+      toast({
+        title: "Erro",
+        description: "Erro ao remover cartão. Tente novamente.",
         variant: "destructive"
       })
     }
@@ -494,7 +525,7 @@ export default function ContasImproved() {
                         <Button variant="ghost" size="sm" onClick={() => openEditCreditCardDialog(card)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteCreditCard(card.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

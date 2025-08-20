@@ -39,6 +39,7 @@ const TransacoesImproved = () => {
   const { 
     transactions, 
     accounts, 
+    creditCards,
     categories,
     addTransaction,
     updateTransaction,
@@ -61,6 +62,10 @@ const TransacoesImproved = () => {
     category_id: "",
     date: new Date().toISOString().split('T')[0],
     account_id: "",
+    credit_card_id: "",
+    payment_method: "account" as "account" | "credit_card",
+    installments: 1,
+    is_installment: false,
     notes: ""
   })
 
@@ -87,7 +92,7 @@ const TransacoesImproved = () => {
   })
 
   const handleAddTransaction = async () => {
-    if (!newTransaction.description || !newTransaction.account_id) {
+    if (!newTransaction.description || (!newTransaction.account_id && !newTransaction.credit_card_id)) {
       toast({
         title: "Erro",
         description: "Por favor, preencha todos os campos obrigatórios",
@@ -97,25 +102,59 @@ const TransacoesImproved = () => {
     }
 
     try {
-      const transactionData = {
+      const baseTransactionData = {
         ...newTransaction,
         amount: newTransaction.type === "expense" ? -Math.abs(newTransaction.amount) : newTransaction.amount,
         user_id: user?.id,
-        currency: 'BRL'
+        currency: 'BRL',
+        account_id: newTransaction.payment_method === "account" ? newTransaction.account_id : null,
+        credit_card_id: newTransaction.payment_method === "credit_card" ? newTransaction.credit_card_id : null
       }
 
       if (editingTransaction) {
-        await updateTransaction(editingTransaction.id, transactionData)
+        await updateTransaction(editingTransaction.id, baseTransactionData)
         toast({
           title: "✅ Transação Atualizada",
-          description: `${transactionData.description} foi atualizada com sucesso`,
+          description: `${baseTransactionData.description} foi atualizada com sucesso`,
         })
       } else {
-        await addTransaction(transactionData)
-        toast({
-          title: "✅ Transação Adicionada",
-          description: `${transactionData.description} - ${formatCurrency(Math.abs(transactionData.amount))}`,
-        })
+        // Check if it's an installment transaction
+        if (newTransaction.payment_method === "credit_card" && newTransaction.is_installment && newTransaction.installments > 1) {
+          // Create multiple transactions for installments
+          const installmentAmount = baseTransactionData.amount / newTransaction.installments
+          const installmentDate = new Date(newTransaction.date)
+          
+          for (let i = 1; i <= newTransaction.installments; i++) {
+            const installmentData = {
+              ...baseTransactionData,
+              amount: installmentAmount,
+              installments: newTransaction.installments,
+              installment_number: i,
+              is_installment: true,
+              description: `${baseTransactionData.description} (${i}/${newTransaction.installments})`,
+              date: new Date(installmentDate.getFullYear(), installmentDate.getMonth() + (i - 1), installmentDate.getDate()).toISOString().split('T')[0]
+            }
+            await addTransaction(installmentData)
+          }
+          
+          toast({
+            title: "✅ Transação Parcelada Criada",
+            description: `${newTransaction.installments}x de ${formatCurrency(Math.abs(installmentAmount))}`,
+          })
+        } else {
+          // Single transaction
+          await addTransaction({
+            ...baseTransactionData,
+            installments: 1,
+            installment_number: 1,
+            is_installment: false
+          })
+          
+          toast({
+            title: "✅ Transação Adicionada",
+            description: `${baseTransactionData.description} - ${formatCurrency(Math.abs(baseTransactionData.amount))}`,
+          })
+        }
       }
 
       setNewTransaction({
@@ -125,6 +164,10 @@ const TransacoesImproved = () => {
         category_id: "",
         date: new Date().toISOString().split('T')[0],
         account_id: "",
+        credit_card_id: "",
+        payment_method: "account",
+        installments: 1,
+        is_installment: false,
         notes: ""
       })
       setEditingTransaction(null)
@@ -164,6 +207,10 @@ const TransacoesImproved = () => {
       category_id: transaction.category_id || "",
       date: transaction.date,
       account_id: transaction.account_id || "",
+      credit_card_id: transaction.credit_card_id || "",
+      payment_method: transaction.account_id ? "account" : "credit_card",
+      installments: transaction.installments || 1,
+      is_installment: transaction.is_installment || false,
       notes: transaction.notes || ""
     })
     setIsDialogOpen(true)
@@ -318,6 +365,10 @@ const TransacoesImproved = () => {
                 category_id: "",
                 date: new Date().toISOString().split('T')[0],
                 account_id: "",
+                credit_card_id: "",
+                payment_method: "account",
+                installments: 1,
+                is_installment: false,
                 notes: ""
               })
               setIsDialogOpen(true)
@@ -550,21 +601,87 @@ const TransacoesImproved = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="account">Conta</Label>
-                  <Select value={newTransaction.account_id} onValueChange={(value) => setNewTransaction({...newTransaction, account_id: value})}>
+                  <Label htmlFor="payment_method">Forma de Pagamento</Label>
+                  <Select value={newTransaction.payment_method} onValueChange={(value: any) => setNewTransaction({...newTransaction, payment_method: value, account_id: "", credit_card_id: ""})}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma conta" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {accounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
+                      <SelectItem value="account">Conta Bancária</SelectItem>
+                      <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                {newTransaction.payment_method === "account" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="account">Conta</Label>
+                    <Select value={newTransaction.account_id} onValueChange={(value) => setNewTransaction({...newTransaction, account_id: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma conta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="credit_card">Cartão de Crédito</Label>
+                    <Select value={newTransaction.credit_card_id} onValueChange={(value) => setNewTransaction({...newTransaction, credit_card_id: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um cartão" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {creditCards.map((card) => (
+                          <SelectItem key={card.id} value={card.id}>
+                            {card.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
+                {newTransaction.payment_method === "credit_card" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="installment_type">Tipo de Pagamento</Label>
+                    <Select value={newTransaction.is_installment ? "installment" : "cash"} onValueChange={(value) => setNewTransaction({...newTransaction, is_installment: value === "installment", installments: value === "installment" ? newTransaction.installments : 1})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">À Vista</SelectItem>
+                        <SelectItem value="installment">Parcelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              
+              {newTransaction.payment_method === "credit_card" && newTransaction.is_installment && (
+                <div className="space-y-2">
+                  <Label htmlFor="installments">Quantidade de Parcelas</Label>
+                  <Select value={newTransaction.installments.toString()} onValueChange={(value) => setNewTransaction({...newTransaction, installments: parseInt(value)})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({length: 24}, (_, i) => i + 1).map((num) => (
+                        <SelectItem key={num} value={num.toString()}>
+                          {num}x de {formatCurrency(newTransaction.amount / num)}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              )}
               
               <div className="space-y-2">
                 <Label htmlFor="notes">Observações (opcional)</Label>

@@ -352,6 +352,9 @@ export type Database = {
           date: string
           description: string
           id: string
+          installment_number: number | null
+          installments: number | null
+          is_installment: boolean | null
           notes: string | null
           type: Database["public"]["Enums"]["transaction_type"]
           updated_at: string
@@ -367,6 +370,9 @@ export type Database = {
           date?: string
           description: string
           id?: string
+          installment_number?: number | null
+          installments?: number | null
+          is_installment?: boolean | null
           notes?: string | null
           type: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
@@ -382,6 +388,9 @@ export type Database = {
           date?: string
           description?: string
           id?: string
+          installment_number?: number | null
+          installments?: number | null
+          is_installment?: boolean | null
           notes?: string | null
           type?: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string

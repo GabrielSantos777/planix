@@ -244,6 +244,49 @@ export const useSupabaseData = () => {
     }
   }
 
+  const updateCreditCard = async (id: string, updates: Partial<CreditCard>) => {
+    try {
+      const { data, error } = await supabase
+        .from('credit_cards')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      setCreditCards(prev => prev.map(card => card.id === id ? data : card))
+      return data
+    } catch (error) {
+      console.error('Error updating credit card:', error)
+      throw error
+    }
+  }
+
+  const deleteCreditCard = async (id: string) => {
+    try {
+      // First, delete all transactions related to this credit card
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('credit_card_id', id)
+
+      // Then, delete the credit card
+      const { error } = await supabase
+        .from('credit_cards')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      setCreditCards(prev => prev.filter(card => card.id !== id))
+      
+      // Refresh transactions to reflect the changes
+      await fetchTransactions()
+    } catch (error) {
+      console.error('Error deleting credit card:', error)
+      throw error
+    }
+  }
+
   const addTransaction = async (transaction: Database['public']['Tables']['transactions']['Insert']) => {
     if (!user) return
     try {
@@ -420,6 +463,8 @@ export const useSupabaseData = () => {
     updateAccount,
     deleteAccount,
     addCreditCard,
+    updateCreditCard,
+    deleteCreditCard,
     addTransaction,
     updateTransaction,
     deleteTransaction,
