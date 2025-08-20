@@ -312,6 +312,15 @@ export const useSupabaseData = () => {
         }
       }
       
+      // Update credit card balance
+      if (transaction.credit_card_id) {
+        const creditCard = creditCards.find(card => card.id === transaction.credit_card_id)
+        if (creditCard) {
+          const newBalance = (creditCard.current_balance || 0) + Math.abs(transaction.amount || 0)
+          await updateCreditCard(transaction.credit_card_id, { current_balance: newBalance })
+        }
+      }
+      
       setTransactions(prev => [data, ...prev])
       await fetchAllData() // Refresh all data to ensure sync
       return data
@@ -356,6 +365,18 @@ export const useSupabaseData = () => {
         }
       }
       
+      // Update credit card balance if transaction has a credit card
+      if (originalTransaction.credit_card_id) {
+        const creditCard = creditCards.find(card => card.id === originalTransaction.credit_card_id)
+        if (creditCard) {
+          // Reverse the original transaction effect (subtract from balance)
+          let newBalance = (creditCard.current_balance || 0) - Math.abs(originalTransaction.amount || 0)
+          // Apply the new transaction effect (add to balance)
+          newBalance += Math.abs(data.amount || 0)
+          await updateCreditCard(originalTransaction.credit_card_id, { current_balance: newBalance })
+        }
+      }
+      
       setTransactions(prev => prev.map(transaction => 
         transaction.id === id ? data : transaction
       ))
@@ -385,6 +406,15 @@ export const useSupabaseData = () => {
         if (account) {
           const newBalance = (account.current_balance || 0) - (transaction.amount || 0)
           await updateAccount(transaction.account_id, { current_balance: newBalance })
+        }
+      }
+      
+      // Update credit card balance if transaction had a credit card
+      if (transaction?.credit_card_id) {
+        const creditCard = creditCards.find(card => card.id === transaction.credit_card_id)
+        if (creditCard) {
+          const newBalance = (creditCard.current_balance || 0) - Math.abs(transaction.amount || 0)
+          await updateCreditCard(transaction.credit_card_id, { current_balance: newBalance })
         }
       }
       

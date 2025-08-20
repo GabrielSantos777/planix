@@ -714,7 +714,7 @@ const TransacoesImproved = () => {
                   </div>
                 )}
                 
-                {newTransaction.payment_method === "credit_card" && (
+                {newTransaction.payment_method === "credit_card" && !editingTransaction && (
                   <div className="space-y-2">
                     <Label htmlFor="installment_type">Tipo de Pagamento</Label>
                     <Select value={newTransaction.is_installment ? "installment" : "cash"} onValueChange={(value) => setNewTransaction({...newTransaction, is_installment: value === "installment", installments: value === "installment" ? newTransaction.installments : 1})}>
@@ -728,9 +728,19 @@ const TransacoesImproved = () => {
                     </Select>
                   </div>
                 )}
+                
+                {editingTransaction && editingTransaction.is_installment && (
+                  <div className="space-y-2">
+                    <Label>Tipo de Pagamento</Label>
+                    <div className="p-2 bg-muted rounded border">
+                      <p className="text-sm">Transação Parcelada ({editingTransaction.installment_number}/{editingTransaction.installments})</p>
+                      <p className="text-xs text-muted-foreground">Não é possível alterar o parcelamento de uma transação já criada</p>
+                    </div>
+                  </div>
+                )}
               </div>
               
-              {newTransaction.payment_method === "credit_card" && newTransaction.is_installment && (
+              {newTransaction.payment_method === "credit_card" && newTransaction.is_installment && !editingTransaction && (
                 <div className="space-y-2">
                   <Label htmlFor="installments">Quantidade de Parcelas</Label>
                   <Select value={newTransaction.installments.toString()} onValueChange={(value) => setNewTransaction({...newTransaction, installments: parseInt(value)})}>
