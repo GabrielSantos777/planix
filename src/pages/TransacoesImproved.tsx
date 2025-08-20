@@ -63,7 +63,7 @@ const TransacoesImproved = () => {
     date: new Date().toISOString().split('T')[0],
     account_id: "",
     credit_card_id: "",
-    payment_method: "account" as "account" | "credit_card",
+    payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
     installments: 1,
     is_installment: false,
     notes: ""
@@ -77,6 +77,12 @@ const TransacoesImproved = () => {
       setIsDialogOpen(true)
     }
   }, [searchParams])
+
+  // Set default payment method based on available options
+  useEffect(() => {
+    const defaultPaymentMethod = accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account"
+    setNewTransaction(prev => ({ ...prev, payment_method: defaultPaymentMethod }))
+  }, [accounts, creditCards])
 
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -92,10 +98,30 @@ const TransacoesImproved = () => {
   })
 
   const handleAddTransaction = async () => {
-    if (!newTransaction.description || (!newTransaction.account_id && !newTransaction.credit_card_id)) {
+    // Validation
+    if (!newTransaction.description || !newTransaction.amount || !newTransaction.category_id) {
       toast({
-        title: "Erro",
-        description: "Por favor, preencha todos os campos obrigatórios",
+        title: "Erro de Validação",
+        description: "Por favor, preencha todos os campos obrigatórios.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Validate payment method selection
+    if (newTransaction.payment_method === "account" && !newTransaction.account_id) {
+      toast({
+        title: "Erro de Validação",
+        description: "Por favor, selecione uma conta bancária.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (newTransaction.payment_method === "credit_card" && !newTransaction.credit_card_id) {
+      toast({
+        title: "Erro de Validação",
+        description: "Por favor, selecione um cartão de crédito.",
         variant: "destructive"
       })
       return
@@ -165,7 +191,7 @@ const TransacoesImproved = () => {
         date: new Date().toISOString().split('T')[0],
         account_id: "",
         credit_card_id: "",
-        payment_method: "account",
+                payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
         installments: 1,
         is_installment: false,
         notes: ""
@@ -366,7 +392,7 @@ const TransacoesImproved = () => {
                 date: new Date().toISOString().split('T')[0],
                 account_id: "",
                 credit_card_id: "",
-                payment_method: "account",
+                payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
                 installments: 1,
                 is_installment: false,
                 notes: ""
@@ -607,10 +633,29 @@ const TransacoesImproved = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="account">Conta Bancária</SelectItem>
-                      <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                      {accounts.length > 0 && (
+                        <SelectItem value="account">Conta Bancária</SelectItem>
+                      )}
+                      {creditCards.length > 0 && (
+                        <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
+                  {accounts.length === 0 && creditCards.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-destructive">
+                      Nenhuma conta ou cartão cadastrado. Cadastre primeiro em "Contas".
+                    </p>
+                  )}
+                  {accounts.length === 0 && creditCards.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Apenas cartões de crédito disponíveis.
+                    </p>
+                  )}
+                  {creditCards.length === 0 && accounts.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Apenas contas bancárias disponíveis. Cadastre cartões em "Contas" para mais opções.
+                    </p>
+                  )}
                 </div>
               </div>
               
@@ -622,13 +667,21 @@ const TransacoesImproved = () => {
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione uma conta" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {accounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
+                        {accounts.length === 0 ? (
+                          <SelectContent>
+                            <SelectItem value="" disabled>
+                              Nenhuma conta cadastrada
+                            </SelectItem>
+                          </SelectContent>
+                        ) : (
+                          <SelectContent>
+                            {accounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        )}
                     </Select>
                   </div>
                 ) : (
@@ -638,13 +691,21 @@ const TransacoesImproved = () => {
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione um cartão" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {creditCards.map((card) => (
-                          <SelectItem key={card.id} value={card.id}>
-                            {card.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
+                        {creditCards.length === 0 ? (
+                          <SelectContent>
+                            <SelectItem value="" disabled>
+                              Nenhum cartão cadastrado
+                            </SelectItem>
+                          </SelectContent>
+                        ) : (
+                          <SelectContent>
+                            {creditCards.map((card) => (
+                              <SelectItem key={card.id} value={card.id}>
+                                {card.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        )}
                     </Select>
                   </div>
                 )}
