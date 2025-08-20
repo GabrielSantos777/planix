@@ -129,8 +129,12 @@ const TransacoesImproved = () => {
 
     try {
       const baseTransactionData = {
-        ...newTransaction,
+        description: newTransaction.description,
         amount: newTransaction.type === "expense" ? -Math.abs(newTransaction.amount) : newTransaction.amount,
+        type: newTransaction.type,
+        category_id: newTransaction.category_id,
+        date: newTransaction.date,
+        notes: newTransaction.notes,
         user_id: user?.id,
         currency: 'BRL',
         account_id: newTransaction.payment_method === "account" ? newTransaction.account_id : null,
