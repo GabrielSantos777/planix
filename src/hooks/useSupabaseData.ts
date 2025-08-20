@@ -280,6 +280,10 @@ export const useSupabaseData = () => {
 
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
     try {
+      // Get the original transaction to calculate balance changes
+      const originalTransaction = transactions.find(t => t.id === id)
+      if (!originalTransaction) throw new Error('Transaction not found')
+
       const { data, error } = await supabase
         .from('transactions')
         .update({
@@ -296,6 +300,18 @@ export const useSupabaseData = () => {
         .single()
 
       if (error) throw error
+      
+      // Update account balance if transaction has an account
+      if (originalTransaction.account_id) {
+        const account = accounts.find(acc => acc.id === originalTransaction.account_id)
+        if (account) {
+          // Reverse the original transaction effect
+          let newBalance = (account.current_balance || 0) - (originalTransaction.amount || 0)
+          // Apply the new transaction effect
+          newBalance += (data.amount || 0)
+          await updateAccount(originalTransaction.account_id, { current_balance: newBalance })
+        }
+      }
       
       setTransactions(prev => prev.map(transaction => 
         transaction.id === id ? data : transaction
