@@ -16,7 +16,7 @@ import Auth from "./pages/Auth";
 import Plans from "./pages/Plans";
 import Dashboard from "./pages/Dashboard";
 import TransacoesImproved from "./pages/TransacoesImproved";
-import Contas from "./pages/Contas";
+import ContasImproved from "./pages/ContasImproved";
 import Investimentos from "./pages/Investimentos";
 import GoalsImproved from "./pages/GoalsImproved";
 import RelatoriosImproved from "./pages/RelatoriosImproved";
@@ -62,7 +62,7 @@ const App = () => (
                       } />
                       <Route path="/contas" element={
                         <ProtectedRoute requireSubscription>
-                          <Contas />
+                          <ContasImproved />
                         </ProtectedRoute>
                       } />
                       <Route path="/investimentos" element={
