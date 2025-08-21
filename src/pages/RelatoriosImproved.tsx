@@ -6,62 +6,105 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { 
   TrendingUp, 
   TrendingDown, 
   Download,
-  Calendar,
+  Calendar as CalendarIcon,
   Filter,
   DollarSign,
-  PieChart
+  PieChart,
+  FileText,
+  Table as TableIcon,
+  X
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useCurrency } from "@/context/CurrencyContext"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import Layout from "@/components/Layout"
-import { ResponsiveContainer, PieChart as RechartsPieChart, Cell, Tooltip, Legend, Pie } from 'recharts'
+import { ResponsiveContainer, PieChart as RechartsPieChart, Cell, Tooltip, Legend, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
 
 const COLORS = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16']
 
 const RelatoriosImproved = () => {
   const { toast } = useToast()
   const { formatCurrency } = useCurrency()
-  const { transactions, categories, accounts } = useSupabaseData()
+  const { transactions, categories, accounts, creditCards } = useSupabaseData()
   
-  const [selectedPeriod, setSelectedPeriod] = useState("all")
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [transactionFilter, setTransactionFilter] = useState("")
-  const [accountFilter, setAccountFilter] = useState("all")
+  // Estados para filtros
+  const [startDate, setStartDate] = useState<Date>()
+  const [endDate, setEndDate] = useState<Date>()
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [typeFilter, setTypeFilter] = useState("all")
+  const [accountFilter, setAccountFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [descriptionFilter, setDescriptionFilter] = useState("")
 
-  // Filter transactions based on period and additional filters
+  // Função para limpar todos os filtros
+  const clearAllFilters = () => {
+    setStartDate(undefined)
+    setEndDate(undefined)
+    setCategoryFilter("all")
+    setTypeFilter("all")
+    setAccountFilter("all")
+    setStatusFilter("all")
+    setDescriptionFilter("")
+  }
+
+  // Verificar se há filtros ativos
+  const hasActiveFilters = startDate || endDate || categoryFilter !== "all" || 
+    typeFilter !== "all" || accountFilter !== "all" || statusFilter !== "all" || descriptionFilter
+
+  // Filter transactions based on all filters
   const filteredTransactions = useMemo(() => {
     let filtered = transactions.filter(transaction => {
       const transactionDate = new Date(transaction.date)
+      
+      // Filtro de data
       let dateMatch = true
-
-      if (selectedPeriod === "month") {
-        dateMatch = transactionDate.getMonth() + 1 === selectedMonth && 
-                   transactionDate.getFullYear() === selectedYear
-      } else if (selectedPeriod === "year") {
-        dateMatch = transactionDate.getFullYear() === selectedYear
+      if (startDate) {
+        dateMatch = dateMatch && transactionDate >= startDate
+      }
+      if (endDate) {
+        dateMatch = dateMatch && transactionDate <= endDate
       }
 
-      const descriptionMatch = !transactionFilter || 
-        transaction.description.toLowerCase().includes(transactionFilter.toLowerCase())
+      // Filtro de descrição
+      const descriptionMatch = !descriptionFilter || 
+        transaction.description.toLowerCase().includes(descriptionFilter.toLowerCase())
       
-      const accountMatch = accountFilter === "all" || transaction.account_id === accountFilter
-      
+      // Filtro de categoria
       const categoryMatch = categoryFilter === "all" || transaction.category_id === categoryFilter
+      
+      // Filtro de tipo
+      const typeMatch = typeFilter === "all" || transaction.type === typeFilter
+      
+      // Filtro de conta (incluindo cartões de crédito)
+      let accountMatch = true
+      if (accountFilter !== "all") {
+        accountMatch = transaction.account_id === accountFilter || transaction.credit_card_id === accountFilter
+      }
+      
+      // Filtro de status (simulado baseado na data - se futuro = pendente)
+      let statusMatch = true
+      if (statusFilter !== "all") {
+        const today = new Date()
+        const isPaid = transactionDate <= today
+        if (statusFilter === "paid" && !isPaid) statusMatch = false
+        if (statusFilter === "pending" && isPaid) statusMatch = false
+      }
 
-      return dateMatch && descriptionMatch && accountMatch && categoryMatch
+      return dateMatch && descriptionMatch && categoryMatch && typeMatch && accountMatch && statusMatch
     })
 
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [transactions, selectedPeriod, selectedMonth, selectedYear, transactionFilter, accountFilter, categoryFilter])
+  }, [transactions, startDate, endDate, categoryFilter, typeFilter, accountFilter, statusFilter, descriptionFilter])
 
   const totalIncome = filteredTransactions
     .filter(t => t.type === "income")
@@ -90,58 +133,114 @@ const RelatoriosImproved = () => {
       .sort((a, b) => b.value - a.value)
   }, [filteredTransactions])
 
+  // Group by type for overview
+  const transactionsByType = useMemo(() => {
+    const types = {
+      income: { name: "Receitas", value: totalIncome, color: "#10B981" },
+      expense: { name: "Despesas", value: totalExpenses, color: "#EF4444" }
+    }
+    return Object.values(types).filter(item => item.value > 0)
+  }, [totalIncome, totalExpenses])
+
+  const getFilterPeriodText = () => {
+    if (startDate && endDate) {
+      return `${format(startDate, "dd/MM/yyyy")} até ${format(endDate, "dd/MM/yyyy")}`
+    } else if (startDate) {
+      return `A partir de ${format(startDate, "dd/MM/yyyy")}`
+    } else if (endDate) {
+      return `Até ${format(endDate, "dd/MM/yyyy")}`
+    }
+    return "Todos os períodos"
+  }
+
   const handleExportPDF = () => {
-    // Enhanced PDF with all filtered data
     const doc = new jsPDF()
     
-    // Title
-    doc.setFontSize(18)
-    doc.text('Relatório Financeiro', 20, 20)
+    // Header
+    doc.setFontSize(20)
+    doc.setFont("helvetica", "bold")
+    doc.text('FinanceFlow', 20, 20)
     
-    // Period info
+    doc.setFontSize(16)
+    doc.text('Relatório Financeiro Detalhado', 20, 35)
+    
+    // Period and filters info
     doc.setFontSize(12)
-    let periodText = "Período: "
-    if (selectedPeriod === "month") {
-      periodText += `${selectedMonth}/${selectedYear}`
-    } else if (selectedPeriod === "year") {
-      periodText += `${selectedYear}`
-    } else {
-      periodText += "Todos os registros"
+    doc.setFont("helvetica", "normal")
+    doc.text(`Período: ${getFilterPeriodText()}`, 20, 50)
+    
+    if (hasActiveFilters) {
+      let yPos = 60
+      if (categoryFilter !== "all") {
+        const cat = categories.find(c => c.id === categoryFilter)
+        doc.text(`Categoria: ${cat?.name || 'N/A'}`, 20, yPos)
+        yPos += 10
+      }
+      if (typeFilter !== "all") {
+        doc.text(`Tipo: ${typeFilter === 'income' ? 'Receita' : typeFilter === 'expense' ? 'Despesa' : 'Transferência'}`, 20, yPos)
+        yPos += 10
+      }
     }
-    doc.text(periodText, 20, 35)
     
     // Summary
     doc.setFontSize(14)
-    doc.text('Resumo:', 20, 50)
-    doc.setFontSize(10)
-    doc.text(`Total de Receitas: ${formatCurrency(totalIncome)}`, 20, 60)
-    doc.text(`Total de Despesas: ${formatCurrency(totalExpenses)}`, 20, 70)
-    doc.text(`Saldo Líquido: ${formatCurrency(netBalance)}`, 20, 80)
+    doc.setFont("helvetica", "bold")
+    doc.text('Resumo Financeiro:', 20, 80)
     
-    // Transactions
+    doc.setFontSize(12)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Total de Receitas: ${formatCurrency(totalIncome)}`, 20, 95)
+    doc.text(`Total de Despesas: ${formatCurrency(totalExpenses)}`, 20, 105)
+    doc.text(`Saldo Líquido: ${formatCurrency(netBalance)}`, 20, 115)
+    
+    // Transactions table
     doc.setFontSize(14)
-    doc.text('Transações:', 20, 100)
+    doc.setFont("helvetica", "bold")
+    doc.text('Transações:', 20, 135)
     
-    let yPosition = 110
-    filteredTransactions.forEach((transaction, index) => {
+    // Table headers
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "bold")
+    doc.text('Data', 20, 150)
+    doc.text('Descrição', 45, 150)
+    doc.text('Categoria', 100, 150)
+    doc.text('Valor', 140, 150)
+    doc.text('Tipo', 170, 150)
+    
+    // Table data
+    doc.setFont("helvetica", "normal")
+    let yPosition = 160
+    filteredTransactions.slice(0, 30).forEach((transaction) => {
       if (yPosition > 270) {
         doc.addPage()
         yPosition = 20
       }
       
-      doc.setFontSize(9)
-      const type = transaction.type === 'income' ? 'Receita' : 'Despesa'
+      const date = format(new Date(transaction.date), "dd/MM/yyyy")
+      const description = transaction.description.substring(0, 25)
+      const category = transaction.category?.name?.substring(0, 15) || 'N/A'
       const amount = formatCurrency(Math.abs(transaction.amount || 0))
-      const date = new Date(transaction.date).toLocaleDateString('pt-BR')
-      const category = transaction.category?.name || 'Sem categoria'
-      const account = transaction.account?.name || 'Conta removida'
+      const type = transaction.type === 'income' ? 'Receita' : 'Despesa'
       
-      doc.text(`${date} | ${type} | ${transaction.description}`, 20, yPosition)
-      doc.text(`${category} | ${account} | ${amount}`, 20, yPosition + 5)
-      yPosition += 15
+      doc.text(date, 20, yPosition)
+      doc.text(description, 45, yPosition)
+      doc.text(category, 100, yPosition)
+      doc.text(amount, 140, yPosition)
+      doc.text(type, 170, yPosition)
+      yPosition += 8
     })
     
-    doc.save(`relatorio-financeiro-${Date.now()}.pdf`)
+    // Footer
+    const totalPages = doc.getNumberOfPages()
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`, 20, 290)
+      doc.text(`Página ${i} de ${totalPages}`, 170, 290)
+    }
+    
+    const fileName = `Relatorio_Financeiro_${startDate ? format(startDate, "dd-MM-yyyy") : 'inicio'}_a_${endDate ? format(endDate, "dd-MM-yyyy") : 'fim'}.pdf`
+    doc.save(fileName)
     
     toast({
       title: "PDF Exportado",
@@ -151,19 +250,39 @@ const RelatoriosImproved = () => {
 
   const handleExportExcel = () => {
     const workbook = XLSX.utils.book_new()
-    const data = filteredTransactions.map(transaction => ({
-      'Data': new Date(transaction.date).toLocaleDateString('pt-BR'),
+    
+    // Primeira aba: Dados detalhados
+    const detailedData = filteredTransactions.map(transaction => ({
+      'Data': format(new Date(transaction.date), "dd/MM/yyyy"),
       'Descrição': transaction.description,
-      'Tipo': transaction.type === 'income' ? 'Receita' : 'Despesa',
       'Categoria': transaction.category?.name || 'Sem categoria',
-      'Conta': transaction.account?.name || 'Conta removida',
+      'Conta': transaction.account?.name || transaction.credit_card?.name || 'N/A',
+      'Tipo': transaction.type === 'income' ? 'Receita' : transaction.type === 'expense' ? 'Despesa' : 'Transferência',
       'Valor': transaction.amount,
       'Observações': transaction.notes || ''
     }))
     
-    const worksheet = XLSX.utils.json_to_sheet(data)
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transações')
-    XLSX.writeFile(workbook, `relatorio-financeiro-${Date.now()}.xlsx`)
+    const detailedSheet = XLSX.utils.json_to_sheet(detailedData)
+    XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Transações Detalhadas')
+    
+    // Segunda aba: Resumo por categoria
+    const summaryData = [
+      { 'Métrica': 'Total de Receitas', 'Valor': totalIncome },
+      { 'Métrica': 'Total de Despesas', 'Valor': totalExpenses },
+      { 'Métrica': 'Saldo Líquido', 'Valor': netBalance },
+      { 'Métrica': '', 'Valor': '' }, // Linha em branco
+      { 'Métrica': 'DESPESAS POR CATEGORIA', 'Valor': '' },
+      ...expensesByCategory.map(cat => ({
+        'Métrica': cat.name,
+        'Valor': cat.value
+      }))
+    ]
+    
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData)
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumo')
+    
+    const fileName = `Relatorio_Financeiro_${startDate ? format(startDate, "dd-MM-yyyy") : 'inicio'}_a_${endDate ? format(endDate, "dd-MM-yyyy") : 'fim'}.xlsx`
+    XLSX.writeFile(workbook, fileName)
     
     toast({
       title: "Excel Exportado",
@@ -171,194 +290,212 @@ const RelatoriosImproved = () => {
     })
   }
 
-  const getMonthName = (month: number) => {
-    const months = [
-      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ]
-    return months[month - 1]
-  }
+  // Combinar contas e cartões para o filtro
+  const allAccounts = [
+    ...accounts.map(acc => ({ id: acc.id, name: acc.name, type: 'account' })),
+    ...creditCards.map(cc => ({ id: cc.id, name: cc.name, type: 'credit_card' }))
+  ]
 
   return (
     <Layout>
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 p-6">
         {/* Header */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold">Relatórios</h1>
-              <p className="text-muted-foreground">
-                Análise detalhada das suas finanças
-              </p>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={handleExportPDF} variant="outline" className="gap-2">
-                <Download className="h-4 w-4" />
-                Exportar PDF
-              </Button>
-              <Button onClick={handleExportExcel} variant="outline" className="gap-2">
-                <Download className="h-4 w-4" />
-                Exportar Excel
-              </Button>
-            </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Relatórios Financeiros</h1>
+            <p className="text-muted-foreground">
+              Análise completa das suas finanças com filtros avançados
+            </p>
           </div>
-
-          {/* Period Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Período de Análise
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="period">Período</Label>
-                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os períodos</SelectItem>
-                      <SelectItem value="month">Por mês</SelectItem>
-                      <SelectItem value="year">Por ano</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {selectedPeriod === "month" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="month">Mês</Label>
-                    <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                          <SelectItem key={month} value={month.toString()}>
-                            {getMonthName(month)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                
-                {(selectedPeriod === "month" || selectedPeriod === "year") && (
-                  <div className="space-y-2">
-                    <Label htmlFor="year">Ano</Label>
-                    <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((year) => (
-                          <SelectItem key={year} value={year.toString()}>
-                            {year}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Filters */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filtros Avançados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div className="space-y-2">
-                  <Label htmlFor="description">Descrição</Label>
-                  <Input
-                    id="description"
-                    placeholder="Filtrar por descrição..."
-                    value={transactionFilter}
-                    onChange={(e) => setTransactionFilter(e.target.value)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="combined-filter">Conta/Categoria</Label>
-                  <Select 
-                    value={accountFilter !== "all" ? accountFilter : categoryFilter !== "all" ? categoryFilter : "all"} 
-                    onValueChange={(value) => {
-                      if (value === "all") {
-                        setAccountFilter("all")
-                        setCategoryFilter("all")
-                      } else if (accounts.some(account => account.id === value)) {
-                        setAccountFilter(value)
-                        setCategoryFilter("all")
-                      } else if (categories.some(category => category.id === value)) {
-                        setCategoryFilter(value)
-                        setAccountFilter("all")
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas as contas/categorias" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as contas/categorias</SelectItem>
-                      
-                      {accounts.length > 0 && (
-                        <>
-                          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-                            Contas
-                          </div>
-                          {accounts.map((account) => (
-                            <SelectItem key={`account-${account.id}`} value={account.id}>
-                              {account.name}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                      
-                      {categories.length > 0 && (
-                        <>
-                          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-                            Categorias
-                          </div>
-                          {categories.map((category) => (
-                            <SelectItem key={`category-${category.id}`} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Ações</Label>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setTransactionFilter("")
-                      setAccountFilter("all")
-                      setCategoryFilter("all")
-                    }}
-                    className="w-full"
-                  >
-                    Limpar Filtros
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={handleExportPDF} variant="outline" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Exportar PDF
+            </Button>
+            <Button onClick={handleExportExcel} variant="outline" className="gap-2">
+              <TableIcon className="h-4 w-4" />
+              Exportar Excel
+            </Button>
+          </div>
         </div>
 
-        {/* Estatísticas por Período */}
+        {/* Filtros Centralizados */}
+        <Card className="border-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                <CardTitle>Filtros de Relatório</CardTitle>
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="ml-2">
+                    {[
+                      startDate && "Data início",
+                      endDate && "Data fim", 
+                      categoryFilter !== "all" && "Categoria",
+                      typeFilter !== "all" && "Tipo",
+                      accountFilter !== "all" && "Conta",
+                      statusFilter !== "all" && "Status",
+                      descriptionFilter && "Descrição"
+                    ].filter(Boolean).length} filtro(s) ativo(s)
+                  </Badge>
+                )}
+              </div>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearAllFilters} className="gap-2">
+                  <X className="h-4 w-4" />
+                  Limpar tudo
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {/* Período - Data Inicial */}
+              <div className="space-y-2">
+                <Label>Data Inicial</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "dd/MM/yyyy") : "Selecionar"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={setStartDate}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Período - Data Final */}
+              <div className="space-y-2">
+                <Label>Data Final</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "dd/MM/yyyy") : "Selecionar"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Categoria */}
+              <div className="space-y-2">
+                <Label>Categoria</Label>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as categorias</SelectItem>
+                    {categories.map(category => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Tipo */}
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    <SelectItem value="income">Receita</SelectItem>
+                    <SelectItem value="expense">Despesa</SelectItem>
+                    <SelectItem value="transfer">Transferência</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Conta */}
+              <div className="space-y-2">
+                <Label>Conta</Label>
+                <Select value={accountFilter} onValueChange={setAccountFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as contas</SelectItem>
+                    {allAccounts.map(account => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name} {account.type === 'credit_card' && '(Cartão)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Status */}
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="paid">Pago</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Filtro de Descrição - Linha separada */}
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Buscar por descrição</Label>
+                <Input
+                  placeholder="Digite para filtrar por descrição..."
+                  value={descriptionFilter}
+                  onChange={(e) => setDescriptionFilter(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <div className="text-sm text-muted-foreground">
+                  {filteredTransactions.length} transação(ões) encontrada(s)
+                  {hasActiveFilters && " com os filtros aplicados"}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Resumo Financeiro */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -370,12 +507,7 @@ const RelatoriosImproved = () => {
                 {formatCurrency(totalIncome)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {selectedPeriod === "month" 
-                  ? `${getMonthName(selectedMonth)} ${selectedYear}` 
-                  : selectedPeriod === "year" 
-                    ? `${selectedYear}` 
-                    : "Todos os períodos"
-                }
+                {getFilterPeriodText()}
               </p>
             </CardContent>
           </Card>
@@ -390,12 +522,7 @@ const RelatoriosImproved = () => {
                 {formatCurrency(totalExpenses)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {selectedPeriod === "month" 
-                  ? `${getMonthName(selectedMonth)} ${selectedYear}` 
-                  : selectedPeriod === "year" 
-                    ? `${selectedYear}` 
-                    : "Todos os períodos"
-                }
+                {getFilterPeriodText()}
               </p>
             </CardContent>
           </Card>
@@ -412,19 +539,15 @@ const RelatoriosImproved = () => {
                 {formatCurrency(netBalance)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {selectedPeriod === "month" 
-                  ? `${getMonthName(selectedMonth)} ${selectedYear}` 
-                  : selectedPeriod === "year" 
-                    ? `${selectedYear}` 
-                    : "Todos os períodos"
-                }
+                {getFilterPeriodText()}
               </p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-1">
-          {/* Despesas por Categoria com Gráfico */}
+        {/* Gráficos */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Gráfico de Pizza - Despesas por Categoria */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -432,24 +555,15 @@ const RelatoriosImproved = () => {
                 Despesas por Categoria
               </CardTitle>
               <CardDescription>
-                Distribuição de gastos por categoria no período selecionado
+                Distribuição dos gastos no período selecionado
               </CardDescription>
             </CardHeader>
             <CardContent>
               {expensesByCategory.length > 0 ? (
                 <div className="space-y-6">
-                  {/* Gráfico */}
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsPieChart>
-                        <defs>
-                          {COLORS.map((color, index) => (
-                            <linearGradient key={index} id={`gradient${index}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor={color} stopOpacity={0.8}/>
-                              <stop offset="100%" stopColor={color} stopOpacity={0.6}/>
-                            </linearGradient>
-                          ))}
-                        </defs>
                         <Pie
                           data={expensesByCategory}
                           dataKey="value"
@@ -457,54 +571,85 @@ const RelatoriosImproved = () => {
                           cx="50%"
                           cy="50%"
                           outerRadius={80}
-                          fill="#8884d8"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         >
                           {expensesByCategory.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={`url(#gradient${index % COLORS.length})`} />
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                        <Legend />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                       </RechartsPieChart>
                     </ResponsiveContainer>
                   </div>
                   
-                  {/* Lista detalhada */}
                   <div className="space-y-2">
-                    {expensesByCategory.map((category, index) => (
-                      <div key={category.name} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
+                    {expensesByCategory.slice(0, 5).map((category, index) => (
+                      <div key={category.name} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
                           <div 
-                            className="w-4 h-4 rounded-full"
+                            className="w-3 h-3 rounded" 
                             style={{ backgroundColor: COLORS[index % COLORS.length] }}
                           />
-                          <span className="font-medium">{category.name}</span>
+                          <span>{category.name}</span>
                         </div>
-                        <span className="font-bold text-destructive">
-                          {formatCurrency(category.value)}
-                        </span>
+                        <span className="font-medium">{formatCurrency(category.value)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <p className="text-center text-muted-foreground py-8">
-                  Nenhuma despesa encontrada no período selecionado
-                </p>
+                <div className="flex items-center justify-center h-64 text-muted-foreground">
+                  Nenhuma despesa encontrada no período
+                </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Todas as Transações */}
+          {/* Gráfico de Barras - Receitas vs Despesas */}
           <Card>
             <CardHeader>
-              <CardTitle>Todas as Transações</CardTitle>
+              <CardTitle>Receitas vs Despesas</CardTitle>
               <CardDescription>
-                {filteredTransactions.length} transação(ões) encontrada(s)
+                Comparativo financeiro do período
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              {transactionsByType.length > 0 ? (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={transactionsByType}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      <Bar dataKey="value">
+                        {transactionsByType.map((entry, index) => (
+                          <Cell key={`bar-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-64 text-muted-foreground">
+                  Nenhuma transação encontrada no período
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabela de Transações */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Transações Detalhadas</CardTitle>
+            <CardDescription>
+              Lista completa das transações filtradas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {filteredTransactions.length > 0 ? (
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -514,48 +659,64 @@ const RelatoriosImproved = () => {
                       <TableHead>Conta</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredTransactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
-                        <TableCell>
-                          {new Date(transaction.date).toLocaleDateString('pt-BR')}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {transaction.description}
-                        </TableCell>
-                        <TableCell>
-                          {transaction.category?.name || 'Sem categoria'}
-                        </TableCell>
-                        <TableCell>
-                          {transaction.account?.name || 'Conta removida'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={transaction.type === 'income' ? 'default' : 'destructive'}>
-                            {transaction.type === 'income' ? 'Receita' : 'Despesa'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className={`text-right font-medium ${
-                          transaction.type === "income" ? "text-success" : "text-destructive"
-                        }`}>
-                          {transaction.type === "income" ? "+" : ""}
-                          {formatCurrency(Math.abs(transaction.amount || 0))}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredTransactions.map((transaction) => {
+                      const isPaid = new Date(transaction.date) <= new Date()
+                      return (
+                        <TableRow key={transaction.id}>
+                          <TableCell className="font-medium">
+                            {format(new Date(transaction.date), "dd/MM/yyyy")}
+                          </TableCell>
+                          <TableCell>{transaction.description}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {transaction.category?.name || "Sem categoria"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {transaction.account?.name || transaction.credit_card?.name || "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={transaction.type === "income" ? "default" : "destructive"}
+                            >
+                              {transaction.type === "income" ? "Receita" : 
+                               transaction.type === "expense" ? "Despesa" : "Transferência"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className={`text-right font-medium ${
+                            transaction.type === "income" ? "text-success" : "text-destructive"
+                          }`}>
+                            {transaction.type === "income" ? "+" : "-"}
+                            {formatCurrency(Math.abs(transaction.amount || 0))}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={isPaid ? "default" : "secondary"}
+                            >
+                              {isPaid ? "Pago" : "Pendente"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
-                
-                {filteredTransactions.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Nenhuma transação encontrada com os filtros aplicados
-                  </div>
-                )}
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <PieChart className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Nenhuma transação encontrada</h3>
+                <p className="text-muted-foreground">
+                  Tente ajustar os filtros para ver suas transações
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   )
