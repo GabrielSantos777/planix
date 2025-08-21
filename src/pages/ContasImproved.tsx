@@ -87,56 +87,59 @@ export default function ContasImproved() {
     return cardTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0)
   }
 
-  // Calculate used limit including installments for future months
+  // Calculate used limit including all open invoices and future installments
   const getUsedLimit = (cardId: string) => {
     const cardTransactions = transactions.filter(t => t.credit_card_id === cardId)
     
-    let totalUsed = 0
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth()
-    
-    // Track installment transactions to avoid counting multiple times
-    const processedInstallments = new Set<string>()
+    // Group transactions by invoice month
+    const invoicesByMonth: { [key: string]: { transactions: any[], total: number, isPaid: boolean } } = {}
     
     cardTransactions.forEach(transaction => {
-      if (transaction.is_installment && transaction.installments && transaction.installment_number) {
-        // Create unique key for installment group (assuming parent transaction has same base info)
-        const installmentKey = `${transaction.description}-${transaction.amount}-${transaction.installments}`
-        
-        if (!processedInstallments.has(installmentKey)) {
-          processedInstallments.add(installmentKey)
-          
-          // Calculate remaining installments from current month forward
-          const transactionDate = new Date(transaction.date)
-          const transactionMonth = transactionDate.getMonth()
-          const transactionYear = transactionDate.getFullYear()
-          
-          // Find the starting installment number for current calculation
-          let remainingInstallments = 0
-          
-          // Count how many installments are from current month forward
-          for (let i = 1; i <= transaction.installments; i++) {
-            const installmentDate = new Date(transactionYear, transactionMonth + i - 1, transactionDate.getDate())
-            
-            if (installmentDate.getFullYear() > currentYear || 
-                (installmentDate.getFullYear() === currentYear && installmentDate.getMonth() >= currentMonth)) {
-              remainingInstallments++
-            }
-          }
-          
-          totalUsed += Math.abs(transaction.amount) * remainingInstallments
+      const transactionDate = new Date(transaction.date)
+      const month = transactionDate.getMonth()
+      const year = transactionDate.getFullYear()
+      
+      const invoiceKey = `${year}-${month.toString().padStart(2, '0')}`
+      
+      if (!invoicesByMonth[invoiceKey]) {
+        invoicesByMonth[invoiceKey] = {
+          transactions: [],
+          total: 0,
+          isPaid: false
         }
-      } else {
-        // For regular transactions, only count from current month forward
-        const transactionDate = new Date(transaction.date)
-        const transactionYear = transactionDate.getFullYear()
-        const transactionMonth = transactionDate.getMonth()
-        
-        if (transactionYear > currentYear || 
-           (transactionYear === currentYear && transactionMonth >= currentMonth)) {
-          totalUsed += Math.abs(transaction.amount)
-        }
+      }
+      
+      invoicesByMonth[invoiceKey].transactions.push(transaction)
+      invoicesByMonth[invoiceKey].total += Math.abs(transaction.amount)
+    })
+    
+    // Check for payment transactions to mark invoices as paid
+    const paymentTransactions = transactions.filter(t => 
+      t.account_id && 
+      t.description.toLowerCase().includes('pagamento fatura') &&
+      t.description.toLowerCase().includes(creditCards.find(c => c.id === cardId)?.name.toLowerCase() || '')
+    )
+    
+    paymentTransactions.forEach(payment => {
+      const paymentDate = new Date(payment.date)
+      const paymentMonth = paymentDate.getMonth()
+      const paymentYear = paymentDate.getFullYear()
+      
+      // Mark the previous month's invoice as paid (assuming payment is for previous month)
+      const prevMonth = paymentMonth === 0 ? 11 : paymentMonth - 1
+      const prevYear = paymentMonth === 0 ? paymentYear - 1 : paymentYear
+      const invoiceKey = `${prevYear}-${prevMonth.toString().padStart(2, '0')}`
+      
+      if (invoicesByMonth[invoiceKey]) {
+        invoicesByMonth[invoiceKey].isPaid = true
+      }
+    })
+    
+    // Calculate total from open invoices
+    let totalUsed = 0
+    Object.values(invoicesByMonth).forEach(invoice => {
+      if (!invoice.isPaid) {
+        totalUsed += invoice.total
       }
     })
     
@@ -370,8 +373,8 @@ export default function ContasImproved() {
   // Calculate totals
   const totalBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0)
   const totalCreditLimit = creditCards.reduce((sum, card) => sum + (card.limit_amount || 0), 0)
-  const totalCreditUsed = creditCards.reduce((sum, card) => sum + Math.abs(card.current_balance || 0), 0)
-  const totalCreditAvailable = totalCreditLimit - totalCreditUsed
+  const totalCreditUsed = creditCards.reduce((sum, card) => sum + getUsedLimit(card.id), 0)
+  const totalCreditAvailable = Math.max(0, totalCreditLimit - totalCreditUsed)
 
   // Get recent transactions for accounts
   const getAccountTransactions = (accountId) => {
@@ -685,6 +688,10 @@ export default function ContasImproved() {
                       
                       <div className="grid grid-cols-3 gap-4">
                         <div>
+                          <Label className="text-sm font-medium">Limite Disponível</Label>
+                          <p className="text-lg text-green-600">{formatCurrency(Math.max(0, (card.limit_amount || 0) - getUsedLimit(card.id)))}</p>
+                        </div>
+                        <div>
                           <Label className="text-sm font-medium">Vencimento</Label>
                           <p className="text-sm">Dia {card.due_day}</p>
                         </div>
@@ -692,6 +699,9 @@ export default function ContasImproved() {
                           <Label className="text-sm font-medium">Fechamento</Label>
                           <p className="text-sm">Dia {card.closing_day}</p>
                         </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-4">
                         <div>
                           <Label className="text-sm font-medium">Melhor Compra</Label>
                           <p className="text-sm">{card.best_purchase_day ? `Dia ${card.best_purchase_day}` : 'N/A'}</p>
