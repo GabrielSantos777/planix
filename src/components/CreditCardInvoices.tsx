@@ -76,7 +76,7 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
     return inv.month === now.getMonth() && inv.year === now.getFullYear()
   })
 
-  const displayInvoice = selectedMonth 
+  const displayInvoice = selectedMonth && selectedMonth !== 'current'
     ? invoices.find(inv => `${inv.year}-${inv.month.toString().padStart(2, '0')}` === selectedMonth)
     : currentMonthInvoice
 
@@ -126,7 +126,7 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
             <SelectValue placeholder="Selecionar mês" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Mês Atual</SelectItem>
+            <SelectItem value="current">Mês Atual</SelectItem>
             {invoices.map((invoice) => (
               <SelectItem 
                 key={`${invoice.year}-${invoice.month}`}
