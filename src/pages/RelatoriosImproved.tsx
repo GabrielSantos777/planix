@@ -288,35 +288,53 @@ const RelatoriosImproved = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="account">Conta</Label>
-                  <Select value={accountFilter} onValueChange={setAccountFilter}>
+                  <Label htmlFor="combined-filter">Conta/Categoria</Label>
+                  <Select 
+                    value={accountFilter !== "all" ? accountFilter : categoryFilter !== "all" ? categoryFilter : "all"} 
+                    onValueChange={(value) => {
+                      if (value === "all") {
+                        setAccountFilter("all")
+                        setCategoryFilter("all")
+                      } else if (accounts.some(account => account.id === value)) {
+                        setAccountFilter(value)
+                        setCategoryFilter("all")
+                      } else if (categories.some(category => category.id === value)) {
+                        setCategoryFilter(value)
+                        setAccountFilter("all")
+                      }
+                    }}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Todas as contas" />
+                      <SelectValue placeholder="Todas as contas/categorias" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas as contas</SelectItem>
-                      {accounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="category">Categoria</Label>
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas as categorias" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as categorias</SelectItem>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="all">Todas as contas/categorias</SelectItem>
+                      
+                      {accounts.length > 0 && (
+                        <>
+                          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+                            Contas
+                          </div>
+                          {accounts.map((account) => (
+                            <SelectItem key={`account-${account.id}`} value={account.id}>
+                              {account.name}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      
+                      {categories.length > 0 && (
+                        <>
+                          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+                            Categorias
+                          </div>
+                          {categories.map((category) => (
+                            <SelectItem key={`category-${category.id}`} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
