@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,6 +36,7 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [invoiceToPayAmount, setInvoiceToPayAmount] = useState(0)
+  const [paidInvoices, setPaidInvoices] = useState<Set<string>>(new Set())
 
   // Get all invoices for this card
   const getCardInvoices = (): MonthlyInvoice[] => {
@@ -56,7 +57,7 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
           transactions: [],
           total: 0,
           dueDate: new Date(year, month + 1, 10), // Assuming due date is 10th of next month
-          status: 'open'
+          status: paidInvoices.has(invoiceKey) ? 'paid' : 'open'
         }
       }
       
@@ -85,7 +86,7 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
     payment_date: Date
     amount: number
   }) => {
-    if (!user) return
+    if (!user || !displayInvoice) return
     
     try {
       // Create expense transaction for payment
@@ -99,10 +100,16 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
         user_id: user.id
       })
 
+      // Mark invoice as paid
+      const invoiceKey = `${displayInvoice.year}-${displayInvoice.month.toString().padStart(2, '0')}`
+      setPaidInvoices(prev => new Set(prev).add(invoiceKey))
+
       toast({
         title: "Sucesso",
         description: "Pagamento da fatura registrado com sucesso!",
       })
+      
+      setPaymentModalOpen(false)
     } catch (error) {
       console.error('Error processing payment:', error)
       toast({

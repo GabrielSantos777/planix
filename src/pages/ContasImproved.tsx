@@ -93,17 +93,48 @@ export default function ContasImproved() {
     
     let totalUsed = 0
     const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth()
+    
+    // Track installment transactions to avoid counting multiple times
+    const processedInstallments = new Set<string>()
     
     cardTransactions.forEach(transaction => {
       if (transaction.is_installment && transaction.installments && transaction.installment_number) {
-        // For installments, calculate how many are still pending
-        const remainingInstallments = transaction.installments - transaction.installment_number + 1
-        totalUsed += Math.abs(transaction.amount) * remainingInstallments
+        // Create unique key for installment group (assuming parent transaction has same base info)
+        const installmentKey = `${transaction.description}-${transaction.amount}-${transaction.installments}`
+        
+        if (!processedInstallments.has(installmentKey)) {
+          processedInstallments.add(installmentKey)
+          
+          // Calculate remaining installments from current month forward
+          const transactionDate = new Date(transaction.date)
+          const transactionMonth = transactionDate.getMonth()
+          const transactionYear = transactionDate.getFullYear()
+          
+          // Find the starting installment number for current calculation
+          let remainingInstallments = 0
+          
+          // Count how many installments are from current month forward
+          for (let i = 1; i <= transaction.installments; i++) {
+            const installmentDate = new Date(transactionYear, transactionMonth + i - 1, transactionDate.getDate())
+            
+            if (installmentDate.getFullYear() > currentYear || 
+                (installmentDate.getFullYear() === currentYear && installmentDate.getMonth() >= currentMonth)) {
+              remainingInstallments++
+            }
+          }
+          
+          totalUsed += Math.abs(transaction.amount) * remainingInstallments
+        }
       } else {
-        // For regular transactions, only count current month forward
+        // For regular transactions, only count from current month forward
         const transactionDate = new Date(transaction.date)
-        if (transactionDate >= now || 
-           (transactionDate.getMonth() === now.getMonth() && transactionDate.getFullYear() === now.getFullYear())) {
+        const transactionYear = transactionDate.getFullYear()
+        const transactionMonth = transactionDate.getMonth()
+        
+        if (transactionYear > currentYear || 
+           (transactionYear === currentYear && transactionMonth >= currentMonth)) {
           totalUsed += Math.abs(transaction.amount)
         }
       }
