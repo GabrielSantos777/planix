@@ -13,6 +13,7 @@ import { InvestmentsProvider } from "./context/InvestmentsContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import Index from "./pages/Index";
+import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Plans from "./pages/Plans";
 import Dashboard from "./pages/Dashboard";
@@ -49,6 +50,7 @@ const App = () => (
                   <BrowserRouter>
                     <Routes>
                       <Route path="/" element={<Index />} />
+                      <Route path="/landing" element={<Landing />} />
                       <Route path="/auth" element={<Auth />} />
                       <Route path="/plans" element={<Plans />} />
                       <Route path="/dashboard" element={
