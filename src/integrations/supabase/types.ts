@@ -86,6 +86,62 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_card_invoices: {
+        Row: {
+          created_at: string
+          credit_card_id: string
+          due_date: string | null
+          id: string
+          month: number
+          notes: string | null
+          paid_amount: number
+          payment_date: string | null
+          status: string
+          total_amount: number
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          credit_card_id: string
+          due_date?: string | null
+          id?: string
+          month: number
+          notes?: string | null
+          paid_amount?: number
+          payment_date?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          credit_card_id?: string
+          due_date?: string | null
+          id?: string
+          month?: number
+          notes?: string | null
+          paid_amount?: number
+          payment_date?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_card_invoices_credit_card_id_fkey"
+            columns: ["credit_card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_cards: {
         Row: {
           best_purchase_day: number | null

@@ -9,6 +9,7 @@ export type Category = Database['public']['Tables']['categories']['Row']
 export type Transaction = Database['public']['Tables']['transactions']['Row']
 export type Investment = Database['public']['Tables']['investments']['Row']
 export type Goal = Database['public']['Tables']['goals']['Row']
+export type CreditCardInvoice = Database['public']['Tables']['credit_card_invoices']['Row']
 
 export interface TransactionWithRelations extends Transaction {
   category?: Category
@@ -24,6 +25,7 @@ export const useSupabaseData = () => {
   const [transactions, setTransactions] = useState<TransactionWithRelations[]>([])
   const [investments, setInvestments] = useState<Investment[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
+  const [creditCardInvoices, setCreditCardInvoices] = useState<CreditCardInvoice[]>([])
   const [loading, setLoading] = useState(true)
 
   // Fetch accounts
@@ -120,6 +122,28 @@ export const useSupabaseData = () => {
   }
 
   // Fetch goals
+  const fetchCreditCardInvoices = async () => {
+    if (!user) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('credit_card_invoices')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching credit card invoices:', error)
+        return
+      }
+
+      setCreditCardInvoices(data || [])
+    } catch (error) {
+      console.error('Error fetching credit card invoices:', error)
+    }
+  }
+
   const fetchGoals = async () => {
     if (!user) return
     try {
@@ -145,7 +169,8 @@ export const useSupabaseData = () => {
       fetchCategories(),
       fetchTransactions(),
       fetchInvestments(),
-      fetchGoals()
+      fetchGoals(),
+      fetchCreditCardInvoices()
     ])
     setLoading(false)
   }
@@ -477,6 +502,74 @@ export const useSupabaseData = () => {
     }
   }
 
+  // Credit Card Invoice operations
+  const addCreditCardInvoice = async (invoiceData: Omit<CreditCardInvoice, 'id' | 'created_at' | 'updated_at'>) => {
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('credit_card_invoices')
+      .insert([{
+        ...invoiceData,
+        user_id: user.id
+      }])
+      .select()
+      .single()
+
+    if (error) throw error
+
+    setCreditCardInvoices(prev => [data, ...prev])
+    return data
+  }
+
+  const updateCreditCardInvoice = async (id: string, updates: Partial<CreditCardInvoice>) => {
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('credit_card_invoices')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    setCreditCardInvoices(prev => prev.map(invoice => 
+      invoice.id === id ? data : invoice
+    ))
+    return data
+  }
+
+  const upsertCreditCardInvoice = async (invoiceData: {
+    credit_card_id: string
+    month: number
+    year: number
+    total_amount: number
+    paid_amount: number
+    status: string
+    due_date?: string
+    payment_date?: string
+    notes?: string
+  }) => {
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('credit_card_invoices')
+      .upsert([{
+        ...invoiceData,
+        user_id: user.id
+      }], {
+        onConflict: 'credit_card_id,month,year'
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    await fetchCreditCardInvoices()
+    return data
+  }
+
   return {
     // Data
     accounts,
@@ -485,6 +578,7 @@ export const useSupabaseData = () => {
     transactions,
     investments,
     goals,
+    creditCardInvoices,
     loading,
     
     // Methods
@@ -500,6 +594,9 @@ export const useSupabaseData = () => {
     deleteTransaction,
     addGoal,
     updateGoal,
-    deleteGoal
+    deleteGoal,
+    addCreditCardInvoice,
+    updateCreditCardInvoice,
+    upsertCreditCardInvoice
   }
 }

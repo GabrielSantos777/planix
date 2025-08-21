@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ChevronDown, ChevronUp, Calendar, CreditCard } from 'lucide-react'
+import { ChevronDown, ChevronUp, Calendar, CreditCard, Edit } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useCurrency } from '@/context/CurrencyContext'
 import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { CreditCardInvoiceModal } from './CreditCardInvoiceModal'
+import { CreditCardInvoiceEditModal } from './CreditCardInvoiceEditModal'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/AuthContext'
 
@@ -18,7 +19,7 @@ interface MonthlyInvoice {
   transactions: any[]
   total: number
   dueDate: Date
-  status: 'open' | 'closed' | 'paid'
+  status: 'open' | 'closed' | 'paid' | 'partial'
 }
 
 interface CreditCardInvoicesProps {
@@ -27,7 +28,7 @@ interface CreditCardInvoicesProps {
 }
 
 export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps) => {
-  const { transactions, addTransaction } = useSupabaseData()
+  const { transactions, addTransaction, creditCardInvoices, upsertCreditCardInvoice } = useSupabaseData()
   const { formatCurrency } = useCurrency()
   const { toast } = useToast()
   const { user } = useAuth()
@@ -35,14 +36,16 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
   const [selectedMonth, setSelectedMonth] = useState<string>('')
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
   const [invoiceToPayAmount, setInvoiceToPayAmount] = useState(0)
-  const [paidInvoices, setPaidInvoices] = useState<Set<string>>(new Set())
+  const [currentEditingInvoice, setCurrentEditingInvoice] = useState<any>(null)
 
-  // Get all invoices for this card
+  // Get all invoices for this card with database status
   const getCardInvoices = (): MonthlyInvoice[] => {
     const cardTransactions = transactions.filter(t => t.credit_card_id === cardId)
     const invoicesByMonth: { [key: string]: MonthlyInvoice } = {}
     
+    // First, create invoices from transactions
     cardTransactions.forEach(transaction => {
       const transactionDate = new Date(transaction.date)
       const month = transactionDate.getMonth()
@@ -56,14 +59,24 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
           year,
           transactions: [],
           total: 0,
-          dueDate: new Date(year, month + 1, 10), // Assuming due date is 10th of next month
-          status: paidInvoices.has(invoiceKey) ? 'paid' : 'open'
+          dueDate: new Date(year, month + 1, 10),
+          status: 'open'
         }
       }
       
       invoicesByMonth[invoiceKey].transactions.push(transaction)
       invoicesByMonth[invoiceKey].total += Math.abs(transaction.amount)
     })
+    
+    // Update status from database
+    creditCardInvoices
+      .filter(invoice => invoice.credit_card_id === cardId)
+      .forEach(dbInvoice => {
+        const invoiceKey = `${dbInvoice.year}-${dbInvoice.month.toString().padStart(2, '0')}`
+        if (invoicesByMonth[invoiceKey]) {
+          invoicesByMonth[invoiceKey].status = dbInvoice.status as 'open' | 'closed' | 'paid' | 'partial'
+        }
+      })
     
     return Object.values(invoicesByMonth).sort((a, b) => {
       if (a.year !== b.year) return b.year - a.year
@@ -100,9 +113,16 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
         user_id: user.id
       })
 
-      // Mark invoice as paid
-      const invoiceKey = `${displayInvoice.year}-${displayInvoice.month.toString().padStart(2, '0')}`
-      setPaidInvoices(prev => new Set(prev).add(invoiceKey))
+      // Mark invoice as paid in database
+      await upsertCreditCardInvoice({
+        credit_card_id: cardId,
+        month: displayInvoice.month,
+        year: displayInvoice.year,
+        total_amount: displayInvoice.total,
+        paid_amount: paymentData.amount,
+        status: paymentData.amount >= displayInvoice.total ? 'paid' : 'partial',
+        payment_date: format(paymentData.payment_date, 'yyyy-MM-dd')
+      })
 
       toast({
         title: "Sucesso",
@@ -115,6 +135,55 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
       toast({
         title: "Erro",
         description: "Erro ao processar pagamento. Tente novamente.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleEditInvoice = (invoice: MonthlyInvoice) => {
+    const dbInvoice = creditCardInvoices.find(inv => 
+      inv.credit_card_id === cardId && 
+      inv.month === invoice.month && 
+      inv.year === invoice.year
+    )
+    
+    setCurrentEditingInvoice({
+      id: dbInvoice?.id,
+      month: invoice.month,
+      year: invoice.year,
+      total_amount: dbInvoice?.total_amount || invoice.total,
+      paid_amount: dbInvoice?.paid_amount || 0,
+      status: dbInvoice?.status || 'open',
+      due_date: dbInvoice?.due_date ? new Date(dbInvoice.due_date) : invoice.dueDate,
+      payment_date: dbInvoice?.payment_date ? new Date(dbInvoice.payment_date) : undefined,
+      notes: dbInvoice?.notes || ''
+    })
+    setEditModalOpen(true)
+  }
+
+  const handleSaveInvoice = async (invoiceData: any) => {
+    try {
+      await upsertCreditCardInvoice({
+        credit_card_id: cardId,
+        month: invoiceData.month,
+        year: invoiceData.year,
+        total_amount: invoiceData.total_amount,
+        paid_amount: invoiceData.paid_amount,
+        status: invoiceData.status,
+        due_date: invoiceData.due_date ? format(invoiceData.due_date, 'yyyy-MM-dd') : undefined,
+        payment_date: invoiceData.payment_date ? format(invoiceData.payment_date, 'yyyy-MM-dd') : undefined,
+        notes: invoiceData.notes
+      })
+
+      toast({
+        title: "Sucesso",
+        description: "Fatura atualizada com sucesso!",
+      })
+    } catch (error) {
+      console.error('Error saving invoice:', error)
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar fatura. Tente novamente.",
         variant: "destructive"
       })
     }
@@ -154,9 +223,17 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
                 Fatura {format(new Date(displayInvoice.year, displayInvoice.month, 1), 'MMMM yyyy', { locale: ptBR })}
               </CardTitle>
               <div className="flex items-center gap-2">
-                <Badge variant={displayInvoice.status === 'paid' ? 'default' : 'destructive'}>
-                  {displayInvoice.status === 'paid' ? 'Paga' : 'Em Aberto'}
+                <Badge variant={displayInvoice.status === 'paid' ? 'default' : displayInvoice.status === 'partial' ? 'secondary' : 'destructive'}>
+                  {displayInvoice.status === 'paid' ? 'Paga' : displayInvoice.status === 'partial' ? 'Parcial' : 'Em Aberto'}
                 </Badge>
+                <Button 
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleEditInvoice(displayInvoice)}
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Editar
+                </Button>
                 {displayInvoice.status !== 'paid' && (
                   <Button 
                     size="sm"
@@ -249,6 +326,14 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
         invoiceAmount={invoiceToPayAmount}
         cardName={cardName}
         onPayment={handlePayInvoice}
+      />
+
+      <CreditCardInvoiceEditModal
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        invoice={currentEditingInvoice}
+        cardName={cardName}
+        onSave={handleSaveInvoice}
       />
     </div>
   )
