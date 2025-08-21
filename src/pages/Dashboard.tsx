@@ -19,26 +19,39 @@ import Layout from "@/components/Layout"
 const Dashboard = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { accounts, transactions } = useSupabaseData()
+  const { accounts, creditCards, transactions } = useSupabaseData()
   const { getTotalValue: getInvestmentValue } = useInvestments()
   const { formatCurrency } = useCurrency()
 
-  const totalIncome = transactions
+  // Get current month transactions
+  const currentMonth = new Date().getMonth()
+  const currentYear = new Date().getFullYear()
+  
+  const currentMonthTransactions = transactions.filter(t => {
+    const transactionDate = new Date(t.date)
+    return transactionDate.getMonth() === currentMonth && 
+           transactionDate.getFullYear() === currentYear
+  })
+
+  const monthlyIncome = currentMonthTransactions
     .filter(t => t.type === "income")
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
+    .reduce((sum, t) => sum + (t.amount || 0), 0)
 
-  const totalExpenses = transactions
+  const monthlyExpenses = currentMonthTransactions
     .filter(t => t.type === "expense")
-    .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
+    .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
-  // Calculate balance from accounts
-  const accountsBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0);
+  // Total balance from all accounts
+  const totalAccountsBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0)
   
-  // Calculate net balance (income - expenses)
-  const netBalance = totalIncome - totalExpenses;
+  // Total credit card debt
+  const totalCreditDebt = creditCards.reduce((sum, card) => sum + (card.current_balance || 0), 0)
   
-  // Show the total balance from accounts
-  const balance = accountsBalance;
+  // Net balance (accounts - credit debt)
+  const totalBalance = totalAccountsBalance - totalCreditDebt
+  
+  // Monthly net (income - expenses this month)
+  const monthlyNet = monthlyIncome - monthlyExpenses
 
   return (
     <Layout>
@@ -47,45 +60,60 @@ const Dashboard = () => {
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
+              <CardTitle className="text-sm font-medium">Saldo Total Geral</CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${balance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatCurrency(balance)}
+              <div className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {formatCurrency(totalBalance)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Seu saldo atual
+                Contas menos cartões
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Receitas</CardTitle>
+              <CardTitle className="text-sm font-medium">Saldo Mensal</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${monthlyNet >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {formatCurrency(monthlyNet)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Receitas - Despesas (mês atual)
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
               <TrendingUp className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-success">
-                {formatCurrency(totalIncome)}
+                {formatCurrency(monthlyIncome)}
               </div>
               <p className="text-xs text-muted-foreground">
-                +12% em relação ao mês passado
+                Entradas do mês atual
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas</CardTitle>
+              <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
               <TrendingDown className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-destructive">
-                {formatCurrency(totalExpenses)}
+                {formatCurrency(monthlyExpenses)}
               </div>
               <p className="text-xs text-muted-foreground">
-                -5% em relação ao mês passado
+                Gastos do mês atual
               </p>
             </CardContent>
           </Card>

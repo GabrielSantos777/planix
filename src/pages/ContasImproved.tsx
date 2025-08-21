@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import Layout from "@/components/Layout"
+import { CreditCardInvoices } from "@/components/CreditCardInvoices"
 
 const accountTypeLabels = {
   bank: "Conta Corrente",
@@ -49,6 +50,7 @@ interface MonthlyInvoice {
   transactions: any[]
   total: number
   dueDate: Date
+  status: 'open' | 'closed' | 'paid'
 }
 
 export default function ContasImproved() {
@@ -313,7 +315,7 @@ export default function ContasImproved() {
       .slice(0, 5)
   }
 
-  // Get transactions grouped by month for credit cards
+  // Get transactions grouped by month for credit cards with correct current month logic
   const getCreditCardMonthlyInvoices = (cardId): MonthlyInvoice[] => {
     const cardTransactions = transactions.filter(t => t.credit_card_id === cardId)
     
@@ -327,6 +329,7 @@ export default function ContasImproved() {
       
       // Calculate invoice month based on closing day
       let invoiceMonth, invoiceYear
+      const currentDate = new Date()
       
       if (transactionDate.getDate() <= card.closing_day) {
         // Transaction is for current month's invoice
@@ -347,7 +350,8 @@ export default function ContasImproved() {
           year: invoiceYear,
           transactions: [],
           total: 0,
-          dueDate: new Date(invoiceYear, invoiceMonth, card.due_day)
+          dueDate: new Date(invoiceYear, invoiceMonth, card.due_day),
+          status: 'open' as 'open' | 'closed' | 'paid'
         }
       }
       
@@ -619,50 +623,8 @@ export default function ContasImproved() {
                         </div>
                       </div>
 
-                      {/* Monthly Invoices */}
-                      <div>
-                        <Label className="text-sm font-medium mb-2 block">Faturas por Mês</Label>
-                        <div className="space-y-3 max-h-64 overflow-y-auto">
-                          {getCreditCardMonthlyInvoices(card.id).length > 0 ? (
-                            getCreditCardMonthlyInvoices(card.id).slice(0, 6).map((invoice, index) => (
-                              <div key={`${invoice.year}-${invoice.month}`} className="border rounded-lg p-3 bg-background">
-                                <div className="flex justify-between items-center mb-2">
-                                  <h4 className="font-medium text-sm">
-                                    {new Date(invoice.year, invoice.month, 1).toLocaleDateString('pt-BR', { 
-                                      month: 'long', 
-                                      year: 'numeric',
-                                      timeZone: 'UTC'
-                                    })}
-                                  </h4>
-                                  <Badge variant={index === 0 ? "destructive" : "outline"} className="text-xs">
-                                    {formatCurrency(invoice.total)}
-                                  </Badge>
-                                </div>
-                                <div className="text-xs text-muted-foreground mb-2">
-                                  Vencimento: {invoice.dueDate.toLocaleDateString('pt-BR')}
-                                </div>
-                                <div className="space-y-1">
-                                  {invoice.transactions.slice(0, 3).map((transaction) => (
-                                    <div key={transaction.id} className="flex justify-between items-center text-xs">
-                                      <span className="truncate">{transaction.description}</span>
-                                      <span className="text-red-600 font-medium">
-                                        {formatCurrency(Math.abs(transaction.amount))}
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {invoice.transactions.length > 3 && (
-                                    <div className="text-xs text-muted-foreground">
-                                      +{invoice.transactions.length - 3} transações
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-sm text-muted-foreground">Nenhuma fatura encontrada</p>
-                          )}
-                        </div>
-                      </div>
+                       {/* Credit Card Invoices Component */}
+                      <CreditCardInvoices cardId={card.id} cardName={card.name} />
                     </div>
                   </CardContent>
                 </Card>
