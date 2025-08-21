@@ -165,6 +165,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { error }
       }
 
+      // Verificar status da assinatura após login
+      setTimeout(async () => {
+        try {
+          await supabase.functions.invoke('check-subscription')
+        } catch (err) {
+          console.log('Erro ao verificar assinatura:', err)
+        }
+      }, 1000)
+
       toast({
         title: "Login realizado com sucesso!",
         description: "Bem-vindo ao FinanceFlow",

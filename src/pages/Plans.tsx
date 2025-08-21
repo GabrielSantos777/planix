@@ -56,41 +56,38 @@ const Plans = () => {
     },
     {
       name: 'Premium',
-      description: 'Para quem quer controle total das finanças',
-      monthlyPrice: 19.90,
-      yearlyPrice: 199.00,
+      description: 'Completo para empresários e gestores',
+      monthlyPrice: 49.90,
+      yearlyPrice: 499.00,
       features: [
-        'Transações ilimitadas',
-        'Contas e cartões ilimitados',
-        'Todos os relatórios',
-        'Integração WhatsApp + IA',
-        'Metas e planejamento',
-        'Investimentos em tempo real',
+        'Contas ilimitadas',
+        'Lançamentos ilimitados',
+        'Relatórios avançados com dashboards',
+        'Gráficos interativos e personalizáveis',
+        'Exportação personalizada (PDF/Excel)',
+        'WhatsApp Bot integrado',
         'Suporte prioritário',
-        'Backup automático'
+        'Backups automáticos'
       ],
       limitations: [],
-      current: profile?.subscription_plan === 'premium',
+      current: profile?.subscription_plan === 'premium' && profile?.subscription_end && new Date(profile.subscription_end) > new Date(),
       popular: true,
       trial: false
     },
     {
-      name: 'Enterprise',
-      description: 'Para empresários e gestores financeiros',
-      monthlyPrice: 49.90,
-      yearlyPrice: 499.00,
+      name: 'Profissional',
+      description: 'Para uso pessoal avançado',
+      monthlyPrice: 19.90,
+      yearlyPrice: 199.00,
       features: [
-        'Tudo do Premium',
-        'Múltiplas empresas',
-        'API personalizada',
-        'Relatórios avançados',
-        'Consultoria financeira',
-        'Suporte 24/7',
-        'Integração contábil',
-        'Dashboard personalizado'
+        'Até 15 contas bancárias',
+        'Até 10.000 lançamentos por ano',
+        'Relatórios em PDF e Excel',
+        'Gráficos básicos',
+        'Suporte por email'
       ],
       limitations: [],
-      current: profile?.subscription_plan === 'enterprise',
+      current: (profile?.subscription_plan === 'enterprise' || profile?.subscription_plan === 'basic') && (!profile?.subscription_end || new Date(profile.subscription_end) > new Date()),
       popular: false,
       trial: false
     }

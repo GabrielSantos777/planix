@@ -1,0 +1,95 @@
+import { useAuth } from '@/context/AuthContext'
+import { useMemo } from 'react'
+
+export interface PlanLimits {
+  maxAccounts: number
+  maxTransactions: number
+  canExportReports: boolean
+  canAccessWhatsApp: boolean
+  canAccessAdvancedCharts: boolean
+  hasUnlimitedFeatures: boolean
+  planName: string
+}
+
+export const usePlanLimits = (): PlanLimits => {
+  const { profile, hasActiveSubscription, isTrialExpired } = useAuth()
+
+  return useMemo(() => {
+    // Se é admin, tem acesso ilimitado
+    if (profile?.is_admin) {
+      return {
+        maxAccounts: Infinity,
+        maxTransactions: Infinity,
+        canExportReports: true,
+        canAccessWhatsApp: true,
+        canAccessAdvancedCharts: true,
+        hasUnlimitedFeatures: true,
+        planName: 'Admin'
+      }
+    }
+
+    // Se tem assinatura ativa
+    if (hasActiveSubscription) {
+      switch (profile?.subscription_plan) {
+        case 'premium':
+          return {
+            maxAccounts: Infinity,
+            maxTransactions: Infinity,
+            canExportReports: true,
+            canAccessWhatsApp: true,
+            canAccessAdvancedCharts: true,
+            hasUnlimitedFeatures: true,
+            planName: 'Premium'
+          }
+        
+        case 'enterprise': // Mantido para compatibilidade, mas mapeia para profissional
+          return {
+            maxAccounts: 15,
+            maxTransactions: 10000,
+            canExportReports: true,
+            canAccessWhatsApp: false,
+            canAccessAdvancedCharts: false,
+            hasUnlimitedFeatures: false,
+            planName: 'Profissional'
+          }
+        
+        default:
+          return {
+            maxAccounts: 5,
+            maxTransactions: 100,
+            canExportReports: false,
+            canAccessWhatsApp: false,
+            canAccessAdvancedCharts: false,
+            hasUnlimitedFeatures: false,
+            planName: 'Básico'
+          }
+      }
+    }
+
+    // Se ainda está no trial (não expirado)
+    if (!isTrialExpired) {
+      return {
+        maxAccounts: 5,
+        maxTransactions: 100,
+        canExportReports: false,
+        canAccessWhatsApp: false,
+        canAccessAdvancedCharts: false,
+        hasUnlimitedFeatures: false,
+        planName: 'Trial Básico'
+      }
+    }
+
+    // Trial expirado, sem assinatura
+    return {
+      maxAccounts: 0,
+      maxTransactions: 0,
+      canExportReports: false,
+      canAccessWhatsApp: false,
+      canAccessAdvancedCharts: false,
+      hasUnlimitedFeatures: false,
+      planName: 'Expirado'
+    }
+  }, [profile, hasActiveSubscription, isTrialExpired])
+}
+
+export default usePlanLimits
