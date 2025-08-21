@@ -38,7 +38,7 @@ export const CreditCardInvoiceModal = ({
   
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
   const [paymentDate, setPaymentDate] = useState<Date>(new Date())
-  const [paymentAmount, setPaymentAmount] = useState(invoiceAmount)
+  // Payment amount is always the full invoice amount
 
   const handlePayment = () => {
     if (!selectedAccountId) {
@@ -60,7 +60,7 @@ export const CreditCardInvoiceModal = ({
       return
     }
 
-    if ((selectedAccount.current_balance || 0) < paymentAmount) {
+    if ((selectedAccount.current_balance || 0) < invoiceAmount) {
       toast({
         title: "Saldo Insuficiente",
         description: "A conta selecionada não possui saldo suficiente",
@@ -72,7 +72,7 @@ export const CreditCardInvoiceModal = ({
     onPayment({
       account_id: selectedAccountId,
       payment_date: paymentDate,
-      amount: paymentAmount
+      amount: invoiceAmount
     })
 
     onClose()
@@ -94,14 +94,13 @@ export const CreditCardInvoiceModal = ({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="amount">Valor a Pagar</Label>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(Number(e.target.value))}
-            />
+            <Label>Valor a Pagar</Label>
+            <div className="text-2xl font-bold text-destructive">
+              {formatCurrency(invoiceAmount)}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Valor total da fatura
+            </p>
           </div>
 
           <div className="grid gap-2">

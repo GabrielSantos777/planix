@@ -184,7 +184,10 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {transactions.map((transaction) => (
+              {transactions
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, 7)
+                .map((transaction) => (
                 <div key={transaction.id} className="flex items-center justify-between p-3 sm:p-4 border rounded-lg">
                   <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
                     <div className={`p-1.5 sm:p-2 rounded-full flex-shrink-0 ${

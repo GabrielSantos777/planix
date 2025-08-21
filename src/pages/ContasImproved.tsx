@@ -72,6 +72,46 @@ export default function ContasImproved() {
     loading
   } = useSupabaseData()
   
+  // Get current month invoice for a credit card
+  const getCurrentMonthInvoice = (cardId: string) => {
+    const now = new Date()
+    const currentMonth = now.getMonth()
+    const currentYear = now.getFullYear()
+    
+    const cardTransactions = transactions.filter(t => 
+      t.credit_card_id === cardId &&
+      new Date(t.date).getMonth() === currentMonth &&
+      new Date(t.date).getFullYear() === currentYear
+    )
+    
+    return cardTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0)
+  }
+
+  // Calculate used limit including installments for future months
+  const getUsedLimit = (cardId: string) => {
+    const cardTransactions = transactions.filter(t => t.credit_card_id === cardId)
+    
+    let totalUsed = 0
+    const now = new Date()
+    
+    cardTransactions.forEach(transaction => {
+      if (transaction.is_installment && transaction.installments && transaction.installment_number) {
+        // For installments, calculate how many are still pending
+        const remainingInstallments = transaction.installments - transaction.installment_number + 1
+        totalUsed += Math.abs(transaction.amount) * remainingInstallments
+      } else {
+        // For regular transactions, only count current month forward
+        const transactionDate = new Date(transaction.date)
+        if (transactionDate >= now || 
+           (transactionDate.getMonth() === now.getMonth() && transactionDate.getFullYear() === now.getFullYear())) {
+          totalUsed += Math.abs(transaction.amount)
+        }
+      }
+    })
+    
+    return totalUsed
+  }
+  
   // Estados para dialogs
   const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false)
   const [isCreditCardDialogOpen, setIsCreditCardDialogOpen] = useState(false)
@@ -597,14 +637,18 @@ export default function ContasImproved() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div>
                           <Label className="text-sm font-medium">Fatura Atual</Label>
-                          <p className="text-2xl font-bold text-destructive">{formatCurrency(Math.abs(card.current_balance || 0))}</p>
+                          <p className="text-2xl font-bold text-destructive">{formatCurrency(getCurrentMonthInvoice(card.id))}</p>
                         </div>
                         <div>
                           <Label className="text-sm font-medium">Limite</Label>
                           <p className="text-lg">{formatCurrency(card.limit_amount || 0)}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium">Limite Usado</Label>
+                          <p className="text-lg text-destructive">{formatCurrency(getUsedLimit(card.id))}</p>
                         </div>
                       </div>
                       
