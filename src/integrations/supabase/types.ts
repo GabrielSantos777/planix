@@ -505,29 +505,29 @@ export type Database = {
       }
     }
     Views: {
-      whatsapp_integrations_secure: {
+      whatsapp_integrations_safe: {
         Row: {
-          connection_status: string | null
           created_at: string | null
           id: string | null
           is_active: boolean | null
           phone_number: string | null
+          status: string | null
           user_id: string | null
         }
         Insert: {
-          connection_status?: never
           created_at?: string | null
           id?: string | null
           is_active?: boolean | null
           phone_number?: string | null
+          status?: never
           user_id?: string | null
         }
         Update: {
-          connection_status?: never
           created_at?: string | null
           id?: string | null
           is_active?: boolean | null
           phone_number?: string | null
+          status?: never
           user_id?: string | null
         }
         Relationships: []
