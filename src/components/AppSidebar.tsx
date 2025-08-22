@@ -103,7 +103,7 @@ export function AppSidebar() {
       {/* Sidebar */}
       <div 
         className={cn(
-          "fixed left-0 top-0 h-full bg-sidebar-background border-r border-sidebar-border z-50",
+          "fixed left-0 top-0 h-full bg-background border-r border-border z-50 shadow-lg",
           "transition-transform duration-300 ease-in-out",
           // Desktop: 250px de largura
           "w-64 md:w-60 lg:w-64",
@@ -113,14 +113,14 @@ export function AppSidebar() {
           "transform translate-x-0"
         )}
       >
-        <div className="flex flex-col h-full bg-sidebar-background">
+        <div className="flex flex-col h-full bg-background">
           {/* Header com botão de fechar */}
-          <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
+          <div className="p-4 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-primary-foreground" />
               </div>
-              <h1 className="text-lg font-bold text-sidebar-foreground">
+              <h1 className="text-lg font-bold text-foreground">
                 PLANIX
               </h1>
             </div>
@@ -130,7 +130,7 @@ export function AppSidebar() {
               variant="ghost" 
               size="sm"
               onClick={handleOverlayClick}
-              className="h-8 w-8 p-0 hover:bg-sidebar-accent"
+              className="h-8 w-8 p-0 hover:bg-accent"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -139,7 +139,7 @@ export function AppSidebar() {
           {/* Menu */}
           <div className="flex-1 p-4">
             <div className="mb-4">
-              <h2 className="text-sm font-medium text-sidebar-foreground/60 mb-2">
+              <h2 className="text-sm font-medium text-muted-foreground mb-2">
                 Menu Principal
               </h2>
             </div>
@@ -160,8 +160,8 @@ export function AppSidebar() {
                     cn(
                       "flex items-center gap-3 px-3 py-3 rounded-md transition-colors min-h-[40px]",
                       isActive 
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
-                        : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
+                        ? "bg-accent text-accent-foreground font-medium" 
+                        : "hover:bg-accent/50 text-foreground"
                     )
                   }
                 >
