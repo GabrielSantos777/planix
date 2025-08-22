@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { 
-  TrendingUp, 
-  BarChart3, 
-  Target, 
-  Wallet, 
+import {
+  TrendingUp,
+  BarChart3,
+  Target,
+  Wallet,
   FileDown,
   Star,
   Check,
@@ -16,7 +16,8 @@ import {
   Facebook,
   Twitter,
   Instagram,
-  Linkedin
+  Linkedin,
+  Bot
 } from "lucide-react"
 import { useState } from "react"
 import heroImage from "@/assets/hero-dashboard.jpg"
@@ -50,6 +51,11 @@ const Landing = () => {
       icon: FileDown,
       title: "Exportação PDF/Excel",
       description: "Exporte seus relatórios e dados para análise externa ou backup"
+    },
+    {
+      icon: Bot,
+      title: "Bot WhatsApp",
+      description: "Insira suas receitas e despesas, consulte saldos, receba relatórios diretamente no seu WhatsApp"
     }
   ]
 
@@ -139,25 +145,25 @@ const Landing = () => {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-8">
-              <button 
+              <button
                 onClick={() => scrollToSection('funcionalidades')}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Funcionalidades
               </button>
-              <button 
+              <button
                 onClick={() => scrollToSection('planos')}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Planos
               </button>
-              <button 
+              <button
                 onClick={() => scrollToSection('depoimentos')}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Depoimentos
               </button>
-              <button 
+              <button
                 onClick={() => scrollToSection('contato')}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
@@ -188,25 +194,25 @@ const Landing = () => {
           {isMenuOpen && (
             <div className="md:hidden border-t bg-background/95 backdrop-blur">
               <div className="px-2 pt-2 pb-3 space-y-1">
-                <button 
+                <button
                   onClick={() => scrollToSection('funcionalidades')}
                   className="block px-3 py-2 text-muted-foreground hover:text-foreground transition-colors w-full text-left"
                 >
                   Funcionalidades
                 </button>
-                <button 
+                <button
                   onClick={() => scrollToSection('planos')}
                   className="block px-3 py-2 text-muted-foreground hover:text-foreground transition-colors w-full text-left"
                 >
                   Planos
                 </button>
-                <button 
+                <button
                   onClick={() => scrollToSection('depoimentos')}
                   className="block px-3 py-2 text-muted-foreground hover:text-foreground transition-colors w-full text-left"
                 >
                   Depoimentos
                 </button>
-                <button 
+                <button
                   onClick={() => scrollToSection('contato')}
                   className="block px-3 py-2 text-muted-foreground hover:text-foreground transition-colors w-full text-left"
                 >
@@ -243,14 +249,14 @@ const Landing = () => {
                   Começar agora
                 </Button>
                 <Button variant="outline" size="lg" className="text-lg px-8 py-6" onClick={() => scrollToSection('funcionalidades')}>
-                  Ver funcionalidades
+                  Saiba mais
                 </Button>
               </div>
             </div>
             <div className="lg:order-last">
-              <img 
-                src={heroImage} 
-                alt="Dashboard do sistema financeiro" 
+              <img
+                src={heroImage}
+                alt="Dashboard do sistema financeiro"
                 className="w-full h-auto rounded-xl shadow-2xl"
               />
             </div>
@@ -267,7 +273,7 @@ const Landing = () => {
               Todas as ferramentas que você precisa para ter controle total sobre suas finanças
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
               <Card key={index} className="group hover:shadow-lg transition-all duration-300 border-0 bg-card hover:-translate-y-1">
@@ -297,7 +303,7 @@ const Landing = () => {
               Comece grátis e evolua conforme suas necessidades
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {plans.map((plan, index) => (
               <Card key={index} className={`relative ${plan.highlighted ? 'ring-2 ring-primary border-primary' : ''}`}>
@@ -325,8 +331,8 @@ const Landing = () => {
                       </li>
                     ))}
                   </ul>
-                  <Button 
-                    className="w-full" 
+                  <Button
+                    className="w-full"
                     variant={plan.highlighted ? "default" : "outline"}
                     onClick={() => navigate('/auth')}
                   >
@@ -348,7 +354,7 @@ const Landing = () => {
               Descubra como o PLANIX está transformando a vida financeira das pessoas
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {testimonials.map((testimonial, index) => (
               <Card key={index} className="bg-card">
@@ -380,9 +386,9 @@ const Landing = () => {
             <p className="text-xl opacity-90">
               Junte-se a milhares de pessoas que já transformaram sua relação com o dinheiro
             </p>
-            <Button 
-              size="lg" 
-              variant="secondary" 
+            <Button
+              size="lg"
+              variant="secondary"
               className="text-lg px-8 py-6"
               onClick={() => navigate('/auth')}
             >
@@ -402,7 +408,7 @@ const Landing = () => {
                 Sua jornada rumo à liberdade financeira começa aqui.
               </p>
             </div>
-            
+
             <div className="space-y-4">
               <h4 className="font-semibold">Links Rápidos</h4>
               <ul className="space-y-2 text-muted-foreground">
@@ -412,7 +418,7 @@ const Landing = () => {
                 <li><a href="#" className="hover:text-foreground transition-colors">Contato</a></li>
               </ul>
             </div>
-            
+
             <div className="space-y-4">
               <h4 className="font-semibold">Produto</h4>
               <ul className="space-y-2 text-muted-foreground">
@@ -422,7 +428,7 @@ const Landing = () => {
                 <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
               </ul>
             </div>
-            
+
             <div className="space-y-4">
               <h4 className="font-semibold">Redes Sociais</h4>
               <div className="flex space-x-4">
@@ -441,7 +447,7 @@ const Landing = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="mt-8 pt-8 border-t text-center text-muted-foreground">
             <p>&copy; 2025 PLANIX. Todos os direitos reservados.</p>
           </div>
