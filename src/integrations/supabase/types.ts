@@ -505,33 +505,7 @@ export type Database = {
       }
     }
     Views: {
-      whatsapp_integrations_safe: {
-        Row: {
-          created_at: string | null
-          id: string | null
-          is_active: boolean | null
-          phone_number: string | null
-          status: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          phone_number?: string | null
-          status?: never
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          phone_number?: string | null
-          status?: never
-          user_id?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       decrypt_whatsapp_token: {
