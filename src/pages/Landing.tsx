@@ -69,7 +69,9 @@ const Landing = () => {
         "Até 100 transações/mês",
         "Relatórios básicos",
         "1 conta bancária",
-        "Suporte por email"
+        "Suporte por email",
+        "",
+        "",
       ],
       highlighted: false
     },
@@ -433,16 +435,7 @@ const Landing = () => {
               <h4 className="font-semibold">Redes Sociais</h4>
               <div className="flex space-x-4">
                 <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  <Facebook className="h-5 w-5" />
-                </a>
-                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  <Twitter className="h-5 w-5" />
-                </a>
-                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                   <Instagram className="h-5 w-5" />
-                </a>
-                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  <Linkedin className="h-5 w-5" />
                 </a>
               </div>
             </div>
