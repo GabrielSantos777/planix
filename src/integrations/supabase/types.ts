@@ -508,7 +508,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      decrypt_whatsapp_token: {
+        Args: { encrypted_token: string }
+        Returns: string
+      }
+      encrypt_whatsapp_token: {
+        Args: { token: string }
+        Returns: string
+      }
+      get_user_whatsapp_token: {
+        Args: { user_uuid: string }
+        Returns: string
+      }
+      update_whatsapp_token: {
+        Args: { new_token: string; phone: string; user_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       account_type: "bank" | "savings" | "investment"
