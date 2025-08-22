@@ -11,7 +11,7 @@ const TermsOfService = () => {
     {
       title: "1. Aceitação dos Termos",
       content: [
-        "Ao acessar e usar o FinanceApp, você concorda em cumprir estes Termos de Uso e todas as leis e regulamentos aplicáveis.",
+        "Ao acessar e usar o PLANIX, você concorda em cumprir estes Termos de Uso e todas as leis e regulamentos aplicáveis.",
         "Se você não concordar com algum destes termos, está proibido de usar ou acessar este site e seus serviços.",
         "Os materiais contidos neste site são protegidos pelas leis de direitos autorais e marcas comerciais aplicáveis."
       ]
@@ -39,7 +39,7 @@ const TermsOfService = () => {
     {
       title: "4. Limitação de Responsabilidade da Empresa",
       content: [
-        "O FinanceApp é fornecido 'como está', sem garantias de qualquer tipo, expressas ou implícitas.",
+        "O PLANIX é fornecido 'como está', sem garantias de qualquer tipo, expressas ou implícitas.",
         "Não garantimos que o serviço será ininterrupto, livre de erros ou totalmente seguro.",
         "Em nenhuma circunstância seremos responsáveis por danos diretos, indiretos, incidentais ou consequenciais.",
         "Nossa responsabilidade total não excederá o valor pago pelo usuário nos últimos 12 meses.",
@@ -71,7 +71,7 @@ const TermsOfService = () => {
     {
       title: "7. Propriedade Intelectual",
       content: [
-        "Todo o conteúdo, design, código e funcionalidades do FinanceApp são de nossa propriedade exclusiva.",
+        "Todo o conteúdo, design, código e funcionalidades do PLANIX são de nossa propriedade exclusiva.",
         "É proibida a reprodução, distribuição ou criação de trabalhos derivados sem autorização.",
         "Usuários mantêm a propriedade de seus dados pessoais e financeiros inseridos na plataforma.",
         "Concedemos uma licença limitada e revogável para uso pessoal da plataforma."
@@ -111,7 +111,7 @@ const TermsOfService = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-xl font-bold">FinanceApp</h1>
+            <h1 className="text-xl font-bold">PLANIX</h1>
           </div>
           <Button onClick={() => navigate("/auth")}>
             Entrar
@@ -127,7 +127,7 @@ const TermsOfService = () => {
             Termos de Uso
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Leia atentamente nossos termos e condições para uso da plataforma FinanceApp.
+            Leia atentamente nossos termos e condições para uso da plataforma PLANIX.
           </p>
         </div>
       </section>
@@ -143,7 +143,7 @@ const TermsOfService = () => {
                   <h2 className="text-2xl font-bold">Informações Importantes</h2>
                 </div>
                 <p className="text-muted-foreground">
-                  Estes Termos de Uso estabelecem as regras e condições para utilização da plataforma FinanceApp. 
+                  Estes Termos de Uso estabelecem as regras e condições para utilização da plataforma PLANIX. 
                   Ao criar uma conta ou usar nossos serviços, você automaticamente aceita todos os termos descritos abaixo.
                 </p>
               </CardContent>
@@ -178,7 +178,7 @@ const TermsOfService = () => {
                   Se você tiver dúvidas sobre estes Termos de Uso, entre em contato conosco:
                 </p>
                 <div className="space-y-2 text-sm">
-                  <p><strong>Email:</strong> legal@financeapp.com</p>
+                  <p><strong>Email:</strong> legal@PLANIX.com</p>
                   <p><strong>Endereço:</strong> São Paulo, SP - Brasil</p>
                 </div>
               </CardContent>
@@ -210,7 +210,7 @@ const TermsOfService = () => {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            © 2024 FinanceApp. Todos os direitos reservados.
+            © 2024 PLANIX. Todos os direitos reservados.
           </div>
         </div>
       </footer>

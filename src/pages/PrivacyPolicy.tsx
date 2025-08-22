@@ -77,7 +77,7 @@ const PrivacyPolicy = () => {
         "Direito de portabilidade: pode solicitar seus dados em formato estruturado e legível.",
         "Direito de oposição: pode se opor ao processamento de seus dados para certas finalidades.",
         "Direito de limitação: pode solicitar restrição do processamento em certas circunstâncias.",
-        "Para exercer seus direitos, entre em contato através do email: privacidade@financeapp.com"
+        "Para exercer seus direitos, entre em contato através do email: privacidade@PLANIX.com"
       ]
     },
     {
@@ -134,7 +134,7 @@ const PrivacyPolicy = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-xl font-bold">FinanceApp</h1>
+            <h1 className="text-xl font-bold">PLANIX</h1>
           </div>
           <Button onClick={() => navigate("/auth")}>
             Entrar
@@ -166,7 +166,7 @@ const PrivacyPolicy = () => {
                   <h2 className="text-2xl font-bold">Compromisso com sua Privacidade</h2>
                 </div>
                 <p className="text-muted-foreground">
-                  No FinanceApp, sua privacidade é nossa prioridade. Esta política descreve como tratamos 
+                  No PLANIX, sua privacidade é nossa prioridade. Esta política descreve como tratamos 
                   seus dados pessoais em conformidade com a Lei Geral de Proteção de Dados (LGPD) e 
                   outras regulamentações aplicáveis.
                 </p>
@@ -203,8 +203,8 @@ const PrivacyPolicy = () => {
                   Para exercer seus direitos ou esclarecer dúvidas sobre privacidade:
                 </p>
                 <div className="space-y-2 text-sm">
-                  <p><strong>Email do Encarregado de Dados:</strong> privacidade@financeapp.com</p>
-                  <p><strong>Email Geral:</strong> suporte@financeapp.com</p>
+                  <p><strong>Email do Encarregado de Dados:</strong> privacidade@PLANIX.com</p>
+                  <p><strong>Email Geral:</strong> suporte@PLANIX.com</p>
                   <p><strong>Tempo de Resposta:</strong> até 15 dias úteis</p>
                 </div>
               </CardContent>
@@ -236,7 +236,7 @@ const PrivacyPolicy = () => {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            © 2024 FinanceApp. Todos os direitos reservados.
+            © 2024 PLANIX. Todos os direitos reservados.
           </div>
         </div>
       </footer>

@@ -46,7 +46,7 @@ const AboutUs = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-xl font-bold">FinanceApp</h1>
+            <h1 className="text-xl font-bold">PLANIX</h1>
           </div>
           <Button onClick={() => navigate("/auth")}>
             Entrar
@@ -104,7 +104,7 @@ const AboutUs = () => {
             <h2 className="text-3xl font-bold mb-8">Nossa História</h2>
             <div className="prose prose-lg mx-auto text-muted-foreground">
               <p className="text-lg mb-6">
-                O FinanceApp nasceu da necessidade real de simplificar o controle 
+                O PLANIX nasceu da necessidade real de simplificar o controle 
                 financeiro pessoal e empresarial. Fundado em 2024, nossa plataforma 
                 foi desenvolvida por uma equipe de especialistas em tecnologia e 
                 finanças que identificaram as principais dificuldades enfrentadas 
@@ -207,7 +207,7 @@ const AboutUs = () => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <h3 className="font-semibold mb-4">FinanceApp</h3>
+              <h3 className="font-semibold mb-4">PLANIX</h3>
               <p className="text-sm text-muted-foreground">
                 Simplifique suas finanças com inteligência.
               </p>
@@ -230,12 +230,12 @@ const AboutUs = () => {
             <div>
               <h4 className="font-semibold mb-4">Contato</h4>
               <p className="text-sm text-muted-foreground">
-                suporte@financeapp.com
+                suporte@PLANIX.com
               </p>
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            © 2024 FinanceApp. Todos os direitos reservados.
+            © 2024 PLANIX. Todos os direitos reservados.
           </div>
         </div>
       </footer>

@@ -60,7 +60,7 @@ const Contact = () => {
     {
       icon: Mail,
       title: "Email de Suporte",
-      description: "suporte@financeapp.com",
+      description: "suporte@PLANIX.com",
       subtitle: "Resposta em até 24 horas"
     },
     {
@@ -101,7 +101,7 @@ const Contact = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-xl font-bold">FinanceApp</h1>
+            <h1 className="text-xl font-bold">PLANIX</h1>
           </div>
           <Button onClick={() => navigate("/auth")}>
             Entrar
@@ -288,7 +288,7 @@ const Contact = () => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <h3 className="font-semibold mb-4">FinanceApp</h3>
+              <h3 className="font-semibold mb-4">PLANIX</h3>
               <p className="text-sm text-muted-foreground">
                 Simplifique suas finanças com inteligência.
               </p>
@@ -318,7 +318,7 @@ const Contact = () => {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            © 2024 FinanceApp. Todos os direitos reservados.
+            © 2024 PLANIX. Todos os direitos reservados.
           </div>
         </div>
       </footer>
