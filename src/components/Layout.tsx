@@ -44,12 +44,13 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="min-h-screen w-full bg-background relative">
         <AppSidebar />
         
-        <div className="flex-1 flex flex-col">
+        {/* Main Content - sempre ocupa toda a largura */}
+        <div className="w-full flex flex-col">
           {/* Header */}
-          <header className="h-14 flex items-center justify-between border-b bg-card px-2 sm:px-4 shadow-sm">
+          <header className="h-14 flex items-center justify-between border-b bg-card px-2 sm:px-4 shadow-sm z-10 relative">
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
               <SidebarTrigger className="hover:bg-accent hover:text-accent-foreground" />
               <div className="flex items-center gap-1 sm:gap-2 ml-1 sm:ml-2 min-w-0">
