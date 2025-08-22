@@ -117,22 +117,21 @@ const Dashboard = () => {
               </p>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Saldo Total Geral</CardTitle>
-              <Wallet className="h-12 w-12 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatCurrency(totalBalance)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Contas menos cartões
-              </p>
-            </CardContent>
-          </Card>
         </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Saldo Total Geral</CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {formatCurrency(totalBalance)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Contas menos cartões
+            </p>
+          </CardContent>
+        </Card>
 
         {/* Quick Actions */}
         <Card>
@@ -191,8 +190,8 @@ const Dashboard = () => {
                   <div key={transaction.id} className="flex items-center justify-between p-3 sm:p-4 border rounded-lg">
                     <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
                       <div className={`p-1.5 sm:p-2 rounded-full flex-shrink-0 ${transaction.type === "income"
-                          ? "bg-success/10 text-success"
-                          : "bg-destructive/10 text-destructive"
+                        ? "bg-success/10 text-success"
+                        : "bg-destructive/10 text-destructive"
                         }`}>
                         {transaction.type === "income" ? (
                           <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
