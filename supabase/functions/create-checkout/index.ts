@@ -58,7 +58,7 @@ serve(async (req) => {
             currency: "brl",
             product_data: { 
               name: plan.name,
-              description: `Assinatura ${planType} - Planix`
+              description: `Assinatura ${planType} - PLANIX`
             },
             unit_amount: plan.amount,
             recurring: { interval: "month" },

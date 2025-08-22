@@ -134,7 +134,7 @@ const Landing = () => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-primary">Planix</h1>
+              <h1 className="text-2xl font-bold text-primary">PLANIX</h1>
             </div>
 
             {/* Desktop Navigation */}
@@ -345,7 +345,7 @@ const Landing = () => {
           <div className="text-center space-y-4 mb-16">
             <h2 className="text-3xl md:text-4xl font-bold">O que nossos clientes dizem</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Descubra como o Planix está transformando a vida financeira das pessoas
+              Descubra como o PLANIX está transformando a vida financeira das pessoas
             </p>
           </div>
           
@@ -397,7 +397,7 @@ const Landing = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div className="space-y-4">
-              <h3 className="text-2xl font-bold text-primary">Planix</h3>
+              <h3 className="text-2xl font-bold text-primary">PLANIX</h3>
               <p className="text-muted-foreground">
                 Sua jornada rumo à liberdade financeira começa aqui.
               </p>
@@ -443,7 +443,7 @@ const Landing = () => {
           </div>
           
           <div className="mt-8 pt-8 border-t text-center text-muted-foreground">
-            <p>&copy; 2025 Planix. Todos os direitos reservados.</p>
+            <p>&copy; 2025 PLANIX. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>
