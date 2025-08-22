@@ -176,7 +176,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       toast({
         title: "Login realizado com sucesso!",
-        description: "Bem-vindo ao FinanceFlow",
+        description: "Bem-vindo ao Planix",
       })
 
       return { error: null }

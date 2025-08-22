@@ -159,7 +159,7 @@ const RelatoriosImproved = () => {
     // Header
     doc.setFontSize(20)
     doc.setFont("helvetica", "bold")
-    doc.text('FinanceFlow', 20, 20)
+    doc.text('Planix', 20, 20)
     
     doc.setFontSize(16)
     doc.text('Relatório Financeiro Detalhado', 20, 35)

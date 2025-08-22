@@ -83,7 +83,7 @@ export function AppSidebar() {
             </div>
             {!collapsed && (
               <h1 className="text-lg font-bold text-sidebar-foreground">
-                FinanceFlow
+                Planix
               </h1>
             )}
           </div>

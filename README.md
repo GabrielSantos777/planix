@@ -1,56 +1,27 @@
-# Welcome to your Lovable project
+# Sistema de Controle Financeiro
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/ac228287-ee87-4afd-9952-9f0d4479b8a5
+Um sistema completo para gestão de finanças pessoais e empresariais, desenvolvido para ajudar usuários a controlar despesas, receitas, gerar relatórios e planejar metas financeiras de forma simples e inteligente.
 
-## How can I edit this code?
+## Funcionalidades
 
-There are several ways of editing your application.
+✅ Cadastro e login de usuários
 
-**Use Lovable**
+✅ Controle de despesas, receitas e transferências
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ac228287-ee87-4afd-9952-9f0d4479b8a5) and start prompting.
+✅ Gestão de múltiplas contas (corrente, poupança, cartões etc.)
 
-Changes made via Lovable will be committed automatically to this repo.
+✅ Relatórios detalhados com filtros (período, categoria, tipo, conta, status)
 
-**Use your preferred IDE**
+✅ Exportação de relatórios em PDF e Excel
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+✅ Painel com gráficos e dashboards interativos
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+✅ Bot do WhatsApp integrado para consultas rápidas, inserir as receitas e despesas.
 
-Follow these steps:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
+## Tecnologias usadas no projeto:
 
 This project is built with:
 
@@ -60,14 +31,14 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## How can I deploy this project?
+## Contribuição
 
-Simply open [Lovable](https://lovable.dev/projects/ac228287-ee87-4afd-9952-9f0d4479b8a5) and click on Share -> Publish.
+Contribuições são bem-vindas! Sinta-se à vontade para criar problemas (issues) ou enviar solicitações de pull (pull requests) para melhorias ou correções.
 
-## Can I connect a custom domain to my Lovable project?
+## Licença
 
-Yes, you can!
+Esse projeto está sob a licença MIT.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+*Este projeto foi desenvolvido por [Gabriel Santos](https://github.com/GabrielSantos777).*

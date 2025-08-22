@@ -70,7 +70,7 @@ const Auth = () => {
       
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-primary">FinanceFlow</CardTitle>
+          <CardTitle className="text-2xl font-bold text-primary">Planix</CardTitle>
           <CardDescription>
             {isLogin ? 'Faça login para acessar sua conta' : 'Crie sua conta e comece a gerenciar suas finanças'}
           </CardDescription>
