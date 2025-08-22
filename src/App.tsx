@@ -26,6 +26,10 @@ import SettingsImproved from "./pages/SettingsImproved";
 import NotFound from "./pages/NotFound";
 import WhatsAppConnection from "./pages/WhatsAppConnection";
 import Categorias from "./pages/Categorias";
+import AboutUs from "./pages/AboutUs";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Contact from "./pages/Contact";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,12 +97,16 @@ const App = () => (
                           <WhatsAppConnection />
                         </ProtectedRoute>
                       } />
-                      <Route path="/categorias" element={
-                        <ProtectedRoute>
-                          <Categorias />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="*" element={<NotFound />} />
+                       <Route path="/categorias" element={
+                         <ProtectedRoute>
+                           <Categorias />
+                         </ProtectedRoute>
+                       } />
+                       <Route path="/sobre" element={<AboutUs />} />
+                       <Route path="/termos" element={<TermsOfService />} />
+                       <Route path="/privacidade" element={<PrivacyPolicy />} />
+                       <Route path="/contato" element={<Contact />} />
+                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </BrowserRouter>
                 </TooltipProvider>

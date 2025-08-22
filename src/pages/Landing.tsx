@@ -414,10 +414,10 @@ const Landing = () => {
             <div className="space-y-4">
               <h4 className="font-semibold">Links Rápidos</h4>
               <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Sobre</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Termos de Uso</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Política de Privacidade</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contato</a></li>
+                <li><button onClick={() => navigate("/sobre")} className="hover:text-foreground transition-colors">Sobre</button></li>
+                <li><button onClick={() => navigate("/termos")} className="hover:text-foreground transition-colors">Termos de Uso</button></li>
+                <li><button onClick={() => navigate("/privacidade")} className="hover:text-foreground transition-colors">Política de Privacidade</button></li>
+                <li><button onClick={() => navigate("/contato")} className="hover:text-foreground transition-colors">Contato</button></li>
               </ul>
             </div>
 
