@@ -111,121 +111,141 @@ const Investimentos = () => {
 
   return (
     <Layout>
-      <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Investimentos</h1>
-            <p className="text-muted-foreground">
+      <div className="p-4 sm:p-6 space-y-6">
+        {/* Header Section - Responsivo */}
+        <div className="flex flex-col space-y-4 lg:space-y-0 lg:flex-row lg:justify-between lg:items-start">
+          {/* Título e Descrição - Sempre à esquerda */}
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-left">Investimentos</h1>
+            <p className="text-sm sm:text-base text-muted-foreground text-left">
               Gerencie seu portfólio de investimentos
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
-              <span className="text-xs text-muted-foreground">Preços atualizados automaticamente</span>
+          
+          {/* Status e Botões - Layout Responsivo */}
+          <div className="flex flex-col space-y-3 lg:space-y-2 lg:items-end">
+            {/* Indicador de Status - Mobile primeiro */}
+            <div className="flex items-center gap-2 lg:justify-end">
+              <div className="w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></div>
+              <span className="text-xs sm:text-sm text-muted-foreground">
+                Preços atualizados automaticamente
+              </span>
             </div>
-            <Button onClick={handleUpdatePrices} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Atualizar Preços
-            </Button>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Investimento
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Adicionar Novo Investimento</DialogTitle>
-                  <DialogDescription>
-                    Adicione um novo ativo ao seu portfólio
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="symbol">Símbolo/Ticker *</Label>
-                      <Input
-                        id="symbol"
-                        placeholder="Ex: PETR4, HGLG11"
-                        value={newInvestment.symbol}
-                        onChange={(e) => setNewInvestment({...newInvestment, symbol: e.target.value.toUpperCase()})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Tipo</Label>
-                      <Select value={newInvestment.type} onValueChange={(value: any) => setNewInvestment({...newInvestment, type: value})}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="stock">Ação</SelectItem>
-                          <SelectItem value="reit">FII</SelectItem>
-                          <SelectItem value="crypto">Criptomoeda</SelectItem>
-                          <SelectItem value="bond">Renda Fixa</SelectItem>
-                          <SelectItem value="fund">Fundo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome do Ativo *</Label>
-                    <Input
-                      id="name"
-                      placeholder="Ex: Petrobras PN"
-                      value={newInvestment.name}
-                      onChange={(e) => setNewInvestment({...newInvestment, name: e.target.value})}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="quantity">Quantidade *</Label>
-                      <Input
-                        id="quantity"
-                        type="number"
-                        placeholder="100"
-                        value={newInvestment.quantity || ''}
-                        onChange={(e) => setNewInvestment({...newInvestment, quantity: Number(e.target.value)})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="currency">Moeda</Label>
-                      <Select value={newInvestment.currency} onValueChange={(value) => setNewInvestment({...newInvestment, currency: value})}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {currencies.map(currency => (
-                            <SelectItem key={currency.code} value={currency.code}>
-                              {currency.code} - {currency.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="averagePrice">Preço Médio *</Label>
-                    <CurrencyInput
-                      value={newInvestment.averagePrice}
-                      onChange={(value) => setNewInvestment({...newInvestment, averagePrice: value})}
-                      currency={newInvestment.currency === 'BRL' ? 'R$' : newInvestment.currency}
-                    />
-                  </div>
-                </div>
-
-                <DialogFooter>
-                  <Button type="submit" onClick={handleAddInvestment}>
-                    Adicionar Investimento
+            
+            {/* Botões - Grid responsivo */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-row gap-2 lg:gap-3">
+              <Button 
+                onClick={handleUpdatePrices} 
+                variant="outline" 
+                size="sm"
+                className="w-full sm:w-auto h-10 min-h-[40px] flex items-center justify-center"
+              >
+                <RefreshCw className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="text-sm">Atualizar</span>
+              </Button>
+              
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    size="sm"
+                    className="w-full sm:w-auto h-10 min-h-[40px] flex items-center justify-center"
+                  >
+                    <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="text-sm">Adicionar Investimento</span>
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Adicionar Novo Investimento</DialogTitle>
+                    <DialogDescription>
+                      Adicione um novo ativo ao seu portfólio
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="symbol">Símbolo/Ticker *</Label>
+                        <Input
+                          id="symbol"
+                          placeholder="Ex: PETR4, HGLG11"
+                          value={newInvestment.symbol}
+                          onChange={(e) => setNewInvestment({...newInvestment, symbol: e.target.value.toUpperCase()})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="type">Tipo</Label>
+                        <Select value={newInvestment.type} onValueChange={(value: any) => setNewInvestment({...newInvestment, type: value})}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="stock">Ação</SelectItem>
+                            <SelectItem value="reit">FII</SelectItem>
+                            <SelectItem value="crypto">Criptomoeda</SelectItem>
+                            <SelectItem value="bond">Renda Fixa</SelectItem>
+                            <SelectItem value="fund">Fundo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nome do Ativo *</Label>
+                      <Input
+                        id="name"
+                        placeholder="Ex: Petrobras PN"
+                        value={newInvestment.name}
+                        onChange={(e) => setNewInvestment({...newInvestment, name: e.target.value})}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="quantity">Quantidade *</Label>
+                        <Input
+                          id="quantity"
+                          type="number"
+                          placeholder="100"
+                          value={newInvestment.quantity || ''}
+                          onChange={(e) => setNewInvestment({...newInvestment, quantity: Number(e.target.value)})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="currency">Moeda</Label>
+                        <Select value={newInvestment.currency} onValueChange={(value) => setNewInvestment({...newInvestment, currency: value})}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {currencies.map(currency => (
+                              <SelectItem key={currency.code} value={currency.code}>
+                                {currency.code} - {currency.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="averagePrice">Preço Médio *</Label>
+                      <CurrencyInput
+                        value={newInvestment.averagePrice}
+                        onChange={(value) => setNewInvestment({...newInvestment, averagePrice: value})}
+                        currency={newInvestment.currency === 'BRL' ? 'R$' : newInvestment.currency}
+                      />
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button type="submit" onClick={handleAddInvestment} className="w-full sm:w-auto">
+                      Adicionar Investimento
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
 
