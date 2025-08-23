@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Phone, Bot, CheckCircle, AlertCircle, Camera, BarChart3, Smartphone, Copy, Zap } from "lucide-react";
+import { MessageSquare, Phone, Bot, CheckCircle, AlertCircle, Camera, BarChart3, Smartphone, Copy, Zap, QrCode } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
@@ -15,9 +15,12 @@ const WhatsAppConnection = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionToken, setConnectionToken] = useState<string>("");
+  const [connectionCode, setConnectionCode] = useState<string>("");
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Número fixo do bot (na implementação real, seria o número da empresa/bot)
+  const BOT_PHONE_NUMBER = "+55 11 94567-8901"; // Número fictício do bot
 
   useEffect(() => {
     if (user) {
@@ -43,10 +46,10 @@ const WhatsAppConnection = () => {
     }
   };
 
-  const generateConnectionToken = () => {
-    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    setConnectionToken(token);
-    return token;
+  const generateConnectionCode = () => {
+    const code = Math.random().toString(36).substring(2, 15).toUpperCase();
+    setConnectionCode(code);
+    return code;
   };
 
   const formatPhoneNumber = (phone: string) => {
@@ -86,12 +89,12 @@ const WhatsAppConnection = () => {
     
     try {
       const formattedPhone = formatPhoneNumber(phoneNumber);
-      const token = generateConnectionToken();
+      const code = generateConnectionCode();
 
       // Call the database function to update WhatsApp token
       const { data, error } = await supabase.rpc('update_whatsapp_token', {
         user_uuid: user.id,
-        new_token: token,
+        new_token: code,
         phone: formattedPhone
       });
 
@@ -103,8 +106,9 @@ const WhatsAppConnection = () => {
       setPhoneNumber(formattedPhone);
       
       toast({
-        title: "Conexão estabelecida!",
-        description: `WhatsApp conectado! Envie "oi" para ${formattedPhone} no WhatsApp para ativar o bot.`,
+        title: "Conta vinculada com sucesso!",
+        description: `Agora envie mensagens para o bot ${BOT_PHONE_NUMBER} no WhatsApp para usar todas as funcionalidades!`,
+        duration: 5000,
       });
 
       // Send test message via webhook
@@ -152,7 +156,7 @@ const WhatsAppConnection = () => {
 
       setIsConnected(false);
       setPhoneNumber("");
-      setConnectionToken("");
+      setConnectionCode("");
       
       toast({
         title: "Desconectado",
@@ -249,7 +253,7 @@ const WhatsAppConnection = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">Número do WhatsApp</Label>
+                <Label htmlFor="phone">Seu Número do WhatsApp</Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -258,9 +262,12 @@ const WhatsAppConnection = () => {
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   disabled={isConnecting}
                 />
-                <p className="text-sm text-muted-foreground">
-                  Insira o número com código do país (+55 para Brasil)
-                </p>
+                <div className="bg-info/10 p-3 rounded-lg border border-info/20">
+                  <p className="text-sm text-info-foreground">
+                    ⚠️ <strong>Importante:</strong> Este é SEU número para vincular sua conta. 
+                    Após conectar, você enviará mensagens para o número do bot <strong>{BOT_PHONE_NUMBER}</strong>
+                  </p>
+                </div>
               </div>
 
               <Button 
@@ -280,46 +287,81 @@ const WhatsAppConnection = () => {
           </Card>
         )}
 
-        {/* Demo Commands */}
-        {isConnected && (
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-primary">
-                <Bot className="h-5 w-5" />
-                Teste o Bot Agora!
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Envie uma dessas mensagens para {phoneNumber} no WhatsApp:
-              </p>
-              
-              <div className="grid gap-2">
-                {[
-                  "saldo",
-                  "Entrada de R$ 1500 salário",
-                  "Gasto de R$ 50 almoço",
-                  "resumo semanal",
-                  "gastos em alimentação"
-                ].map((command, index) => (
-                  <div 
-                    key={index}
-                    className="flex items-center justify-between bg-background p-3 rounded-lg border"
-                  >
-                    <code className="text-sm font-mono">{command}</code>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => copyToClipboard(command)}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+        {/* Bot Contact Info */}
+        <Card className="border-success/20 bg-success/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-success">
+              <MessageSquare className="h-5 w-5" />
+              Número do Bot Financeiro
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between bg-background p-4 rounded-lg border-2 border-success/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-success/10 rounded-full">
+                  <Bot className="h-5 w-5 text-success" />
+                </div>
+                <div>
+                  <p className="font-mono text-lg font-semibold">{BOT_PHONE_NUMBER}</p>
+                  <p className="text-sm text-muted-foreground">Envie suas mensagens para este número</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => copyToClipboard(BOT_PHONE_NUMBER)}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="bg-info/10 p-3 rounded-lg border border-info/20">
+              <p className="text-sm text-info-foreground">
+                <strong>📱 Como usar:</strong> Salve o número {BOT_PHONE_NUMBER} nos seus contatos como "Bot Financeiro" 
+                e envie qualquer comando financeiro!
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Demo Commands */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <Zap className="h-5 w-5" />
+              Comandos para Testar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Envie uma dessas mensagens para <strong>{BOT_PHONE_NUMBER}</strong> no WhatsApp:
+            </p>
+            
+            <div className="grid gap-2">
+              {[
+                "saldo",
+                "Entrada de R$ 1500 salário",
+                "Gasto de R$ 50 almoço",
+                "resumo semanal",
+                "gastos em alimentação"
+              ].map((command, index) => (
+                <div 
+                  key={index}
+                  className="flex items-center justify-between bg-background p-3 rounded-lg border"
+                >
+                  <code className="text-sm font-mono">{command}</code>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => copyToClipboard(command)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
