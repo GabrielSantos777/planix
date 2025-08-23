@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,10 +46,16 @@ serve(async (req) => {
 
                 if (whatsappIntegration) {
                   // Processar comando financeiro
-                  const response = await processFinancialCommand(messageText, whatsappIntegration.user_id, supabaseClient);
+                  const response = await processFinancialCommand(messageText, whatsappIntegration.user_id, supabaseClient, phoneNumber);
                   
-                  // Aqui você enviaria a resposta via WhatsApp
-                  console.log(`Response to send: ${response}`);
+                  // Enviar resposta via WhatsApp
+                  await sendWhatsAppMessage(phoneNumber, response);
+                  console.log(`Response sent to ${phoneNumber}: ${response}`);
+                } else {
+                  // Usuário não autenticado - solicitar vinculação
+                  const authMessage = `🔐 **Olá! Bem-vindo ao FinanceBot!**\n\nPara usar o bot, você precisa vincular seu número ao sistema:\n\n1. Acesse o sistema financeiro\n2. Vá em Configurações > WhatsApp\n3. Digite seu número: ${phoneNumber}\n4. Clique em "Conectar"\n\nApós isso, você poderá usar todos os comandos do bot! 🚀`;
+                  await sendWhatsAppMessage(phoneNumber, authMessage);
+                  console.log(`Auth message sent to ${phoneNumber}`);
                 }
               }
             }
@@ -70,59 +77,495 @@ serve(async (req) => {
   }
 });
 
-async function processFinancialCommand(message: string, userId: string, supabase: any): Promise<string> {
+// Função para extrair informações de texto usando IA
+async function extractTransactionFromText(text: string): Promise<{
+  amount: number | null;
+  type: 'income' | 'expense' | null;
+  category: string | null;
+  description: string | null;
+}> {
+  const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openAIApiKey) {
+    console.error('OpenAI API key not found');
+    return { amount: null, type: null, category: null, description: null };
+  }
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `Você é um assistente especializado em extrair informações financeiras de mensagens de texto em português brasileiro. 
+            
+            Sua tarefa é analisar mensagens e extrair:
+            1. Valor (amount): número em reais, pode estar com R$, vírgula ou ponto decimal
+            2. Tipo (type): "income" para entradas/receitas ou "expense" para gastos/despesas
+            3. Categoria (category): uma das opções: Alimentação, Transporte, Moradia, Saúde, Educação, Lazer, Salário, Freelance, Investimentos, ou "Outros" se não identificar
+            4. Descrição (description): descrição da transação
+
+            Retorne APENAS um JSON válido no formato:
+            {"amount": 123.45, "type": "expense", "category": "Alimentação", "description": "Almoço no restaurante"}
+
+            Se não conseguir extrair alguma informação, use null para esse campo.`
+          },
+          {
+            role: 'user',
+            content: text
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 200
+      }),
+    });
+
+    const data = await response.json();
+    const content = data.choices[0].message.content.trim();
+    
+    try {
+      return JSON.parse(content);
+    } catch (parseError) {
+      console.error('Error parsing AI response:', parseError);
+      return { amount: null, type: null, category: null, description: null };
+    }
+  } catch (error) {
+    console.error('Error calling OpenAI API:', error);
+    return { amount: null, type: null, category: null, description: null };
+  }
+}
+
+// Função para buscar ou criar categoria
+async function getOrCreateCategory(supabase: any, userId: string, categoryName: string): Promise<string | null> {
+  try {
+    // Buscar categoria existente
+    const { data: existingCategory } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('user_id', userId)
+      .ilike('name', categoryName)
+      .single();
+
+    if (existingCategory) {
+      return existingCategory.id;
+    }
+
+    // Criar nova categoria se não existir
+    const categoryMap: { [key: string]: { icon: string; color: string; type: string } } = {
+      'alimentação': { icon: 'utensils', color: '#EF4444', type: 'expense' },
+      'transporte': { icon: 'car', color: '#F59E0B', type: 'expense' },
+      'moradia': { icon: 'home', color: '#8B5CF6', type: 'expense' },
+      'saúde': { icon: 'heart', color: '#EC4899', type: 'expense' },
+      'educação': { icon: 'book', color: '#06B6D4', type: 'expense' },
+      'lazer': { icon: 'gamepad-2', color: '#10B981', type: 'expense' },
+      'salário': { icon: 'briefcase', color: '#22C55E', type: 'income' },
+      'freelance': { icon: 'laptop', color: '#3B82F6', type: 'income' },
+      'investimentos': { icon: 'trending-up', color: '#F59E0B', type: 'income' },
+    };
+
+    const categoryData = categoryMap[categoryName.toLowerCase()] || 
+                        { icon: 'folder', color: '#6B7280', type: 'expense' };
+
+    const { data: newCategory, error } = await supabase
+      .from('categories')
+      .insert({
+        user_id: userId,
+        name: categoryName,
+        icon: categoryData.icon,
+        color: categoryData.color,
+        type: categoryData.type
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Error creating category:', error);
+      return null;
+    }
+
+    return newCategory.id;
+  } catch (error) {
+    console.error('Error in getOrCreateCategory:', error);
+    return null;
+  }
+}
+
+// Função para enviar mensagem via WhatsApp
+async function sendWhatsAppMessage(phoneNumber: string, message: string): Promise<boolean> {
+  try {
+    const whatsappToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+    if (!whatsappToken) {
+      console.error('WhatsApp access token not found');
+      return false;
+    }
+
+    const response = await fetch(`https://graph.facebook.com/v17.0/YOUR_PHONE_NUMBER_ID/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${whatsappToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: phoneNumber,
+        type: 'text',
+        text: {
+          body: message
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Error sending WhatsApp message:', await response.text());
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error sending WhatsApp message:', error);
+    return false;
+  }
+}
+
+async function processFinancialCommand(message: string, userId: string, supabase: any, phoneNumber: string): Promise<string> {
   const command = message.toLowerCase().trim();
   
   try {
+    // Comandos de consulta
     if (command.includes('saldo') || command.includes('balance')) {
-      // Buscar saldo atual
       const { data: accounts } = await supabase
         .from('accounts')
-        .select('current_balance')
-        .eq('user_id', userId);
-      
-      const totalBalance = accounts?.reduce((sum, account) => sum + (account.current_balance || 0), 0) || 0;
-      return `Seu saldo atual é: R$ ${totalBalance.toFixed(2)}`;
-    }
-    
-    if (command.includes('gastos hoje')) {
-      // Buscar gastos do dia
-      const today = new Date().toISOString().split('T')[0];
-      const { data: transactions } = await supabase
-        .from('transactions')
-        .select('amount')
+        .select('name, current_balance')
         .eq('user_id', userId)
-        .eq('type', 'expense')
-        .gte('date', today);
+        .eq('is_active', true);
       
-      const totalExpenses = transactions?.reduce((sum, t) => sum + Math.abs(t.amount), 0) || 0;
-      return `Seus gastos de hoje: R$ ${totalExpenses.toFixed(2)}`;
-    }
-    
-    if (command.includes('metas') || command.includes('goals')) {
-      // Buscar metas
-      const { data: goals } = await supabase
-        .from('goals')
-        .select('title, current_amount, target_amount')
-        .eq('user_id', userId)
-        .eq('status', 'active');
-      
-      if (!goals || goals.length === 0) {
-        return 'Você não possui metas ativas no momento.';
+      if (!accounts || accounts.length === 0) {
+        return '💳 Você ainda não possui contas cadastradas.';
       }
+
+      const totalBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0);
       
-      let response = 'Suas metas ativas:\n';
-      goals.forEach((goal, index) => {
-        const progress = ((goal.current_amount / goal.target_amount) * 100).toFixed(1);
-        response += `${index + 1}. ${goal.title}: R$ ${goal.current_amount.toFixed(2)} / R$ ${goal.target_amount.toFixed(2)} (${progress}%)\n`;
+      let response = `💰 **Saldo Atual: R$ ${totalBalance.toFixed(2).replace('.', ',')}**\n\n`;
+      response += '📊 **Por conta:**\n';
+      accounts.forEach(account => {
+        const balance = account.current_balance || 0;
+        const emoji = balance >= 0 ? '✅' : '⚠️';
+        response += `${emoji} ${account.name}: R$ ${balance.toFixed(2).replace('.', ',')}\n`;
       });
       
       return response;
     }
     
-    return 'Comandos disponíveis:\n• "saldo" - Ver saldo atual\n• "gastos hoje" - Ver gastos do dia\n• "metas" - Ver suas metas\n• "adicionar gasto [valor] [descrição]" - Registrar despesa';
+    if (command.includes('resumo diário') || command.includes('resumo hoje')) {
+      return await generateDailyReport(supabase, userId);
+    }
+    
+    if (command.includes('resumo semanal')) {
+      return await generateWeeklyReport(supabase, userId);
+    }
+    
+    if (command.includes('resumo mensal')) {
+      return await generateMonthlyReport(supabase, userId);
+    }
+    
+    if (command.startsWith('gastos em ')) {
+      const categoryName = command.replace('gastos em ', '').trim();
+      return await getCategoryExpenses(supabase, userId, categoryName);
+    }
+    
+    // Processar transações usando IA
+    const extractedData = await extractTransactionFromText(message);
+    
+    if (extractedData.amount && extractedData.type) {
+      // Buscar conta padrão do usuário
+      const { data: accounts } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .limit(1);
+
+      if (!accounts || accounts.length === 0) {
+        return '❌ Você precisa cadastrar uma conta primeiro no sistema para registrar transações.';
+      }
+
+      // Buscar ou criar categoria
+      let categoryId = null;
+      if (extractedData.category) {
+        categoryId = await getOrCreateCategory(supabase, userId, extractedData.category);
+      }
+
+      // Criar transação
+      const { data: transaction, error } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: userId,
+          account_id: accounts[0].id,
+          category_id: categoryId,
+          amount: extractedData.type === 'expense' ? -Math.abs(extractedData.amount) : Math.abs(extractedData.amount),
+          type: extractedData.type,
+          description: extractedData.description || `${extractedData.type === 'expense' ? 'Despesa' : 'Receita'} via WhatsApp`,
+          date: new Date().toISOString().split('T')[0]
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating transaction:', error);
+        return '❌ Erro ao registrar transação. Tente novamente.';
+      }
+
+      // Atualizar saldo da conta
+      const balanceChange = extractedData.type === 'expense' ? -Math.abs(extractedData.amount) : Math.abs(extractedData.amount);
+      await supabase
+        .from('accounts')
+        .update({
+          current_balance: supabase.raw(`current_balance + ${balanceChange}`)
+        })
+        .eq('id', accounts[0].id);
+
+      // Buscar saldo atualizado
+      const { data: updatedAccount } = await supabase
+        .from('accounts')
+        .select('current_balance')
+        .eq('id', accounts[0].id)
+        .single();
+
+      const newBalance = updatedAccount?.current_balance || 0;
+      const typeEmoji = extractedData.type === 'expense' ? '💸' : '💰';
+      const typeText = extractedData.type === 'expense' ? 'Despesa' : 'Receita';
+      
+      let response = `${typeEmoji} **${typeText} registrada com sucesso!**\n\n`;
+      response += `💵 Valor: R$ ${Math.abs(extractedData.amount).toFixed(2).replace('.', ',')}\n`;
+      if (extractedData.category) {
+        response += `📂 Categoria: ${extractedData.category}\n`;
+      }
+      if (extractedData.description) {
+        response += `📝 Descrição: ${extractedData.description}\n`;
+      }
+      response += `\n💳 **Saldo atual: R$ ${newBalance.toFixed(2).replace('.', ',')}**`;
+      
+      return response;
+    }
+    
+    // Menu de ajuda
+    return `🤖 **FinanceBot - Comandos Disponíveis:**
+
+📊 **Consultas:**
+• "saldo" - Ver saldo atual
+• "resumo diário" - Relatório de hoje
+• "resumo semanal" - Relatório da semana
+• "resumo mensal" - Relatório do mês
+• "gastos em [categoria]" - Total por categoria
+
+💰 **Registrar Transações:**
+• "Receita de R$ 1.500 salário"
+• "Gasto de R$ 50 na categoria alimentação"
+• "Despesa R$ 30,00 café da manhã"
+• "Entrada freelance R$ 800"
+
+📷 **Comprovantes:**
+• Envie uma foto de nota fiscal ou comprovante
+• O sistema extrairá automaticamente os dados
+
+❓ **Dúvidas:** Digite qualquer comando em linguagem natural!`;
+    
   } catch (error) {
     console.error('Error processing command:', error);
-    return 'Desculpe, ocorreu um erro ao processar sua solicitação.';
+    return '❌ Desculpe, ocorreu um erro ao processar sua solicitação. Tente novamente.';
   }
+}
+
+async function generateDailyReport(supabase: any, userId: string): Promise<string> {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select(`
+      amount,
+      type,
+      description,
+      categories (name)
+    `)
+    .eq('user_id', userId)
+    .eq('date', today);
+
+  if (!transactions || transactions.length === 0) {
+    return '📅 **Resumo de Hoje:**\n\nNenhuma movimentação registrada hoje.';
+  }
+
+  const income = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    
+  const expenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  let response = `📅 **Resumo de Hoje:**\n\n`;
+  response += `💰 Receitas: R$ ${income.toFixed(2).replace('.', ',')}\n`;
+  response += `💸 Despesas: R$ ${expenses.toFixed(2).replace('.', ',')}\n`;
+  response += `📊 Saldo do dia: R$ ${(income - expenses).toFixed(2).replace('.', ',')}\n\n`;
+
+  if (expenses > 0) {
+    response += `💸 **Principais gastos:**\n`;
+    const expenseTransactions = transactions.filter(t => t.type === 'expense');
+    expenseTransactions.slice(0, 5).forEach(t => {
+      const category = t.categories?.name || 'Outros';
+      response += `• ${category}: R$ ${Math.abs(t.amount).toFixed(2).replace('.', ',')} - ${t.description}\n`;
+    });
+  }
+
+  return response;
+}
+
+async function generateWeeklyReport(supabase: any, userId: string): Promise<string> {
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay());
+  
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select(`
+      amount,
+      type,
+      categories (name)
+    `)
+    .eq('user_id', userId)
+    .gte('date', weekStart.toISOString().split('T')[0]);
+
+  if (!transactions || transactions.length === 0) {
+    return '📅 **Resumo Semanal:**\n\nNenhuma movimentação registrada esta semana.';
+  }
+
+  const income = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    
+  const expenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  // Agrupar por categoria
+  const expensesByCategory: { [key: string]: number } = {};
+  transactions
+    .filter(t => t.type === 'expense')
+    .forEach(t => {
+      const category = t.categories?.name || 'Outros';
+      expensesByCategory[category] = (expensesByCategory[category] || 0) + Math.abs(t.amount);
+    });
+
+  let response = `📅 **Resumo Semanal:**\n\n`;
+  response += `💰 Receitas: R$ ${income.toFixed(2).replace('.', ',')}\n`;
+  response += `💸 Despesas: R$ ${expenses.toFixed(2).replace('.', ',')}\n`;
+  response += `📊 Saldo da semana: R$ ${(income - expenses).toFixed(2).replace('.', ',')}\n\n`;
+
+  if (Object.keys(expensesByCategory).length > 0) {
+    response += `💸 **Gastos por categoria:**\n`;
+    Object.entries(expensesByCategory)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .forEach(([category, amount]) => {
+        response += `• ${category}: R$ ${amount.toFixed(2).replace('.', ',')}\n`;
+      });
+  }
+
+  return response;
+}
+
+async function generateMonthlyReport(supabase: any, userId: string): Promise<string> {
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select(`
+      amount,
+      type,
+      categories (name)
+    `)
+    .eq('user_id', userId)
+    .gte('date', monthStart.toISOString().split('T')[0]);
+
+  if (!transactions || transactions.length === 0) {
+    return '📅 **Resumo Mensal:**\n\nNenhuma movimentação registrada este mês.';
+  }
+
+  const income = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    
+  const expenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  // Agrupar por categoria
+  const expensesByCategory: { [key: string]: number } = {};
+  transactions
+    .filter(t => t.type === 'expense')
+    .forEach(t => {
+      const category = t.categories?.name || 'Outros';
+      expensesByCategory[category] = (expensesByCategory[category] || 0) + Math.abs(t.amount);
+    });
+
+  let response = `📅 **Resumo Mensal:**\n\n`;
+  response += `💰 Receitas: R$ ${income.toFixed(2).replace('.', ',')}\n`;
+  response += `💸 Despesas: R$ ${expenses.toFixed(2).replace('.', ',')}\n`;
+  response += `📊 Saldo do mês: R$ ${(income - expenses).toFixed(2).replace('.', ',')}\n\n`;
+
+  if (Object.keys(expensesByCategory).length > 0) {
+    response += `💸 **Gastos por categoria:**\n`;
+    Object.entries(expensesByCategory)
+      .sort(([,a], [,b]) => b - a)
+      .forEach(([category, amount]) => {
+        response += `• ${category}: R$ ${amount.toFixed(2).replace('.', ',')}\n`;
+      });
+  }
+
+  return response;
+}
+
+async function getCategoryExpenses(supabase: any, userId: string, categoryName: string): Promise<string> {
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select(`
+      amount,
+      date,
+      description,
+      categories!inner (name)
+    `)
+    .eq('user_id', userId)
+    .eq('type', 'expense')
+    .ilike('categories.name', `%${categoryName}%`)
+    .gte('date', monthStart.toISOString().split('T')[0])
+    .order('date', { ascending: false });
+
+  if (!transactions || transactions.length === 0) {
+    return `📂 **Gastos em "${categoryName}":**\n\nNenhum gasto encontrado nesta categoria este mês.`;
+  }
+
+  const total = transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  let response = `📂 **Gastos em "${categoryName}" (este mês):**\n\n`;
+  response += `💸 **Total: R$ ${total.toFixed(2).replace('.', ',')}**\n\n`;
+  response += `📋 **Últimas transações:**\n`;
+  
+  transactions.slice(0, 8).forEach(t => {
+    const date = new Date(t.date).toLocaleDateString('pt-BR');
+    response += `• ${date}: R$ ${Math.abs(t.amount).toFixed(2).replace('.', ',')} - ${t.description}\n`;
+  });
+
+  if (transactions.length > 8) {
+    response += `\n... e mais ${transactions.length - 8} transações.`;
+  }
+
+  return response;
 }

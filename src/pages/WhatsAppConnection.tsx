@@ -1,19 +1,67 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Phone, Bot, CheckCircle, AlertCircle } from "lucide-react";
+import { MessageSquare, Phone, Bot, CheckCircle, AlertCircle, Camera, BarChart3, Smartphone, Copy, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const WhatsAppConnection = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionToken, setConnectionToken] = useState<string>("");
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      checkExistingConnection();
+    }
+  }, [user]);
+
+  const checkExistingConnection = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_integrations')
+        .select('phone_number, is_active')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .single();
+
+      if (data && !error) {
+        setIsConnected(true);
+        setPhoneNumber(data.phone_number);
+      }
+    } catch (error) {
+      console.log('No existing connection found');
+    }
+  };
+
+  const generateConnectionToken = () => {
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    setConnectionToken(token);
+    return token;
+  };
+
+  const formatPhoneNumber = (phone: string) => {
+    // Remove all non-numeric characters
+    const cleaned = phone.replace(/\D/g, '');
+    
+    // Add +55 if it doesn't start with it
+    if (!cleaned.startsWith('55') && cleaned.length >= 10) {
+      return `+55${cleaned}`;
+    } else if (cleaned.startsWith('55')) {
+      return `+${cleaned}`;
+    }
+    
+    return phone;
+  };
 
   const handleConnect = async () => {
     if (!phoneNumber) {
@@ -25,25 +73,106 @@ const WhatsAppConnection = () => {
       return;
     }
 
+    if (!user) {
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para conectar o WhatsApp.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsConnecting(true);
     
-    // Simulate connection process
-    setTimeout(() => {
+    try {
+      const formattedPhone = formatPhoneNumber(phoneNumber);
+      const token = generateConnectionToken();
+
+      // Call the database function to update WhatsApp token
+      const { data, error } = await supabase.rpc('update_whatsapp_token', {
+        user_uuid: user.id,
+        new_token: token,
+        phone: formattedPhone
+      });
+
+      if (error) {
+        throw error;
+      }
+
       setIsConnected(true);
-      setIsConnecting(false);
+      setPhoneNumber(formattedPhone);
+      
       toast({
         title: "Conexão estabelecida!",
-        description: "Seu WhatsApp foi conectado com sucesso.",
+        description: `WhatsApp conectado! Envie "oi" para ${formattedPhone} no WhatsApp para ativar o bot.`,
       });
-    }, 2000);
+
+      // Send test message via webhook
+      try {
+        await supabase.functions.invoke('whatsapp-webhook', {
+          body: {
+            object: 'whatsapp_business_account',
+            entry: [{
+              changes: [{
+                field: 'messages',
+                value: {
+                  messages: [{
+                    from: formattedPhone,
+                    text: { body: 'oi' }
+                  }]
+                }
+              }]
+            }]
+          }
+        });
+      } catch (webhookError) {
+        console.log('Webhook test failed, but connection is established');
+      }
+
+    } catch (error) {
+      console.error('Connection error:', error);
+      toast({
+        title: "Erro na conexão",
+        description: "Não foi possível conectar o WhatsApp. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
-  const handleDisconnect = () => {
-    setIsConnected(false);
-    setPhoneNumber("");
+  const handleDisconnect = async () => {
+    try {
+      if (user) {
+        await supabase
+          .from('whatsapp_integrations')
+          .update({ is_active: false })
+          .eq('user_id', user.id);
+      }
+
+      setIsConnected(false);
+      setPhoneNumber("");
+      setConnectionToken("");
+      
+      toast({
+        title: "Desconectado",
+        description: "WhatsApp desconectado com sucesso.",
+      });
+    } catch (error) {
+      console.error('Disconnect error:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao desconectar. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
     toast({
-      title: "Desconectado",
-      description: "WhatsApp desconectado com sucesso.",
+      title: "Copiado!",
+      description: "Texto copiado para a área de transferência.",
     });
   };
 
@@ -56,9 +185,9 @@ const WhatsAppConnection = () => {
             <MessageSquare className="h-6 w-6 text-success" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Conexão WhatsApp</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">Bot WhatsApp com IA</h1>
             <p className="text-muted-foreground">
-              Conecte seu WhatsApp para receber notificações e usar IA
+              Gerencie suas finanças direto do WhatsApp com inteligência artificial
             </p>
           </div>
         </div>
@@ -86,9 +215,14 @@ const WhatsAppConnection = () => {
                   {isConnected ? "Conectado" : "Desconectado"}
                 </Badge>
                 {isConnected && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Número: {phoneNumber}
-                  </p>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm text-muted-foreground">
+                      Número: {phoneNumber}
+                    </p>
+                    <p className="text-xs text-success">
+                      ✅ Bot ativo e pronto para uso!
+                    </p>
+                  </div>
                 )}
               </div>
               {isConnected && (
@@ -109,7 +243,7 @@ const WhatsAppConnection = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Phone className="h-5 w-5" />
+                <Smartphone className="h-5 w-5" />
                 Conectar WhatsApp
               </CardTitle>
             </CardHeader>
@@ -131,17 +265,64 @@ const WhatsAppConnection = () => {
 
               <Button 
                 onClick={handleConnect} 
-                disabled={isConnecting}
+                disabled={isConnecting || !user}
                 className="w-full"
               >
                 {isConnecting ? "Conectando..." : "Conectar WhatsApp"}
               </Button>
+
+              {!user && (
+                <p className="text-sm text-destructive text-center">
+                  Você precisa estar logado para conectar o WhatsApp
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Features */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {/* Demo Commands */}
+        {isConnected && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-primary">
+                <Bot className="h-5 w-5" />
+                Teste o Bot Agora!
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Envie uma dessas mensagens para {phoneNumber} no WhatsApp:
+              </p>
+              
+              <div className="grid gap-2">
+                {[
+                  "saldo",
+                  "Entrada de R$ 1500 salário",
+                  "Gasto de R$ 50 almoço",
+                  "resumo semanal",
+                  "gastos em alimentação"
+                ].map((command, index) => (
+                  <div 
+                    key={index}
+                    className="flex items-center justify-between bg-background p-3 rounded-lg border"
+                  >
+                    <code className="text-sm font-mono">{command}</code>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => copyToClipboard(command)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -153,19 +334,19 @@ const WhatsAppConnection = () => {
               <ul className="space-y-2 text-sm">
                 <li className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-success" />
-                  Consultas sobre gastos via WhatsApp
+                  Registro automático de transações
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-success" />
-                  Lembretes de vencimentos
+                  Consultas em linguagem natural
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-success" />
-                  Análises automáticas de gastos
+                  Processamento de categorias
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-success" />
-                  Dicas de economia personalizadas
+                  Análises inteligentes de gastos
                 </li>
               </ul>
             </CardContent>
@@ -174,60 +355,107 @@ const WhatsAppConnection = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-success" />
-                Notificações
+                <Camera className="h-5 w-5 text-warning" />
+                OCR de Comprovantes
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm">
                 <li className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-success" />
-                  Alertas de gastos elevados
+                  Envie fotos de notas fiscais
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-success" />
-                  Resumos diários/semanais
+                  Extração automática de dados
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-success" />
-                  Metas alcançadas
+                  Criação automática de transações
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-success" />
-                  Lembretes de pagamentos
+                  Categorização inteligente
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-accent" />
+                Relatórios
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Resumos diários/semanais/mensais
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Gastos por categoria
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Saldo em tempo real
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Progresso de metas
                 </li>
               </ul>
             </CardContent>
           </Card>
         </div>
 
-        {/* Instructions */}
+        {/* Advanced Commands */}
         <Card>
           <CardHeader>
-            <CardTitle>Como usar a IA no WhatsApp</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-warning" />
+              Comandos Avançados
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h4 className="font-medium mb-2">Comandos básicos:</h4>
+                <h4 className="font-medium mb-3">📝 Registro de Transações:</h4>
                 <div className="bg-muted p-3 rounded-lg space-y-1 text-sm font-mono">
-                  <p>• "Gastos hoje" - Ver gastos do dia</p>
-                  <p>• "Saldo atual" - Consultar saldo</p>
-                  <p>• "Adicionar gasto [valor] [descrição]" - Registrar despesa</p>
-                  <p>• "Metas" - Ver progresso das metas</p>
-                  <p>• "Relatório mensal" - Obter análise do mês</p>
+                  <p>• "Receita de R$ 1200 freelance"</p>
+                  <p>• "Despesa R$ 80 supermercado"</p>
+                  <p>• "Gasto de R$ 45,50 na categoria transporte"</p>
+                  <p>• "Entrada salário R$ 3000"</p>
                 </div>
               </div>
 
-              <Separator />
-
-              <div className="bg-primary/5 p-4 rounded-lg">
-                <h4 className="font-medium text-primary mb-2">💡 Dica Pro</h4>
-                <p className="text-sm text-muted-foreground">
-                  A IA aprende com seus padrões de gastos e oferece insights 
-                  personalizados para melhorar sua saúde financeira!
-                </p>
+              <div>
+                <h4 className="font-medium mb-3">📊 Consultas e Relatórios:</h4>
+                <div className="bg-muted p-3 rounded-lg space-y-1 text-sm font-mono">
+                  <p>• "saldo atual"</p>
+                  <p>• "resumo diário"</p>
+                  <p>• "resumo semanal"</p>
+                  <p>• "resumo mensal"</p>
+                  <p>• "gastos em alimentação"</p>
+                  <p>• "metas"</p>
+                </div>
               </div>
+            </div>
+
+            <Separator className="my-4" />
+
+            <div className="bg-primary/5 p-4 rounded-lg">
+              <h4 className="font-medium text-primary mb-2 flex items-center gap-2">
+                <Camera className="h-4 w-4" />
+                💡 Processamento de Imagens
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                Envie fotos de notas fiscais, comprovantes ou recibos que o bot 
+                extrairá automaticamente o valor, categoria e descrição, criando 
+                a transação no seu sistema!
+              </p>
             </div>
           </CardContent>
         </Card>
