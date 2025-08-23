@@ -19,8 +19,8 @@ const WhatsAppConnection = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Número fixo do bot (na implementação real, seria o número da empresa/bot)
-  const BOT_PHONE_NUMBER = "+55 11 94567-8901"; // Número fictício do bot
+  // Número do bot - deve ser configurado com o número real do WhatsApp Business API
+  const BOT_PHONE_NUMBER = "[CONFIGURAR NÚMERO DO BOT]"; // Substituir pelo número real do WhatsApp Business
 
   useEffect(() => {
     if (user) {
