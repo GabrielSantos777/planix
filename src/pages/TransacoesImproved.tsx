@@ -347,10 +347,10 @@ const TransacoesImproved = () => {
 
   return (
     <Layout>
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-full overflow-x-hidden">
         {/* Header */}
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col gap-4">
             <div>
               <h1 className="text-3xl font-bold">Lançamentos</h1>
               <p className="text-muted-foreground">
@@ -358,54 +358,70 @@ const TransacoesImproved = () => {
               </p>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleImportCSV}
-              className="hidden"
-              id="csv-import"
-            />
-            <Button 
-              onClick={() => navigate('/categorias')}
-              variant="outline" 
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Gerenciar Categorias
-            </Button>
-            <Button onClick={() => document.getElementById('csv-import')?.click()} variant="outline" className="gap-2">
-              <Upload className="h-4 w-4" />
-              Importar CSV
-            </Button>
-            <Button onClick={handleExportPDF} variant="outline" className="gap-2">
-              <Download className="h-4 w-4" />
-              Exportar PDF
-            </Button>
-            <Button onClick={handleExportExcel} variant="outline" className="gap-2">
-              <Download className="h-4 w-4" />
-              Exportar Excel
-            </Button>
-            <Button onClick={() => {
-              setEditingTransaction(null)
-              setNewTransaction({
-                description: "",
-                amount: 0,
-                type: "expense",
-                category_id: "",
-                date: new Date().toISOString().split('T')[0],
-                account_id: "",
-                credit_card_id: "",
-                payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
-                installments: 1,
-                is_installment: false,
-                notes: ""
-              })
-              setIsDialogOpen(true)
-            }} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nova Transação
-            </Button>
+            {/* Action Buttons - Responsive Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 w-full">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleImportCSV}
+                className="hidden"
+                id="csv-import"
+              />
+              <Button 
+                onClick={() => navigate('/categorias')}
+                variant="outline" 
+                className="gap-2 w-full"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Gerenciar</span> Categorias
+              </Button>
+              <Button 
+                onClick={() => document.getElementById('csv-import')?.click()} 
+                variant="outline" 
+                className="gap-2 w-full"
+              >
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">Importar</span> CSV
+              </Button>
+              <Button 
+                onClick={handleExportPDF} 
+                variant="outline" 
+                className="gap-2 w-full"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Exportar</span> PDF
+              </Button>
+              <Button 
+                onClick={handleExportExcel} 
+                variant="outline" 
+                className="gap-2 w-full"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Exportar</span> Excel
+              </Button>
+              <Button 
+                onClick={() => {
+                  setEditingTransaction(null)
+                  setNewTransaction({
+                    description: "",
+                    amount: 0,
+                    type: "expense",
+                    category_id: "",
+                    date: new Date().toISOString().split('T')[0],
+                    account_id: "",
+                    credit_card_id: "",
+                    payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
+                    installments: 1,
+                    is_installment: false,
+                    notes: ""
+                  })
+                  setIsDialogOpen(true)
+                }} 
+                className="gap-2 w-full bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Plus className="h-4 w-4" />
+                Nova Transação
+              </Button>
             </div>
           </div>
           
@@ -417,8 +433,8 @@ const TransacoesImproved = () => {
             <CardTitle className="text-lg">Filtros</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="sm:col-span-2 lg:col-span-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -521,24 +537,28 @@ const TransacoesImproved = () => {
                         {transaction.type === "income" ? "+" : ""}
                         {formatCurrency(Math.abs(transaction.amount))}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditTransaction(transaction)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteTransaction(transaction.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                       <TableCell className="text-right">
+                         <div className="flex justify-end gap-1 sm:gap-2">
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => handleEditTransaction(transaction)}
+                             className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3"
+                           >
+                             <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                             <span className="sr-only sm:not-sr-only sm:ml-2 hidden sm:inline">Editar</span>
+                           </Button>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => handleDeleteTransaction(transaction.id)}
+                             className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3"
+                           >
+                             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                             <span className="sr-only sm:not-sr-only sm:ml-2 hidden sm:inline">Excluir</span>
+                           </Button>
+                         </div>
+                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -549,7 +569,7 @@ const TransacoesImproved = () => {
 
         {/* Add/Edit Transaction Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-[525px] max-h-[90vh] overflow-y-auto mx-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingTransaction ? "Editar Transação" : "Nova Transação"}
