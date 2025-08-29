@@ -530,7 +530,7 @@ export type Database = {
       card_type: "visa" | "mastercard" | "elo" | "amex"
       goal_status: "active" | "completed" | "paused"
       investment_type: "stocks" | "crypto" | "bonds" | "funds"
-      subscription_plan: "basic" | "premium" | "enterprise"
+      subscription_plan: "basic" | "premium" | "enterprise" | "professional"
       transaction_type: "income" | "expense" | "transfer"
     }
     CompositeTypes: {
@@ -663,7 +663,7 @@ export const Constants = {
       card_type: ["visa", "mastercard", "elo", "amex"],
       goal_status: ["active", "completed", "paused"],
       investment_type: ["stocks", "crypto", "bonds", "funds"],
-      subscription_plan: ["basic", "premium", "enterprise"],
+      subscription_plan: ["basic", "premium", "enterprise", "professional"],
       transaction_type: ["income", "expense", "transfer"],
     },
   },
