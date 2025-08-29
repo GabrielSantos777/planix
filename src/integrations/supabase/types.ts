@@ -520,6 +520,10 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: string
       }
+      is_profile_owner: {
+        Args: { profile_user_id: string }
+        Returns: boolean
+      }
       update_whatsapp_token: {
         Args: { new_token: string; phone: string; user_uuid: string }
         Returns: boolean
