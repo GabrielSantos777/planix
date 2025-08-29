@@ -42,20 +42,20 @@ export const usePlanLimits = (): PlanLimits => {
             planName: 'Premium'
           }
         
-        case 'enterprise': // Mantido para compatibilidade, mas mapeia para profissional
+        case 'professional':
           return {
-            maxAccounts: 15,
-            maxTransactions: 10000,
+            maxAccounts: 6,
+            maxTransactions: Infinity,
             canExportReports: true,
             canAccessWhatsApp: false,
-            canAccessAdvancedCharts: false,
+            canAccessAdvancedCharts: true,
             hasUnlimitedFeatures: false,
             planName: 'Profissional'
           }
         
         default:
           return {
-            maxAccounts: 5,
+            maxAccounts: 2,
             maxTransactions: 100,
             canExportReports: false,
             canAccessWhatsApp: false,
@@ -69,7 +69,7 @@ export const usePlanLimits = (): PlanLimits => {
     // Se ainda está no trial (não expirado)
     if (!isTrialExpired) {
       return {
-        maxAccounts: 5,
+        maxAccounts: 2,
         maxTransactions: 100,
         canExportReports: false,
         canAccessWhatsApp: false,

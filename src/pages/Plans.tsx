@@ -35,61 +35,63 @@ const Plans = () => {
   const plans = [
     {
       name: 'Básico',
-      description: 'Ideal para começar a organizar suas finanças pessoais',
+      description: 'Ideal para quem está começando no controle financeiro',
       monthlyPrice: 0,
       yearlyPrice: 0,
       features: [
-        'Até 50 transações por mês',
-        '2 contas bancárias',
-        'Relatórios básicos',
-        'Suporte por email',
-        '15 dias grátis'
+        'Até 100 transações por mês',
+        'Até 2 contas bancárias conectadas',
+        'Relatórios simples e claros',
+        'Controle de receitas e despesas',
+        'Suporte por e-mail'
       ],
       limitations: [
-        'Sem integração WhatsApp',
-        'Sem metas avançadas',
-        'Sem cartão de crédito'
+        'Sem relatórios avançados',
+        'Sem exportação de dados',
+        'Sem metas financeiras'
       ],
-      current: profile?.subscription_plan === 'basic',
+      current: !profile?.subscription_plan || profile?.subscription_plan === 'basic',
       popular: false,
-      trial: true
-    },
-    {
-      name: 'Premium',
-      description: 'Completo para empresários e gestores',
-      monthlyPrice: 49.90,
-      yearlyPrice: 499.00,
-      features: [
-        'Contas ilimitadas',
-        'Lançamentos ilimitados',
-        'Relatórios avançados com dashboards',
-        'Gráficos interativos e personalizáveis',
-        'Exportação personalizada (PDF/Excel)',
-        'WhatsApp Bot integrado',
-        'Suporte prioritário',
-        'Backups automáticos'
-      ],
-      limitations: [],
-      current: profile?.subscription_plan === 'premium' && profile?.subscription_end && new Date(profile.subscription_end) > new Date(),
-      popular: true,
-      trial: false
+      trial: true,
+      buttonText: 'Plano Gratuito'
     },
     {
       name: 'Profissional',
-      description: 'Para uso pessoal avançado',
-      monthlyPrice: 19.90,
-      yearlyPrice: 199.00,
+      description: 'Para quem quer organização completa das finanças pessoais',
+      monthlyPrice: 24.90,
+      yearlyPrice: 249.00,
       features: [
-        'Até 15 contas bancárias',
-        'Até 10.000 lançamentos por ano',
-        'Relatórios em PDF e Excel',
-        'Gráficos básicos',
-        'Suporte por email'
+        'Transações ilimitadas',
+        'Até 6 contas/cartões conectados',
+        'Relatórios avançados + dashboards interativos',
+        'Metas financeiras personalizadas',
+        'Exportação de relatórios em PDF/Excel',
+        'Suporte prioritário'
       ],
       limitations: [],
-      current: (profile?.subscription_plan === 'enterprise' || profile?.subscription_plan === 'basic') && (!profile?.subscription_end || new Date(profile.subscription_end) > new Date()),
+      current: profile?.subscription_plan === 'professional' && profile?.subscription_end && new Date(profile.subscription_end) > new Date(),
+      popular: true,
+      trial: false,
+      buttonText: 'Escolher Profissional'
+    },
+    {
+      name: 'Premium',
+      description: 'Para empreendedores, autônomos e gestão avançada',
+      monthlyPrice: 49.90,
+      yearlyPrice: 499.00,
+      features: [
+        'Tudo do Plano Profissional',
+        'Análises financeiras avançadas (fluxo de caixa, comparativos)',
+        'Cadastro de contas/cartões ilimitados',
+        'Consultoria financeira com IA',
+        'Integração com outras ferramentas (API)',
+        'Suporte 24 horas'
+      ],
+      limitations: [],
+      current: profile?.subscription_plan === 'premium' && profile?.subscription_end && new Date(profile.subscription_end) > new Date(),
       popular: false,
-      trial: false
+      trial: false,
+      buttonText: 'Escolher Premium'
     }
   ]
 
@@ -108,7 +110,7 @@ const Plans = () => {
     }
     
     try {
-      const planType = planName === 'Premium' ? 'premium' : 'enterprise'
+      const planType = planName === 'Premium' ? 'premium' : 'professional'
       
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { planType }
@@ -173,7 +175,7 @@ const Plans = () => {
             </span>
             {isYearly && (
               <Badge variant="secondary" className="ml-2">
-                Economize 17%
+                Economize até 17%
               </Badge>
             )}
           </div>
@@ -264,14 +266,14 @@ const Plans = () => {
                     className="w-full"
                     variant={plan.popular ? "default" : plan.current ? "secondary" : "outline"}
                     onClick={() => handleChoosePlan(plan.name)}
-                    disabled={plan.current}
+                    disabled={plan.current || plan.name === 'Básico'}
                   >
                     {plan.current ? (
                       'Plano Atual'
                     ) : (
                       <>
-                        Escolher este plano
-                        <ArrowRight className="w-4 h-4 ml-2" />
+                        {plan.buttonText}
+                        {plan.name !== 'Básico' && <ArrowRight className="w-4 h-4 ml-2" />}
                       </>
                     )}
                   </Button>

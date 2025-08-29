@@ -34,13 +34,13 @@ serve(async (req) => {
     }
 
     const plans = {
-      premium: {
-        amount: 1990,
-        name: "Premium Plan"
+      professional: {
+        amount: 2490,
+        name: "Plano Profissional"
       },
-      enterprise: {
+      premium: {
         amount: 4990,
-        name: "Enterprise Plan"
+        name: "Plano Premium"
       }
     };
 
