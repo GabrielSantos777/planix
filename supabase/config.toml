@@ -22,3 +22,6 @@ verify_jwt = true
 
 [functions.whatsapp-webhook]
 verify_jwt = false
+
+[functions.n8n-webhook]
+verify_jwt = false
