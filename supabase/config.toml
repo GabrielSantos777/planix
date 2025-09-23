@@ -25,3 +25,6 @@ verify_jwt = false
 
 [functions.n8n-webhook]
 verify_jwt = false
+
+[functions.get-user-by-phone]
+verify_jwt = false

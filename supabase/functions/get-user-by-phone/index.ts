@@ -1,0 +1,71 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  console.log('Get user by phone called:', req.method);
+
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get phone number from URL params
+    const url = new URL(req.url);
+    const phoneNumber = url.searchParams.get('phone');
+
+    if (!phoneNumber) {
+      return new Response(
+        JSON.stringify({ error: 'Phone number parameter is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Looking up user for phone:', phoneNumber);
+
+    // Search for user by phone number
+    const { data: integration, error } = await supabase
+      .from('whatsapp_integrations')
+      .select('user_id')
+      .eq('phone_number', phoneNumber)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !integration) {
+      console.log('No active integration found for phone:', phoneNumber);
+      return new Response(
+        JSON.stringify({ error: 'No active WhatsApp integration found for this phone number' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Found user_id:', integration.user_id);
+
+    return new Response(
+      JSON.stringify({ 
+        user_id: integration.user_id,
+        phone_number: phoneNumber,
+        success: true 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error in get-user-by-phone function:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
