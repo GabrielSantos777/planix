@@ -33,8 +33,32 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const body = await req.json();
-    console.log('Received data from n8n:', body);
+    // Check if request has body
+    const contentType = req.headers.get('content-type');
+    console.log('Content-Type:', contentType);
+    
+    let body;
+    try {
+      const text = await req.text();
+      console.log('Raw request body:', text);
+      
+      if (!text || text.trim() === '') {
+        throw new Error('Empty request body');
+      }
+      
+      body = JSON.parse(text);
+      console.log('Parsed JSON body:', body);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid JSON in request body', 
+          details: parseError.message,
+          receivedContentType: contentType 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const transactionData: N8NTransaction = body;
 
