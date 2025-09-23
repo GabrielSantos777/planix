@@ -23,27 +23,39 @@ serve(async (req) => {
 
     // Get phone number from URL params
     const url = new URL(req.url);
-    const phoneNumber = url.searchParams.get('phone');
+    const rawPhone = url.searchParams.get('phone');
 
-    if (!phoneNumber) {
+    if (!rawPhone) {
       return new Response(
         JSON.stringify({ error: 'Phone number parameter is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Looking up user for phone:', phoneNumber);
+    // Normalize: decode, trim, remove non-digits and build variants with/without "+"
+    const decoded = decodeURIComponent(rawPhone);
+    const trimmed = decoded.trim();
+    const digits = trimmed.replace(/\D/g, '');
+    const variants = [digits, `+${digits}`];
 
-    // Search for user by phone number
+    console.log('Looking up user for phone (normalized):', {
+      raw: rawPhone,
+      decoded,
+      trimmed,
+      digits,
+      variants,
+    });
+
+    // Search for user by phone number (accept both formats)
     const { data: integration, error } = await supabase
       .from('whatsapp_integrations')
-      .select('user_id')
-      .eq('phone_number', phoneNumber)
+      .select('user_id, phone_number')
+      .in('phone_number', variants)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (error || !integration) {
-      console.log('No active integration found for phone:', phoneNumber);
+      console.log('No active integration found for phone variants:', variants);
       return new Response(
         JSON.stringify({ error: 'No active WhatsApp integration found for this phone number' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -55,7 +67,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         user_id: integration.user_id,
-        phone_number: phoneNumber,
+        phone_number: integration.phone_number ?? `+${digits}`,
         success: true 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
