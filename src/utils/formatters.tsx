@@ -18,8 +18,8 @@ export const formatCurrencyWithColor = (
   const absAmount = Math.abs(amount)
   const formattedAmount = formatCurrency(absAmount, currency)
   
-  const colorClass = isNegative ? 'text-destructive' : 'text-success'
-  const sign = isNegative ? '- ' : (showSign && amount > 0 ? '+ ' : '')
+  const colorClass = isNegative ? 'text-destructive font-medium' : 'text-success'
+  const sign = isNegative ? '− ' : (showSign && amount > 0 ? '+ ' : '')
   
   return (
     <span className={colorClass}>
