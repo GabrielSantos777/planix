@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp } from 'lucide-react'
 import { useApp } from '@/context/AppContext'
-import { useInvestments } from '@/context/InvestmentsContext'
+import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { useCurrency } from '@/context/CurrencyContext'
 
 interface WealthEvolutionChartProps {
@@ -12,8 +12,14 @@ interface WealthEvolutionChartProps {
 
 export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) => {
   const { transactions, accounts } = useApp()
-  const { getTotalValue: getInvestmentValue } = useInvestments()
+  const { investments } = useSupabaseData()
   const { formatCurrency } = useCurrency()
+
+  const getInvestmentValue = () => {
+    return investments.reduce((total, investment) => {
+      return total + (investment.quantity * investment.current_price)
+    }, 0)
+  }
 
   const evolutionData = useMemo(() => {
     const last6Months = Array.from({ length: 6 }, (_, i) => {
@@ -45,7 +51,7 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
         investments: Math.max(0, investmentValue)
       }
     })
-  }, [transactions, accounts, getInvestmentValue])
+  }, [transactions, accounts, investments])
 
   const currentWealth = evolutionData[evolutionData.length - 1]?.wealth || 0
   const previousWealth = evolutionData[evolutionData.length - 2]?.wealth || 0

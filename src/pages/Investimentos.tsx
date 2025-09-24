@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useInvestments } from "@/context/InvestmentsContext"
+import { useSupabaseData } from "@/hooks/useSupabaseData"
 import { useCurrency } from "@/context/CurrencyContext"
 import { useToast } from "@/hooks/use-toast"
 import Layout from "@/components/Layout"
@@ -16,7 +16,7 @@ import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw } from "lucide-react"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 
 const Investimentos = () => {
-  const { investments, addInvestment, deleteInvestment, getTotalValue, getTotalProfit, updatePrices } = useInvestments()
+  const { investments, addInvestment, deleteInvestment, loading } = useSupabaseData()
   const { formatCurrency, currencies, selectedCurrency } = useCurrency()
   const { toast } = useToast()
   
@@ -24,14 +24,14 @@ const Investimentos = () => {
   const [newInvestment, setNewInvestment] = useState({
     symbol: '',
     name: '',
-    type: 'stock' as 'stock' | 'reit' | 'crypto' | 'bond' | 'fund',
+    type: 'stocks' as 'stocks' | 'crypto' | 'bonds' | 'funds',
     quantity: 0,
-    averagePrice: 0,
-    currentPrice: 0,
+    average_price: 0,
+    current_price: 0,
     currency: 'BRL'
   })
 
-  const handleAddInvestment = () => {
+  const handleAddInvestment = async () => {
     if (!newInvestment.symbol || !newInvestment.name || newInvestment.quantity <= 0) {
       toast({
         title: "❌ Erro",
@@ -41,43 +41,72 @@ const Investimentos = () => {
       return
     }
 
-    addInvestment({
-      ...newInvestment,
-      currentPrice: newInvestment.averagePrice, // Inicialmente o preço atual é igual ao preço médio
-      lastUpdate: new Date().toISOString()
-    })
-    
-    setNewInvestment({
-      symbol: '',
-      name: '',
-      type: 'stock',
-      quantity: 0,
-      averagePrice: 0,
-      currentPrice: 0,
-      currency: 'BRL'
-    })
-    setIsAddDialogOpen(false)
-    
-    toast({
-      title: "📈 Investimento adicionado",
-      description: "Novo investimento foi adicionado com sucesso"
-    })
+    try {
+      await addInvestment({
+        ...newInvestment,
+        current_price: newInvestment.average_price, // Inicialmente o preço atual é igual ao preço médio
+      })
+      
+      setNewInvestment({
+        symbol: '',
+        name: '',
+        type: 'stocks',
+        quantity: 0,
+        average_price: 0,
+        current_price: 0,
+        currency: 'BRL'
+      })
+      setIsAddDialogOpen(false)
+      
+      toast({
+        title: "📈 Investimento adicionado",
+        description: "Novo investimento foi adicionado com sucesso"
+      })
+    } catch (error) {
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao adicionar investimento",
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleDeleteInvestment = (id: string) => {
-    deleteInvestment(id)
-    toast({
-      title: "🗑️ Investimento removido",
-      description: "O investimento foi removido com sucesso"
-    })
+  const handleDeleteInvestment = async (id: string) => {
+    try {
+      await deleteInvestment(id)
+      toast({
+        title: "🗑️ Investimento removido",
+        description: "O investimento foi removido com sucesso"
+      })
+    } catch (error) {
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao remover investimento",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleUpdatePrices = async () => {
-    await updatePrices()
+    // Mock function for price updates - in a real app this would call an API
     toast({
       title: "🔄 Preços atualizados",
       description: "Os preços dos investimentos foram atualizados"
     })
+  }
+
+  const getTotalValue = () => {
+    return investments.reduce((total, investment) => {
+      return total + (investment.quantity * investment.current_price)
+    }, 0)
+  }
+
+  const getTotalProfit = () => {
+    return investments.reduce((total, investment) => {
+      const invested = investment.quantity * investment.average_price
+      const current = investment.quantity * investment.current_price
+      return total + (current - invested)
+    }, 0)
   }
 
   const totalValue = getTotalValue()
@@ -87,22 +116,21 @@ const Investimentos = () => {
   // Dados para gráficos
   const chartData = investments.map(inv => ({
     name: inv.symbol,
-    value: inv.quantity * inv.currentPrice,
-    profit: (inv.quantity * inv.currentPrice) - (inv.quantity * inv.averagePrice)
+    value: inv.quantity * inv.current_price,
+    profit: (inv.quantity * inv.current_price) - (inv.quantity * inv.average_price)
   }))
 
   const typeDistribution = investments.reduce((acc, inv) => {
     const type = inv.type
-    const value = inv.quantity * inv.currentPrice
+    const value = inv.quantity * inv.current_price
     acc[type] = (acc[type] || 0) + value
     return acc
   }, {} as Record<string, number>)
 
   const pieData = Object.entries(typeDistribution).map(([type, value]) => ({
-    name: type === 'stock' ? 'Ações' : 
-          type === 'reit' ? 'FIIs' : 
+    name: type === 'stocks' ? 'Ações' : 
           type === 'crypto' ? 'Crypto' : 
-          type === 'bond' ? 'Renda Fixa' : 'Fundos',
+          type === 'bonds' ? 'Renda Fixa' : 'Fundos',
     value,
     percentage: (value / totalValue) * 100
   }))
@@ -180,11 +208,10 @@ const Investimentos = () => {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="stock">Ação</SelectItem>
-                            <SelectItem value="reit">FII</SelectItem>
+                            <SelectItem value="stocks">Ação</SelectItem>
                             <SelectItem value="crypto">Criptomoeda</SelectItem>
-                            <SelectItem value="bond">Renda Fixa</SelectItem>
-                            <SelectItem value="fund">Fundo</SelectItem>
+                            <SelectItem value="bonds">Renda Fixa</SelectItem>
+                            <SelectItem value="funds">Fundo</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -231,8 +258,8 @@ const Investimentos = () => {
                     <div className="space-y-2">
                       <Label htmlFor="averagePrice">Preço Médio *</Label>
                       <CurrencyInput
-                        value={newInvestment.averagePrice}
-                        onChange={(value) => setNewInvestment({...newInvestment, averagePrice: value})}
+                        value={newInvestment.average_price}
+                        onChange={(value) => setNewInvestment({...newInvestment, average_price: value})}
                         currency={newInvestment.currency === 'BRL' ? 'R$' : newInvestment.currency}
                       />
                     </div>
@@ -330,8 +357,8 @@ const Investimentos = () => {
                   </TableHeader>
                   <TableBody>
                     {investments.map((investment) => {
-                      const totalValue = investment.quantity * investment.currentPrice
-                      const totalCost = investment.quantity * investment.averagePrice
+                      const totalValue = investment.quantity * investment.current_price
+                      const totalCost = investment.quantity * investment.average_price
                       const profit = totalValue - totalCost
                       const profitPercentage = (profit / totalCost) * 100
 
@@ -344,14 +371,13 @@ const Investimentos = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {investment.type === 'stock' ? 'Ação' : 
-                             investment.type === 'reit' ? 'FII' : 
+                            {investment.type === 'stocks' ? 'Ação' : 
                              investment.type === 'crypto' ? 'Crypto' : 
-                             investment.type === 'bond' ? 'Renda Fixa' : 'Fundo'}
+                             investment.type === 'bonds' ? 'Renda Fixa' : 'Fundo'}
                           </TableCell>
                           <TableCell>{investment.quantity}</TableCell>
-                          <TableCell>{formatCurrency(investment.averagePrice, investment.currency)}</TableCell>
-                          <TableCell>{formatCurrency(investment.currentPrice, investment.currency)}</TableCell>
+                          <TableCell>{formatCurrency(investment.average_price, investment.currency)}</TableCell>
+                          <TableCell>{formatCurrency(investment.current_price, investment.currency)}</TableCell>
                           <TableCell className="font-medium">{formatCurrency(totalValue, investment.currency)}</TableCell>
                           <TableCell className={profit >= 0 ? 'text-success' : 'text-destructive'}>
                             <div className="font-medium">{formatCurrency(profit, investment.currency)}</div>

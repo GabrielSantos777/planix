@@ -570,6 +570,58 @@ export const useSupabaseData = () => {
     return data
   }
 
+  // Investment operations
+  const addInvestment = async (investment: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    if (!user) return
+    try {
+      const { data, error } = await supabase
+        .from('investments')
+        .insert([{ ...investment, user_id: user.id }])
+        .select()
+        .single()
+
+      if (error) throw error
+      setInvestments(prev => [data, ...prev])
+      return data
+    } catch (error) {
+      console.error('Error adding investment:', error)
+      throw error
+    }
+  }
+
+  const updateInvestment = async (id: string, updates: Partial<Investment>) => {
+    try {
+      const { data, error } = await supabase
+        .from('investments')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      setInvestments(prev => prev.map(investment => investment.id === id ? data : investment))
+      return data
+    } catch (error) {
+      console.error('Error updating investment:', error)
+      throw error
+    }
+  }
+
+  const deleteInvestment = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('investments')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      setInvestments(prev => prev.filter(investment => investment.id !== id))
+    } catch (error) {
+      console.error('Error deleting investment:', error)
+      throw error
+    }
+  }
+
   return {
     // Data
     accounts,
@@ -592,6 +644,9 @@ export const useSupabaseData = () => {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    addInvestment,
+    updateInvestment,
+    deleteInvestment,
     addGoal,
     updateGoal,
     deleteGoal,

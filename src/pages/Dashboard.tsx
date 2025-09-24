@@ -11,7 +11,6 @@ import {
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
-import { useInvestments } from "@/context/InvestmentsContext"
 import { useCurrency } from "@/context/CurrencyContext"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import Layout from "@/components/Layout"
@@ -19,8 +18,12 @@ import Layout from "@/components/Layout"
 const Dashboard = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { accounts, creditCards, transactions } = useSupabaseData()
-  const { getTotalValue: getInvestmentValue } = useInvestments()
+  const { accounts, creditCards, transactions, investments } = useSupabaseData()
+  const getTotalInvestmentValue = () => {
+    return investments.reduce((total, investment) => {
+      return total + (investment.quantity * investment.current_price)
+    }, 0)
+  }
   const { formatCurrency } = useCurrency()
 
   // Get current month transactions
@@ -110,7 +113,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-success">
-                {formatCurrency(getInvestmentValue())}
+                {formatCurrency(getTotalInvestmentValue())}
               </div>
               <p className="text-xs text-muted-foreground">
                 Valor total investido

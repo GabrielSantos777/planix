@@ -9,7 +9,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { AppProvider } from "./context/AppContext";
 import { CurrencyProvider } from "./context/CurrencyContext";
 import { CategoriesProvider } from "./context/CategoriesContext";
-import { InvestmentsProvider } from "./context/InvestmentsContext";
+
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import Index from "./pages/Index";
@@ -46,8 +46,7 @@ const App = () => (
       <AuthProvider>
         <CurrencyProvider>
           <CategoriesProvider>
-            <InvestmentsProvider>
-              <AppProvider>
+            <AppProvider>
                 <TooltipProvider>
                   <Toaster />
                   <Sonner />
@@ -110,8 +109,7 @@ const App = () => (
                     </Routes>
                   </BrowserRouter>
                 </TooltipProvider>
-              </AppProvider>
-            </InvestmentsProvider>
+            </AppProvider>
           </CategoriesProvider>
         </CurrencyProvider>
       </AuthProvider>
