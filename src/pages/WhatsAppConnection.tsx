@@ -20,7 +20,7 @@ const WhatsAppConnection = () => {
   const { user } = useAuth();
 
   // Número do bot - deve ser configurado com o número real do WhatsApp Business API
-  const BOT_PHONE_NUMBER = "[CONFIGURAR NÚMERO DO BOT]"; // Substituir pelo número real do WhatsApp Business
+  const BOT_PHONE_NUMBER = "+55 37 99869-0185"; // Substituir pelo número real do WhatsApp Business
 
   useEffect(() => {
     if (user) {
@@ -55,14 +55,14 @@ const WhatsAppConnection = () => {
   const formatPhoneNumber = (phone: string) => {
     // Remove all non-numeric characters
     const cleaned = phone.replace(/\D/g, '');
-    
+
     // Add +55 if it doesn't start with it
     if (!cleaned.startsWith('55') && cleaned.length >= 10) {
       return `+55${cleaned}`;
     } else if (cleaned.startsWith('55')) {
       return `+${cleaned}`;
     }
-    
+
     return phone;
   };
 
@@ -86,7 +86,7 @@ const WhatsAppConnection = () => {
     }
 
     setIsConnecting(true);
-    
+
     try {
       const formattedPhone = formatPhoneNumber(phoneNumber);
       const code = generateConnectionCode();
@@ -104,7 +104,7 @@ const WhatsAppConnection = () => {
 
       setIsConnected(true);
       setPhoneNumber(formattedPhone);
-      
+
       toast({
         title: "Conta vinculada com sucesso!",
         description: `Agora envie mensagens para o bot ${BOT_PHONE_NUMBER} no WhatsApp para usar todas as funcionalidades!`,
@@ -157,7 +157,7 @@ const WhatsAppConnection = () => {
       setIsConnected(false);
       setPhoneNumber("");
       setConnectionCode("");
-      
+
       toast({
         title: "Desconectado",
         description: "WhatsApp desconectado com sucesso.",
@@ -195,173 +195,6 @@ const WhatsAppConnection = () => {
             </p>
           </div>
         </div>
-
-        {/* Status Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <div className={`p-2 rounded-full ${
-                isConnected ? 'bg-success/10 text-success' : 'bg-muted'
-              }`}>
-                {isConnected ? (
-                  <CheckCircle className="h-5 w-5" />
-                ) : (
-                  <AlertCircle className="h-5 w-5" />
-                )}
-              </div>
-              Status da Conexão
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <Badge variant={isConnected ? "default" : "secondary"}>
-                  {isConnected ? "Conectado" : "Desconectado"}
-                </Badge>
-                {isConnected && (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-sm text-muted-foreground">
-                      Número: {phoneNumber}
-                    </p>
-                    <p className="text-xs text-success">
-                      ✅ Bot ativo e pronto para uso!
-                    </p>
-                  </div>
-                )}
-              </div>
-              {isConnected && (
-                <Button 
-                  variant="outline" 
-                  onClick={handleDisconnect}
-                  className="text-destructive hover:text-destructive"
-                >
-                  Desconectar
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Connection Form */}
-        {!isConnected && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Smartphone className="h-5 w-5" />
-                Conectar WhatsApp
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Seu Número do WhatsApp</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+55 11 99999-9999"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  disabled={isConnecting}
-                />
-                <div className="bg-info/10 p-3 rounded-lg border border-info/20">
-                  <p className="text-sm text-info-foreground">
-                    ⚠️ <strong>Importante:</strong> Este é SEU número para vincular sua conta. 
-                    Após conectar, você enviará mensagens para o número do bot <strong>{BOT_PHONE_NUMBER}</strong>
-                  </p>
-                </div>
-              </div>
-
-              <Button 
-                onClick={handleConnect} 
-                disabled={isConnecting || !user}
-                className="w-full"
-              >
-                {isConnecting ? "Conectando..." : "Conectar WhatsApp"}
-              </Button>
-
-              {!user && (
-                <p className="text-sm text-destructive text-center">
-                  Você precisa estar logado para conectar o WhatsApp
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Bot Contact Info */}
-        <Card className="border-success/20 bg-success/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-success">
-              <MessageSquare className="h-5 w-5" />
-              Número do Bot Financeiro
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between bg-background p-4 rounded-lg border-2 border-success/20">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-success/10 rounded-full">
-                  <Bot className="h-5 w-5 text-success" />
-                </div>
-                <div>
-                  <p className="font-mono text-lg font-semibold">{BOT_PHONE_NUMBER}</p>
-                  <p className="text-sm text-muted-foreground">Envie suas mensagens para este número</p>
-                </div>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => copyToClipboard(BOT_PHONE_NUMBER)}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            <div className="bg-info/10 p-3 rounded-lg border border-info/20">
-              <p className="text-sm text-info-foreground">
-                <strong>📱 Como usar:</strong> Salve o número {BOT_PHONE_NUMBER} nos seus contatos como "Bot Financeiro" 
-                e envie qualquer comando financeiro!
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Demo Commands */}
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-primary">
-              <Zap className="h-5 w-5" />
-              Comandos para Testar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Envie uma dessas mensagens para <strong>{BOT_PHONE_NUMBER}</strong> no WhatsApp:
-            </p>
-            
-            <div className="grid gap-2">
-              {[
-                "saldo",
-                "Entrada de R$ 1500 salário",
-                "Gasto de R$ 50 almoço",
-                "resumo semanal",
-                "gastos em alimentação"
-              ].map((command, index) => (
-                <div 
-                  key={index}
-                  className="flex items-center justify-between bg-background p-3 rounded-lg border"
-                >
-                  <code className="text-sm font-mono">{command}</code>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => copyToClipboard(command)}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -453,6 +286,98 @@ const WhatsAppConnection = () => {
           </Card>
         </div>
 
+        {/* Status Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className={`p-2 rounded-full ${isConnected ? 'bg-success/10 text-success' : 'bg-muted'
+                }`}>
+                {isConnected ? (
+                  <CheckCircle className="h-5 w-5" />
+                ) : (
+                  <AlertCircle className="h-5 w-5" />
+                )}
+              </div>
+              Status da Conexão
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <Badge variant={isConnected ? "default" : "secondary"}>
+                  {isConnected ? "Conectado" : "Desconectado"}
+                </Badge>
+                {isConnected && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm text-muted-foreground">
+                      Número: {phoneNumber}
+                    </p>
+                    <p className="text-xs text-success">
+                      ✅ Bot ativo e pronto para uso!
+                    </p>
+                  </div>
+                )}
+              </div>
+              {isConnected && (
+                <Button
+                  variant="outline"
+                  onClick={handleDisconnect}
+                  className="text-destructive hover:text-destructive"
+                >
+                  Desconectar
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Connection Form */}
+        {!isConnected && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                Conectar WhatsApp
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Seu Número do WhatsApp</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+55 11 99999-9999"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  disabled={isConnecting}
+                />
+                <div className="bg-info/10 p-3 rounded-lg border border-info/20">
+                  <p className="text-sm text-info-foreground">
+                    ⚠️ <strong>Importante:</strong> Este é SEU número para vincular sua conta.
+                    Após conectar, você enviará mensagens para o número do bot <strong>{BOT_PHONE_NUMBER}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleConnect}
+                disabled={isConnecting || !user}
+                className="w-full"
+              >
+                {isConnecting ? "Conectando..." : "Conectar WhatsApp"}
+              </Button>
+
+              {!user && (
+                <p className="text-sm text-destructive text-center">
+                  Você precisa estar logado para conectar o WhatsApp
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+
+
         {/* Advanced Commands */}
         <Card>
           <CardHeader>
@@ -494,8 +419,8 @@ const WhatsAppConnection = () => {
                 💡 Processamento de Imagens
               </h4>
               <p className="text-sm text-muted-foreground">
-                Envie fotos de notas fiscais, comprovantes ou recibos que o bot 
-                extrairá automaticamente o valor, categoria e descrição, criando 
+                Envie fotos de notas fiscais, comprovantes ou recibos que o bot
+                extrairá automaticamente o valor, categoria e descrição, criando
                 a transação no seu sistema!
               </p>
             </div>
