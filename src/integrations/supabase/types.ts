@@ -397,6 +397,33 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_log: {
+        Row: {
+          created_at: string | null
+          endpoint: string
+          id: string
+          ip_address: unknown
+          request_count: number | null
+          window_start: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          ip_address: unknown
+          request_count?: number | null
+          window_start?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          ip_address?: unknown
+          request_count?: number | null
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       subscribers: {
         Row: {
           created_at: string
@@ -544,7 +571,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          p_endpoint: string
+          p_ip_address: unknown
+          p_max_requests?: number
+          p_window_minutes?: number
+        }
+        Returns: boolean
+      }
       cleanup_old_audit_logs: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      cleanup_rate_limit_logs: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
@@ -568,6 +608,14 @@ export type Database = {
         Args: { token: string }
         Returns: string
       }
+      generate_security_report: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          description: string
+          metric: string
+          value: number
+        }[]
+      }
       get_user_whatsapp_token: {
         Args: { user_uuid: string }
         Returns: string
@@ -575,6 +623,18 @@ export type Database = {
       is_profile_owner: {
         Args: { profile_user_id: string }
         Returns: boolean
+      }
+      mask_sensitive_financial_data: {
+        Args: {
+          data_owner_id: string
+          sensitive_value: number
+          user_requesting_id: string
+        }
+        Returns: string
+      }
+      sanitize_text_input: {
+        Args: { input_text: string }
+        Returns: string
       }
       update_whatsapp_token: {
         Args: { new_token: string; phone: string; user_uuid: string }
