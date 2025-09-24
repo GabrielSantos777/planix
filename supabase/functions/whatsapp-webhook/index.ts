@@ -232,6 +232,9 @@ async function sendWhatsAppMessage(phoneNumber: string, message: string): Promis
   }
 }
 
+// Armazenar transações pendentes na memória (em produção, usar banco de dados)
+const pendingTransactions = new Map<string, any>();
+
 async function processFinancialCommand(message: string, userId: string, supabase: any, phoneNumber: string): Promise<string> {
   const command = message.toLowerCase().trim();
   
@@ -278,77 +281,85 @@ async function processFinancialCommand(message: string, userId: string, supabase
       return await getCategoryExpenses(supabase, userId, categoryName);
     }
     
+    // Verificar se é uma resposta de seleção de conta (números 1-9)
+    if (/^[1-9]$/.test(command) && pendingTransactions.has(phoneNumber)) {
+      return await processAccountSelection(command, userId, supabase, phoneNumber);
+    }
+    
     // Processar transações usando IA
     const extractedData = await extractTransactionFromText(message);
     
     if (extractedData.amount && extractedData.type) {
-      // Buscar conta padrão do usuário
-      const { data: accounts } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .limit(1);
+      // Buscar contas e cartões disponíveis
+      const [accountsResult, cardsResult] = await Promise.all([
+        supabase
+          .from('accounts')
+          .select('id, name, type')
+          .eq('user_id', userId)
+          .eq('is_active', true),
+        supabase
+          .from('credit_cards')
+          .select('id, name, card_type')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+      ]);
 
-      if (!accounts || accounts.length === 0) {
-        return '❌ Você precisa cadastrar uma conta primeiro no sistema para registrar transações.';
-      }
-
-      // Buscar ou criar categoria
-      let categoryId = null;
-      if (extractedData.category) {
-        categoryId = await getOrCreateCategory(supabase, userId, extractedData.category);
-      }
-
-      // Criar transação
-      const { data: transaction, error } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: userId,
-          account_id: accounts[0].id,
-          category_id: categoryId,
-          amount: extractedData.type === 'expense' ? -Math.abs(extractedData.amount) : Math.abs(extractedData.amount),
-          type: extractedData.type,
-          description: extractedData.description || `${extractedData.type === 'expense' ? 'Despesa' : 'Receita'} via WhatsApp`,
-          date: new Date().toISOString().split('T')[0]
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating transaction:', error);
-        return '❌ Erro ao registrar transação. Tente novamente.';
-      }
-
-      // Atualizar saldo da conta
-      const balanceChange = extractedData.type === 'expense' ? -Math.abs(extractedData.amount) : Math.abs(extractedData.amount);
-      await supabase
-        .from('accounts')
-        .update({
-          current_balance: supabase.raw(`current_balance + ${balanceChange}`)
-        })
-        .eq('id', accounts[0].id);
-
-      // Buscar saldo atualizado
-      const { data: updatedAccount } = await supabase
-        .from('accounts')
-        .select('current_balance')
-        .eq('id', accounts[0].id)
-        .single();
-
-      const newBalance = updatedAccount?.current_balance || 0;
-      const typeEmoji = extractedData.type === 'expense' ? '💸' : '💰';
-      const typeText = extractedData.type === 'expense' ? 'Despesa' : 'Receita';
+      const accounts = accountsResult.data || [];
+      const creditCards = cardsResult.data || [];
       
-      let response = `${typeEmoji} **${typeText} registrada com sucesso!**\n\n`;
+      // Se não há contas nem cartões
+      if (accounts.length === 0 && creditCards.length === 0) {
+        return '❌ **Você precisa cadastrar uma conta bancária ou cartão de crédito primeiro no sistema para registrar transações.**\n\nAcesse o sistema e vá em:\n• "Contas" para adicionar conta bancária\n• "Cartões" para adicionar cartão de crédito';
+      }
+      
+      // Se há apenas uma opção disponível, usar automaticamente
+      if (accounts.length + creditCards.length === 1) {
+        const accountId = accounts.length > 0 ? accounts[0].id : null;
+        const creditCardId = creditCards.length > 0 ? creditCards[0].id : null;
+        
+        return await createTransaction(extractedData, userId, supabase, accountId, creditCardId);
+      }
+      
+      // Armazenar transação pendente e mostrar opções
+      pendingTransactions.set(phoneNumber, {
+        extractedData,
+        userId,
+        timestamp: Date.now()
+      });
+      
+      let response = `💰 **Transação identificada:**\n`;
       response += `💵 Valor: R$ ${Math.abs(extractedData.amount).toFixed(2).replace('.', ',')}\n`;
+      response += `📂 Tipo: ${extractedData.type === 'expense' ? 'Despesa' : 'Receita'}\n`;
       if (extractedData.category) {
         response += `📂 Categoria: ${extractedData.category}\n`;
       }
       if (extractedData.description) {
         response += `📝 Descrição: ${extractedData.description}\n`;
       }
-      response += `\n💳 **Saldo atual: R$ ${newBalance.toFixed(2).replace('.', ',')}**`;
+      
+      response += `\n🏦 **Escolha onde registrar:**\n`;
+      
+      let optionNumber = 1;
+      
+      // Listar contas bancárias
+      if (accounts.length > 0) {
+        response += `\n**💳 Contas Bancárias:**\n`;
+        accounts.forEach(account => {
+          response += `${optionNumber}. ${account.name} (${account.type})\n`;
+          optionNumber++;
+        });
+      }
+      
+      // Listar cartões de crédito
+      if (creditCards.length > 0) {
+        response += `\n**💎 Cartões de Crédito:**\n`;
+        creditCards.forEach(card => {
+          response += `${optionNumber}. ${card.name} (${card.card_type})\n`;
+          optionNumber++;
+        });
+      }
+      
+      response += `\n**Digite o número da opção desejada (1-${optionNumber-1})**`;
       
       return response;
     }
@@ -378,6 +389,136 @@ async function processFinancialCommand(message: string, userId: string, supabase
   } catch (error) {
     console.error('Error processing command:', error);
     return '❌ Desculpe, ocorreu um erro ao processar sua solicitação. Tente novamente.';
+  }
+}
+
+// Função para processar seleção de conta
+async function processAccountSelection(selection: string, userId: string, supabase: any, phoneNumber: string): Promise<string> {
+  const pendingData = pendingTransactions.get(phoneNumber);
+  if (!pendingData) {
+    return '❌ Não há transação pendente. Envie uma nova transação.';
+  }
+  
+  // Limpar dados antigos (mais de 5 minutos)
+  if (Date.now() - pendingData.timestamp > 5 * 60 * 1000) {
+    pendingTransactions.delete(phoneNumber);
+    return '⏰ Transação expirou. Envie uma nova transação.';
+  }
+  
+  const optionIndex = parseInt(selection) - 1;
+  
+  // Buscar contas e cartões novamente
+  const [accountsResult, cardsResult] = await Promise.all([
+    supabase
+      .from('accounts')
+      .select('id, name')
+      .eq('user_id', userId)
+      .eq('is_active', true),
+    supabase
+      .from('credit_cards')
+      .select('id, name')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+  ]);
+  
+  const accounts = accountsResult.data || [];
+  const creditCards = cardsResult.data || [];
+  const allOptions = [...accounts, ...creditCards];
+  
+  if (optionIndex < 0 || optionIndex >= allOptions.length) {
+    return `❌ Opção inválida. Digite um número entre 1 e ${allOptions.length}.`;
+  }
+  
+  const selectedOption = allOptions[optionIndex];
+  const isAccount = optionIndex < accounts.length;
+  
+  const accountId = isAccount ? selectedOption.id : null;
+  const creditCardId = !isAccount ? selectedOption.id : null;
+  
+  // Remover transação pendente
+  pendingTransactions.delete(phoneNumber);
+  
+  return await createTransaction(pendingData.extractedData, userId, supabase, accountId, creditCardId);
+}
+
+// Função para criar transação
+async function createTransaction(extractedData: any, userId: string, supabase: any, accountId: string | null, creditCardId: string | null): Promise<string> {
+  try {
+    // Buscar ou criar categoria
+    let categoryId = null;
+    if (extractedData.category) {
+      categoryId = await getOrCreateCategory(supabase, userId, extractedData.category);
+    }
+
+    // Criar transação
+    const transactionData: any = {
+      user_id: userId,
+      category_id: categoryId,
+      amount: extractedData.type === 'expense' ? -Math.abs(extractedData.amount) : Math.abs(extractedData.amount),
+      type: extractedData.type,
+      description: extractedData.description || `${extractedData.type === 'expense' ? 'Despesa' : 'Receita'} via WhatsApp`,
+      date: new Date().toISOString().split('T')[0]
+    };
+    
+    if (accountId) {
+      transactionData.account_id = accountId;
+    }
+    if (creditCardId) {
+      transactionData.credit_card_id = creditCardId;
+    }
+
+    const { data: transaction, error } = await supabase
+      .from('transactions')
+      .insert(transactionData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating transaction:', error);
+      return '❌ Erro ao registrar transação. Tente novamente.';
+    }
+
+    // Atualizar saldo apenas se for conta bancária
+    if (accountId) {
+      const balanceChange = extractedData.type === 'expense' ? -Math.abs(extractedData.amount) : Math.abs(extractedData.amount);
+      await supabase
+        .from('accounts')
+        .update({
+          current_balance: supabase.raw(`current_balance + ${balanceChange}`)
+        })
+        .eq('id', accountId);
+    }
+
+    const typeEmoji = extractedData.type === 'expense' ? '💸' : '💰';
+    const typeText = extractedData.type === 'expense' ? 'Despesa' : 'Receita';
+    const accountType = creditCardId ? 'cartão de crédito' : 'conta bancária';
+    
+    let response = `${typeEmoji} **${typeText} registrada com sucesso!**\n\n`;
+    response += `💵 Valor: R$ ${Math.abs(extractedData.amount).toFixed(2).replace('.', ',')}\n`;
+    response += `🏦 Registrado em: ${accountType}\n`;
+    if (extractedData.category) {
+      response += `📂 Categoria: ${extractedData.category}\n`;
+    }
+    if (extractedData.description) {
+      response += `📝 Descrição: ${extractedData.description}\n`;
+    }
+    
+    // Mostrar saldo atualizado apenas para contas bancárias
+    if (accountId) {
+      const { data: updatedAccount } = await supabase
+        .from('accounts')
+        .select('current_balance')
+        .eq('id', accountId)
+        .single();
+      
+      const newBalance = updatedAccount?.current_balance || 0;
+      response += `\n💳 **Saldo atual: R$ ${newBalance.toFixed(2).replace('.', ',')}**`;
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error in createTransaction:', error);
+    return '❌ Erro ao processar transação. Tente novamente.';
   }
 }
 
