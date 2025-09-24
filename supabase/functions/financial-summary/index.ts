@@ -47,16 +47,68 @@ Deno.serve(async (req) => {
     // Se só temos o telefone, buscar o user_id
     if (!userId && phone_number) {
       console.log('Searching user by phone:', phone_number)
-      const { data: profileData, error: profileError } = await supabase
+      
+      // Normalizar o número removendo espaços, parênteses e formatação
+      const cleanPhone = phone_number.replace(/[\s\(\)\-]/g, '')
+      console.log('Clean phone:', cleanPhone)
+      
+      // Primeiro tentar busca exata
+      let { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('user_id')
         .eq('phone', phone_number)
         .single()
 
+      // Se não encontrar, tentar na tabela whatsapp_integrations
       if (profileError || !profileData) {
-        console.error('User not found by phone:', profileError)
+        console.log('Not found in profiles, trying whatsapp_integrations')
+        const { data: whatsappData, error: whatsappError } = await supabase
+          .from('whatsapp_integrations')
+          .select('user_id')
+          .eq('phone_number', phone_number)
+          .single()
+        
+        if (whatsappData) {
+          profileData = whatsappData
+          profileError = null
+        } else {
+          // Busca flexível - remover caracteres especiais e tentar várias variações
+          const variations = [
+            cleanPhone,
+            cleanPhone.replace(/^\+55/, ''),  // Remove +55
+            '+55' + cleanPhone.replace(/^\+55/, ''), // Garante +55
+          ]
+          
+          console.log('Trying phone variations:', variations)
+          
+          for (const variation of variations) {
+            const { data: flexData, error: flexError } = await supabase
+              .from('whatsapp_integrations')
+              .select('user_id')
+              .ilike('phone_number', `%${variation.slice(-10)}%`) // Últimos 10 dígitos
+              .single()
+            
+            if (flexData) {
+              profileData = flexData
+              profileError = null
+              console.log('Found with variation:', variation)
+              break
+            }
+          }
+        }
+      }
+
+      if (profileError || !profileData) {
+        console.error('User not found by phone after all attempts:', profileError)
         return new Response(
-          JSON.stringify({ error: 'Usuário não encontrado com este telefone' }), 
+          JSON.stringify({ 
+            error: 'Usuário não encontrado com este telefone',
+            debug: {
+              searched_phone: phone_number,
+              clean_phone: cleanPhone,
+              message: 'Verifique se o telefone está cadastrado no sistema'
+            }
+          }), 
           { 
             status: 404, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

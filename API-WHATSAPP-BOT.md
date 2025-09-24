@@ -23,9 +23,15 @@ POST https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary
 | Parâmetro | Tipo | Obrigatório | Descrição |
 |-----------|------|-------------|-----------|
 | `user_id` | string (UUID) | Não* | ID único do usuário no sistema |
-| `phone_number` | string | Não* | Número de telefone no formato +5511999999999 |
+| `phone_number` | string | Não* | Número de telefone (formatos aceitos: +5511999999999, (11) 99999-9999, etc.) |
 
 *Pelo menos um dos dois parâmetros deve ser fornecido
+
+**📞 Formatos de telefone aceitos:**
+- `+5511999999999` (formato internacional)
+- `11999999999` (apenas números)
+- `(11) 99999-9999` (formatado)
+- A API faz busca inteligente removendo formatação e tentando variações
 
 ### Exemplo de Requisição
 ```json
