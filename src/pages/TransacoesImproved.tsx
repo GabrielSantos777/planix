@@ -603,7 +603,7 @@ const TransacoesImproved = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="type">Tipo</Label>
                   <Select value={newTransaction.type} onValueChange={(value: any) => setNewTransaction({...newTransaction, type: value})}>
@@ -627,7 +627,7 @@ const TransacoesImproved = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="category">Categoria</Label>
                   <Select value={newTransaction.category_id} onValueChange={(value) => setNewTransaction({...newTransaction, category_id: value})}>
@@ -666,26 +666,26 @@ const TransacoesImproved = () => {
                     </SelectContent>
                   </Select>
                   {accounts.length === 0 && creditCards.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-destructive">
+                    <p className="text-xs text-muted-foreground text-destructive">
                       Nenhuma conta ou cartão cadastrado. Cadastre primeiro em "Contas".
                     </p>
                   )}
                   {accounts.length === 0 && creditCards.length > 0 && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Apenas cartões de crédito disponíveis.
                     </p>
                   )}
                   {creditCards.length === 0 && accounts.length > 0 && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Apenas contas bancárias disponíveis. Cadastre cartões em "Contas" para mais opções.
                     </p>
                   )}
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {newTransaction.payment_method === "account" ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 md:col-span-1">
                     <Label htmlFor="account">Conta</Label>
                     <Select value={newTransaction.account_id} onValueChange={(value) => setNewTransaction({...newTransaction, account_id: value})}>
                       <SelectTrigger>
@@ -694,7 +694,7 @@ const TransacoesImproved = () => {
                         {accounts.length === 0 ? (
                           <SelectContent>
                             <SelectItem value="no-account" disabled>
-                              Nenhuma conta cadastrada
+                              <span className="text-xs">Nenhuma conta cadastrada. Cadastre primeiro em "Contas".</span>
                             </SelectItem>
                           </SelectContent>
                         ) : (
@@ -708,8 +708,8 @@ const TransacoesImproved = () => {
                         )}
                     </Select>
                   </div>
-                ) : (
-                  <div className="space-y-2">
+                ) : newTransaction.payment_method === "credit_card" ? (
+                  <div className="space-y-2 md:col-span-1">
                     <Label htmlFor="credit_card">Cartão de Crédito</Label>
                     <Select value={newTransaction.credit_card_id} onValueChange={(value) => setNewTransaction({...newTransaction, credit_card_id: value})}>
                       <SelectTrigger>
@@ -718,7 +718,7 @@ const TransacoesImproved = () => {
                         {creditCards.length === 0 ? (
                           <SelectContent>
                             <SelectItem value="no-card" disabled>
-                              Nenhum cartão cadastrado
+                              <span className="text-xs">Nenhum cartão cadastrado. Cadastre primeiro em "Contas".</span>
                             </SelectItem>
                           </SelectContent>
                         ) : (
@@ -732,7 +732,7 @@ const TransacoesImproved = () => {
                         )}
                     </Select>
                   </div>
-                )}
+                ) : null}
                 
                 {newTransaction.payment_method === "credit_card" && !editingTransaction && (
                   <div className="space-y-2">
