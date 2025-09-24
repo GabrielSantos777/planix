@@ -53,6 +53,42 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          ip_address: unknown | null
+          new_data: Json | null
+          old_data: Json | null
+          operation: string
+          table_name: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_data?: Json | null
+          old_data?: Json | null
+          operation: string
+          table_name: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_data?: Json | null
+          old_data?: Json | null
+          operation?: string
+          table_name?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           color: string | null
@@ -508,6 +544,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_old_audit_logs: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      create_whatsapp_integration: {
+        Args: {
+          p_phone_number: string
+          p_user_id: string
+          p_webhook_token: string
+        }
+        Returns: string
+      }
+      deactivate_whatsapp_integration: {
+        Args: { p_phone_number: string; p_user_id: string }
+        Returns: boolean
+      }
       decrypt_whatsapp_token: {
         Args: { encrypted_token: string }
         Returns: string
@@ -526,6 +578,14 @@ export type Database = {
       }
       update_whatsapp_token: {
         Args: { new_token: string; phone: string; user_uuid: string }
+        Returns: boolean
+      }
+      validate_cpf: {
+        Args: { cpf: string }
+        Returns: boolean
+      }
+      validate_phone_number: {
+        Args: { phone: string }
         Returns: boolean
       }
     }
