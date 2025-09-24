@@ -294,7 +294,7 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-destructive">
-                        {formatCurrency(Math.abs(transaction.amount))}
+                        {formatCurrency(transaction.amount)}
                       </p>
                     </div>
                   </div>

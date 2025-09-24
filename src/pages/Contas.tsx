@@ -383,7 +383,7 @@ const Contas = () => {
                       <TableCell className={`text-right font-medium ${
                         transaction.type === "income" ? "text-success" : "text-destructive"
                       }`}>
-                        {transaction.type === "income" ? "+" : ""}
+                        {transaction.type === "income" ? "+" : "− "}
                         R$ {Math.abs(transaction.amount).toLocaleString('pt-BR')}
                       </TableCell>
                     </TableRow>

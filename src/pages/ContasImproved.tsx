@@ -602,7 +602,7 @@ export default function ContasImproved() {
                                   <p className="text-xs text-muted-foreground">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
                                 </div>
                                 <p className={`font-bold text-sm ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                                  {transaction.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
+                                  {transaction.type === 'income' ? '+' : ''}{formatCurrency(transaction.amount)}
                                 </p>
                               </div>
                             ))

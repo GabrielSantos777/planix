@@ -211,10 +211,10 @@ const Dashboard = () => {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className={`font-bold text-sm sm:text-base ${transaction.type === "income" ? "text-success" : "text-destructive"
-                        }`}>
-                        {transaction.type === "income" ? "+" : ""}
-                        {formatCurrency(Math.abs(transaction.amount))}
-                      </p>
+                         }`}>
+                         {transaction.type === "income" ? "+" : ""}
+                         {formatCurrency(transaction.amount)}
+                       </p>
                       <p className="text-xs sm:text-sm text-muted-foreground">
                         {new Date(transaction.date).toLocaleDateString('pt-BR')}
                       </p>

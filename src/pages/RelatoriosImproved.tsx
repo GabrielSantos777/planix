@@ -219,7 +219,7 @@ const RelatoriosImproved = () => {
       const date = format(new Date(transaction.date), "dd/MM/yyyy")
       const description = transaction.description.substring(0, 25)
       const category = transaction.category?.name?.substring(0, 15) || 'N/A'
-      const amount = formatCurrency(Math.abs(transaction.amount || 0))
+      const amount = formatCurrency(transaction.amount || 0)
       const type = transaction.type === 'income' ? 'Receita' : 'Despesa'
       
       doc.text(date, 20, yPosition)
@@ -690,8 +690,8 @@ const RelatoriosImproved = () => {
                           <TableCell className={`text-right font-medium ${
                             transaction.type === "income" ? "text-success" : "text-destructive"
                           }`}>
-                            {transaction.type === "income" ? "+" : "-"}
-                            {formatCurrency(Math.abs(transaction.amount || 0))}
+                            {transaction.type === "income" ? "+" : ""}
+                            {formatCurrency(transaction.amount || 0)}
                           </TableCell>
                           <TableCell>
                             <Badge 

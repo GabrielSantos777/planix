@@ -535,7 +535,7 @@ const TransacoesImproved = () => {
                         transaction.type === "income" ? "text-success" : "text-destructive"
                       }`}>
                         {transaction.type === "income" ? "+" : ""}
-                        {formatCurrency(Math.abs(transaction.amount))}
+                        {formatCurrency(transaction.amount)}
                       </TableCell>
                        <TableCell className="text-right">
                          <div className="flex justify-end gap-1 sm:gap-2">

@@ -58,10 +58,13 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       ? currencies.find(c => c.code === currencyCode) || selectedCurrency
       : selectedCurrency
 
-    return `${currency.symbol} ${Math.abs(amount).toLocaleString('pt-BR', {
+    const isNegative = amount < 0
+    const formatted = Math.abs(amount).toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    })}`
+    })
+
+    return `${isNegative ? '− ' : ''}${currency.symbol} ${formatted}`
   }
 
   const convertToBRL = (amount: number, fromCurrency: string) => {
