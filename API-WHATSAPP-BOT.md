@@ -117,7 +117,7 @@ ou
 ### 1. Configuração do Nó HTTP Request
 
 - **Method**: POST
-- **URL**: https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary
+- **URL**: `https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary`
 - **Headers**: 
   - Content-Type: application/json
 - **Body**: JSON
@@ -126,6 +126,26 @@ ou
     "phone_number": "{{$node["WhatsApp Trigger"].json["from"]}}"
   }
   ```
+
+### 🚨 Solução para Erro "Invalid URL" no n8n
+
+Se você receber o erro `Invalid URL: "https://...". URL must start with "http" or "https"`, siga estes passos:
+
+1. **Delete e recrie o nó HTTP Request** no n8n
+2. **Cole a URL sem aspas**: `https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary`
+3. **Verifique se não há caracteres invisíveis** copiando a URL deste documento
+4. **Alternative**: Use uma variável de ambiente no n8n:
+   - Crie uma variável `SUPABASE_FUNCTION_URL` 
+   - Valor: `https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary`
+   - Use `{{$env.SUPABASE_FUNCTION_URL}}` no campo URL
+
+### 🔍 Teste Manual
+Antes de configurar no n8n, teste no Postman:
+```bash
+curl -X POST https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary \
+  -H "Content-Type: application/json" \
+  -d '{"phone_number": "+5511999999999"}'
+```
 
 ### 2. Exemplo de Fluxo n8n
 

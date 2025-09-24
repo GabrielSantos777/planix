@@ -198,27 +198,42 @@ const WhatsAppConnection = () => {
     setApiResponse("");
 
     try {
-      const { data, error } = await supabase.functions.invoke('financial-summary', {
-        body: {
-          user_id: user?.id,
-          phone_number: testPhoneNumber || undefined
-        }
+      const payload = testPhoneNumber 
+        ? { phone_number: testPhoneNumber }
+        : { user_id: user?.id };
+
+      console.log('Testando API com payload:', payload);
+
+      // Teste direto via fetch para debugging do n8n
+      const response = await fetch(`https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
       });
 
-      if (error) {
-        setApiResponse(`Erro: ${error.message}`);
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erro na resposta:', response.status, errorText);
+        setApiResponse(`Erro HTTP ${response.status}: ${errorText}`);
         toast({
           title: "Erro na API",
-          description: error.message,
+          description: `HTTP ${response.status}: ${errorText}`,
           variant: "destructive",
         });
         return;
       }
 
+      const data = await response.json();
+      console.log('Resposta da API:', data);
       setApiResponse(JSON.stringify(data, null, 2));
+      
       toast({
         title: "API testada com sucesso!",
-        description: "Confira o resultado abaixo",
+        description: "URL confirmada: https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary",
       });
 
     } catch (error) {
