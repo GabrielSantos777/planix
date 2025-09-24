@@ -683,9 +683,9 @@ const TransacoesImproved = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 {newTransaction.payment_method === "account" ? (
-                  <div className="space-y-2 md:col-span-1">
+                  <div className="space-y-2">
                     <Label htmlFor="account">Conta</Label>
                     <Select value={newTransaction.account_id} onValueChange={(value) => setNewTransaction({...newTransaction, account_id: value})}>
                       <SelectTrigger>
@@ -709,45 +709,47 @@ const TransacoesImproved = () => {
                     </Select>
                   </div>
                 ) : newTransaction.payment_method === "credit_card" ? (
-                  <div className="space-y-2 md:col-span-1">
-                    <Label htmlFor="credit_card">Cartão de Crédito</Label>
-                    <Select value={newTransaction.credit_card_id} onValueChange={(value) => setNewTransaction({...newTransaction, credit_card_id: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um cartão" />
-                      </SelectTrigger>
-                        {creditCards.length === 0 ? (
-                          <SelectContent>
-                            <SelectItem value="no-card" disabled>
-                              <span className="text-xs">Nenhum cartão cadastrado. Cadastre primeiro em "Contas".</span>
-                            </SelectItem>
-                          </SelectContent>
-                        ) : (
-                          <SelectContent>
-                            {creditCards.map((card) => (
-                              <SelectItem key={card.id} value={card.id}>
-                                {card.name}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="credit_card">Cartão de Crédito</Label>
+                      <Select value={newTransaction.credit_card_id} onValueChange={(value) => setNewTransaction({...newTransaction, credit_card_id: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um cartão" />
+                        </SelectTrigger>
+                          {creditCards.length === 0 ? (
+                            <SelectContent>
+                              <SelectItem value="no-card" disabled>
+                                <span className="text-xs">Nenhum cartão cadastrado. Cadastre primeiro em "Contas".</span>
                               </SelectItem>
-                            ))}
+                            </SelectContent>
+                          ) : (
+                            <SelectContent>
+                              {creditCards.map((card) => (
+                                <SelectItem key={card.id} value={card.id}>
+                                  {card.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          )}
+                      </Select>
+                    </div>
+                    
+                    {!editingTransaction && (
+                      <div className="space-y-2">
+                        <Label htmlFor="installment_type">Tipo de Pagamento</Label>
+                        <Select value={newTransaction.is_installment ? "installment" : "cash"} onValueChange={(value) => setNewTransaction({...newTransaction, is_installment: value === "installment", installments: value === "installment" ? newTransaction.installments : 1})}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">À Vista</SelectItem>
+                            <SelectItem value="installment">Parcelado</SelectItem>
                           </SelectContent>
-                        )}
-                    </Select>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 ) : null}
-                
-                {newTransaction.payment_method === "credit_card" && !editingTransaction && (
-                  <div className="space-y-2">
-                    <Label htmlFor="installment_type">Tipo de Pagamento</Label>
-                    <Select value={newTransaction.is_installment ? "installment" : "cash"} onValueChange={(value) => setNewTransaction({...newTransaction, is_installment: value === "installment", installments: value === "installment" ? newTransaction.installments : 1})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">À Vista</SelectItem>
-                        <SelectItem value="installment">Parcelado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
                 
                 {editingTransaction && editingTransaction.is_installment && (
                   <div className="space-y-2">
