@@ -1,0 +1,224 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+Deno.serve(async (req) => {
+  console.log('Financial Summary API called:', req.method, req.url)
+
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
+  try {
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }), 
+        { 
+          status: 405, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    const { user_id, phone_number } = await req.json()
+    console.log('Request data:', { user_id, phone_number })
+
+    if (!user_id && !phone_number) {
+      return new Response(
+        JSON.stringify({ error: 'user_id ou phone_number é obrigatório' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    let userId = user_id
+
+    // Se só temos o telefone, buscar o user_id
+    if (!userId && phone_number) {
+      console.log('Searching user by phone:', phone_number)
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('phone', phone_number)
+        .single()
+
+      if (profileError || !profileData) {
+        console.error('User not found by phone:', profileError)
+        return new Response(
+          JSON.stringify({ error: 'Usuário não encontrado com este telefone' }), 
+          { 
+            status: 404, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+      userId = profileData.user_id
+    }
+
+    console.log('Using userId:', userId)
+
+    // Buscar todas as transações do usuário
+    const { data: transactions, error: transactionsError } = await supabase
+      .from('transactions')
+      .select(`
+        *,
+        category:categories(*)
+      `)
+      .eq('user_id', userId)
+      .order('date', { ascending: false })
+
+    if (transactionsError) {
+      console.error('Error fetching transactions:', transactionsError)
+      return new Response(
+        JSON.stringify({ error: 'Erro ao buscar transações' }), 
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Buscar contas do usuário
+    const { data: accounts, error: accountsError } = await supabase
+      .from('accounts')
+      .select('current_balance')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+
+    if (accountsError) {
+      console.error('Error fetching accounts:', accountsError)
+    }
+
+    // Buscar metas do usuário
+    const { data: goals, error: goalsError } = await supabase
+      .from('goals')
+      .select('*')
+      .eq('user_id', userId)
+
+    if (goalsError) {
+      console.error('Error fetching goals:', goalsError)
+    }
+
+    // Calcular saldo total
+    const transactionBalance = transactions?.reduce((total, transaction) => {
+      return total + (Number(transaction.amount) || 0)
+    }, 0) || 0
+
+    const accountsBalance = accounts?.reduce((total, account) => {
+      return total + (Number(account.current_balance) || 0)
+    }, 0) || 0
+
+    const saldoTotal = transactionBalance + accountsBalance
+
+    // Calcular gastos por categoria (apenas despesas)
+    const gastosPorCategoria: Record<string, number> = {}
+    
+    transactions?.forEach(transaction => {
+      if (transaction.type === 'expense' && transaction.category) {
+        const categoryName = transaction.category.name
+        const amount = Math.abs(Number(transaction.amount) || 0)
+        gastosPorCategoria[categoryName] = (gastosPorCategoria[categoryName] || 0) + amount
+      }
+    })
+
+    // Processar metas
+    const metasProcessadas = goals?.map(goal => {
+      const objetivo = Number(goal.target_amount) || 0
+      const atual = Number(goal.current_amount) || 0
+      const progressoPercentual = objetivo > 0 ? Math.round((atual / objetivo) * 100) : 0
+
+      return {
+        titulo: goal.title,
+        objetivo: objetivo,
+        atual: atual,
+        progresso_percentual: progressoPercentual,
+        status: goal.status
+      }
+    }) || []
+
+    // Gerar resumo do mês atual
+    const agora = new Date()
+    const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1)
+    
+    const transacoesMesAtual = transactions?.filter(t => 
+      new Date(t.date) >= inicioMes
+    ) || []
+
+    const gastosMesAtual = transacoesMesAtual
+      .filter(t => t.type === 'expense')
+      .reduce((total, t) => total + Math.abs(Number(t.amount) || 0), 0)
+
+    const receitasMesAtual = transacoesMesAtual
+      .filter(t => t.type === 'income')
+      .reduce((total, t) => total + (Number(t.amount) || 0), 0)
+
+    // Encontrar principal categoria de gastos do mês
+    const categoriasMesAtual: Record<string, number> = {}
+    transacoesMesAtual
+      .filter(t => t.type === 'expense' && t.category)
+      .forEach(t => {
+        const categoryName = t.category.name
+        const amount = Math.abs(Number(t.amount) || 0)
+        categoriasMesAtual[categoryName] = (categoriasMesAtual[categoryName] || 0) + amount
+      })
+
+    const principalCategoria = Object.entries(categoriasMesAtual)
+      .sort(([,a], [,b]) => b - a)[0]
+
+    // Preparar resposta final
+    const response = {
+      saldo: Number(saldoTotal.toFixed(2)),
+      gastos_por_categoria: Object.fromEntries(
+        Object.entries(gastosPorCategoria).map(([cat, valor]) => [cat, Number(valor.toFixed(2))])
+      ),
+      metas: metasProcessadas,
+      resumo_mensal: {
+        mes_ano: agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+        total_gastos: Number(gastosMesAtual.toFixed(2)),
+        total_receitas: Number(receitasMesAtual.toFixed(2)),
+        principal_categoria: principalCategoria ? {
+          nome: principalCategoria[0],
+          valor: Number(principalCategoria[1].toFixed(2))
+        } : null,
+        saldo_mensal: Number((receitasMesAtual - gastosMesAtual).toFixed(2))
+      },
+      estatisticas: {
+        total_transacoes: transactions?.length || 0,
+        total_categorias: Object.keys(gastosPorCategoria).length,
+        total_metas: metasProcessadas.length,
+        ultima_atualizacao: new Date().toISOString()
+      }
+    }
+
+    console.log('Financial summary generated successfully for user:', userId)
+    
+    return new Response(
+      JSON.stringify(response), 
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
+
+  } catch (error) {
+    console.error('Error in financial-summary function:', error)
+    return new Response(
+      JSON.stringify({ error: 'Erro interno do servidor' }), 
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
+  }
+})

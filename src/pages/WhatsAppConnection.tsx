@@ -5,17 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Phone, Bot, CheckCircle, AlertCircle, Camera, BarChart3, Smartphone, Copy, Zap, QrCode } from "lucide-react";
+import { MessageSquare, Phone, Bot, CheckCircle, AlertCircle, Camera, BarChart3, Smartphone, Copy, Zap, QrCode, TestTube, Code } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Textarea } from "@/components/ui/textarea";
 
 const WhatsAppConnection = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionCode, setConnectionCode] = useState<string>("");
+  const [testPhoneNumber, setTestPhoneNumber] = useState("");
+  const [apiResponse, setApiResponse] = useState<string>("");
+  const [isTestingApi, setIsTestingApi] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -178,6 +182,56 @@ const WhatsAppConnection = () => {
       title: "Copiado!",
       description: "Texto copiado para a área de transferência.",
     });
+  };
+
+  const testFinancialSummaryApi = async () => {
+    if (!testPhoneNumber && !user?.id) {
+      toast({
+        title: "Erro",
+        description: "Insira um número de telefone ou certifique-se de estar logado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTestingApi(true);
+    setApiResponse("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke('financial-summary', {
+        body: {
+          user_id: user?.id,
+          phone_number: testPhoneNumber || undefined
+        }
+      });
+
+      if (error) {
+        setApiResponse(`Erro: ${error.message}`);
+        toast({
+          title: "Erro na API",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setApiResponse(JSON.stringify(data, null, 2));
+      toast({
+        title: "API testada com sucesso!",
+        description: "Confira o resultado abaixo",
+      });
+
+    } catch (error) {
+      console.error('API test error:', error);
+      setApiResponse(`Erro: ${error}`);
+      toast({
+        title: "Erro",
+        description: "Falha ao testar a API",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTestingApi(false);
+    }
   };
 
   return (
@@ -377,6 +431,137 @@ const WhatsAppConnection = () => {
         )}
 
 
+
+        {/* API Testing Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TestTube className="h-5 w-5 text-primary" />
+              Testar API de Resumo Financeiro
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-accent/10 p-4 rounded-lg border border-accent/20">
+              <h4 className="font-medium text-accent mb-2 flex items-center gap-2">
+                <Code className="h-4 w-4" />
+                📡 Nova API Disponível
+              </h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                API criada para consultas financeiras via bot do WhatsApp. Retorna saldo, gastos por categoria, metas e resumo mensal.
+              </p>
+              <div className="bg-muted p-3 rounded-lg">
+                <p className="text-sm font-mono">
+                  <strong>Endpoint:</strong> https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={() => copyToClipboard("https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary")}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copiar URL
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="test-phone">Número do WhatsApp (opcional se estiver logado)</Label>
+                <Input
+                  id="test-phone"
+                  type="tel"
+                  placeholder="+55 11 99999-9999"
+                  value={testPhoneNumber}
+                  onChange={(e) => setTestPhoneNumber(e.target.value)}
+                  disabled={isTestingApi}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Deixe em branco para usar seu usuário logado atual
+                </p>
+              </div>
+
+              <Button
+                onClick={testFinancialSummaryApi}
+                disabled={isTestingApi}
+                className="w-full"
+              >
+                {isTestingApi ? "Testando API..." : "Testar API de Resumo Financeiro"}
+              </Button>
+
+              {apiResponse && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Resposta da API:</Label>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => copyToClipboard(apiResponse)}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copiar
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={apiResponse}
+                    readOnly
+                    className="h-64 font-mono text-xs"
+                    placeholder="A resposta da API aparecerá aqui..."
+                  />
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="bg-info/10 p-4 rounded-lg border border-info/20">
+              <h4 className="font-medium text-info-foreground mb-2">📋 Documentação da API</h4>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="font-medium">Método: POST</p>
+                  <p className="text-muted-foreground">Content-Type: application/json</p>
+                </div>
+                
+                <div>
+                  <p className="font-medium">Body de Exemplo:</p>
+                  <div className="bg-muted p-2 rounded mt-1 font-mono text-xs">
+{`{
+  "user_id": "uuid-do-usuario",
+  "phone_number": "+5511999999999"
+}`}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="font-medium">Retorno Esperado:</p>
+                  <div className="bg-muted p-2 rounded mt-1 font-mono text-xs">
+{`{
+  "saldo": 1250.75,
+  "gastos_por_categoria": {
+    "alimentacao": 450.20,
+    "transporte": 180.00
+  },
+  "metas": [{
+    "titulo": "Viagem",
+    "objetivo": 5000,
+    "atual": 1500,
+    "progresso_percentual": 30
+  }],
+  "resumo_mensal": { ... }
+}`}
+                  </div>
+                </div>
+
+                <div className="bg-warning/10 p-3 rounded border border-warning/20">
+                  <p className="text-warning-foreground text-xs">
+                    <strong>⚠️ Para n8n:</strong> Use este endpoint em um nó HTTP Request com método POST.
+                    Envie no body either user_id ou phone_number para identificar o usuário.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Advanced Commands */}
         <Card>
