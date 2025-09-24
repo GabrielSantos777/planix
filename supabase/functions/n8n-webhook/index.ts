@@ -19,6 +19,14 @@ interface N8NTransaction {
   notes?: string;
 }
 
+interface N8NCategory {
+  user_id: string;
+  name: string;
+  type: 'income' | 'expense';
+  icon?: string;
+  color?: string;
+}
+
 serve(async (req) => {
   console.log('N8N webhook called:', req.method);
 
@@ -60,12 +68,86 @@ serve(async (req) => {
       );
     }
 
+    // Check if it's a category creation request
+    if (body.action === 'create_category') {
+      const categoryData: N8NCategory = body;
+      
+      // Validate required fields for category
+      if (!categoryData.user_id || !categoryData.name || !categoryData.type) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required fields for category: user_id, name, type' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Check if category already exists
+      const { data: existingCategory } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('user_id', categoryData.user_id)
+        .eq('name', categoryData.name)
+        .eq('type', categoryData.type)
+        .single();
+
+      if (existingCategory) {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            category_id: existingCategory.id,
+            message: 'Category already exists' 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Create new category
+      const { data: newCategory, error: categoryError } = await supabase
+        .from('categories')
+        .insert({
+          user_id: categoryData.user_id,
+          name: categoryData.name,
+          type: categoryData.type,
+          icon: categoryData.icon || 'folder',
+          color: categoryData.color || '#6B7280'
+        })
+        .select('id')
+        .single();
+
+      if (categoryError) {
+        console.error('Error creating category:', categoryError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to create category', details: categoryError }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('Category created successfully:', newCategory.id);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          category_id: newCategory.id,
+          message: 'Category created successfully' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Handle transaction creation (existing logic)
     const transactionData: N8NTransaction = body;
 
     // Validate required fields
     if (!transactionData.user_id || !transactionData.amount || !transactionData.type || !transactionData.description) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: user_id, amount, type, description' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate that account or credit card is specified
+    if (!transactionData.account_name && !transactionData.credit_card_name) {
+      return new Response(
+        JSON.stringify({ error: 'Either account_name or credit_card_name must be specified' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -117,6 +199,11 @@ serve(async (req) => {
 
       if (account) {
         accountId = account.id;
+      } else {
+        return new Response(
+          JSON.stringify({ error: `Account '${transactionData.account_name}' not found` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
 
@@ -132,6 +219,11 @@ serve(async (req) => {
 
       if (creditCard) {
         creditCardId = creditCard.id;
+      } else {
+        return new Response(
+          JSON.stringify({ error: `Credit card '${transactionData.credit_card_name}' not found` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
 

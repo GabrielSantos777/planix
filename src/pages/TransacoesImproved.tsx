@@ -108,6 +108,16 @@ const TransacoesImproved = () => {
       return
     }
 
+    // Check if user has accounts or credit cards
+    if (accounts.length === 0 && creditCards.length === 0) {
+      toast({
+        title: "Erro de Validação",
+        description: "Você precisa ter pelo menos uma conta bancária ou cartão de crédito cadastrado para registrar transações.",
+        variant: "destructive"
+      })
+      return
+    }
+
     // Validate payment method selection
     if (newTransaction.payment_method === "account" && !newTransaction.account_id) {
       toast({

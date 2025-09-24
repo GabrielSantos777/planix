@@ -1,16 +1,82 @@
-# API de Resumo Financeiro para Bot WhatsApp
+# API WhatsApp Bot
 
-## 📋 Visão Geral
+Esta é a documentação da API do Bot do WhatsApp para integração com sistemas financeiros.
 
-API criada para permitir que bots do WhatsApp consultem informações financeiras personalizadas dos usuários. Retorna dados estruturados em JSON para fácil integração com n8n e outros sistemas de automação.
+## 🔗 Endpoints
 
-## 🔗 Endpoint
+### 1. N8N Integration - Transações
 
+**URL:** `https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/n8n-webhook`
+**Método:** POST
+**Content-Type:** application/json
+
+### 2. N8N Integration - Categorias  
+
+**URL:** `https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/n8n-category-webhook`
+**Método:** POST
+**Content-Type:** application/json
+
+### 3. Resumo Financeiro
+
+**URL:** `https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary`
+**Método:** POST
+**Content-Type:** application/json
+
+## 📨 N8N Webhook - Transações
+
+Permite integração com n8n para automação de transações financeiras.
+
+### Exemplo de Payload para Transação:
+```json
+{
+  "user_id": "user-uuid-here",
+  "amount": 100.50,
+  "type": "expense",
+  "description": "Compra no supermercado",
+  "category_name": "Alimentação",
+  "account_name": "Conta Corrente",
+  "date": "2024-01-15",
+  "notes": "Compras da semana"
+}
 ```
-POST https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary
+
+### Campos Obrigatórios:
+- `user_id`: UUID do usuário
+- `amount`: Valor da transação (número positivo)
+- `type`: Tipo da transação ("income" ou "expense")
+- `description`: Descrição da transação
+- `account_name` OU `credit_card_name`: Pelo menos um deve ser especificado
+
+### Campos Opcionais:
+- `category_name`: Nome da categoria (será criada se não existir)
+- `date`: Data da transação (formato YYYY-MM-DD)
+- `notes`: Observações adicionais
+
+## 📨 N8N Webhook - Categorias
+
+Permite criação de categorias via n8n.
+
+### Exemplo de Payload para Categoria:
+```json
+{
+  "user_id": "user-uuid-here",
+  "name": "Nova Categoria",
+  "type": "expense",
+  "icon": "shopping-cart",
+  "color": "#FF6B6B"
+}
 ```
 
-## 📨 Requisição
+### Campos Obrigatórios:
+- `user_id`: UUID do usuário
+- `name`: Nome da categoria
+- `type`: Tipo da categoria ("income" ou "expense")
+
+### Campos Opcionais:
+- `icon`: Ícone da categoria (padrão: "folder")
+- `color`: Cor da categoria em hex (padrão: "#6B7280")
+
+## 📨 Resumo Financeiro
 
 ### Headers
 ```json
@@ -215,6 +281,14 @@ return [{ json: { message } }];
 - ✅ Validação de entrada obrigatória
 - ✅ Rate limiting aplicado pelo Supabase
 - ✅ Logs detalhados para monitoramento
+
+## ⚠️ Notas Importantes
+
+1. **Transações**: É obrigatório especificar uma conta bancária (`account_name`) ou cartão de crédito (`credit_card_name`). Se a conta/cartão não existir, a transação será rejeitada.
+2. **Categorias**: Se já existir uma categoria com o mesmo nome e tipo para o usuário, retornará a categoria existente ao invés de criar uma nova.
+3. Todas as datas devem estar no formato ISO 8601 (YYYY-MM-DD)
+4. Valores monetários devem ser números positivos
+5. O sistema criará automaticamente categorias que não existirem nas transações
 
 ## 📊 Monitoramento
 
