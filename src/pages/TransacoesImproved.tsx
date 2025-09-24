@@ -693,7 +693,7 @@ const TransacoesImproved = () => {
                       </SelectTrigger>
                         {accounts.length === 0 ? (
                           <SelectContent>
-                            <SelectItem value="" disabled>
+                            <SelectItem value="no-account" disabled>
                               Nenhuma conta cadastrada
                             </SelectItem>
                           </SelectContent>
@@ -717,7 +717,7 @@ const TransacoesImproved = () => {
                       </SelectTrigger>
                         {creditCards.length === 0 ? (
                           <SelectContent>
-                            <SelectItem value="" disabled>
+                            <SelectItem value="no-card" disabled>
                               Nenhum cartão cadastrado
                             </SelectItem>
                           </SelectContent>
