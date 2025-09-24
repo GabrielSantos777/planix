@@ -588,6 +588,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      create_security_backup: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       create_whatsapp_integration: {
         Args: {
           p_phone_number: string
@@ -603,6 +607,15 @@ export type Database = {
       decrypt_whatsapp_token: {
         Args: { encrypted_token: string }
         Returns: string
+      }
+      detect_suspicious_activity: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          details: string
+          risk_level: string
+          suspicious_activity: string
+          user_id: string
+        }[]
       }
       encrypt_whatsapp_token: {
         Args: { token: string }
@@ -647,6 +660,14 @@ export type Database = {
       validate_phone_number: {
         Args: { phone: string }
         Returns: boolean
+      }
+      verify_financial_integrity: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_name: string
+          details: string
+          status: string
+        }[]
       }
     }
     Enums: {
