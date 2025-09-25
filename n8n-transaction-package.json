@@ -1,0 +1,105 @@
+{
+  "description": "Pacote completo para inserir transações via N8N Webhook",
+  "webhook_url": "https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/n8n-webhook",
+  "method": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer YOUR_SUPABASE_ANON_KEY"
+  },
+  "examples": {
+    "transaction_with_account": {
+      "user_id": "01bbae9d-54fb-41fe-86b7-75c1bb0600ca",
+      "amount": 150.50,
+      "type": "expense",
+      "description": "Compra no supermercado",
+      "category_name": "Alimentação",
+      "account_name": "Conta Corrente",
+      "date": "2025-01-23",
+      "notes": "Compras da semana"
+    },
+    "transaction_with_credit_card": {
+      "user_id": "01bbae9d-54fb-41fe-86b7-75c1bb0600ca",
+      "amount": 89.90,
+      "type": "expense",
+      "description": "Pagamento Netflix",
+      "category_name": "Lazer",
+      "credit_card_name": "Cartão Nubank",
+      "date": "2025-01-23",
+      "notes": "Assinatura mensal"
+    },
+    "income_transaction": {
+      "user_id": "01bbae9d-54fb-41fe-86b7-75c1bb0600ca",
+      "amount": 5000.00,
+      "type": "income",
+      "description": "Salário Janeiro",
+      "category_name": "Salário",
+      "account_name": "Conta Corrente",
+      "date": "2025-01-20"
+    },
+    "create_category": {
+      "action": "create_category",
+      "user_id": "01bbae9d-54fb-41fe-86b7-75c1bb0600ca",
+      "name": "Nova Categoria",
+      "type": "expense",
+      "icon": "shopping-cart",
+      "color": "#10B981"
+    }
+  },
+  "required_fields": {
+    "transaction": [
+      "user_id",
+      "amount",
+      "type",
+      "description"
+    ],
+    "account_or_credit_card": "Deve ter account_name OU credit_card_name (não ambos)",
+    "category": [
+      "user_id",
+      "name",
+      "type"
+    ]
+  },
+  "optional_fields": {
+    "transaction": [
+      "category_name",
+      "date (formato: YYYY-MM-DD)",
+      "notes"
+    ],
+    "category": [
+      "icon",
+      "color (formato hex)"
+    ]
+  },
+  "validation_rules": {
+    "amount": "Número positivo",
+    "type": "income ou expense",
+    "date": "Formato YYYY-MM-DD ou será usado a data atual",
+    "account_name": "Deve existir na base de dados do usuário",
+    "credit_card_name": "Deve existir na base de dados do usuário",
+    "category_name": "Se não existir, será criada automaticamente"
+  },
+  "responses": {
+    "success": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "transaction_id": "uuid",
+        "message": "Transaction registered successfully"
+      }
+    },
+    "error": {
+      "status": 400,
+      "body": {
+        "error": "Missing required fields: user_id, amount, type, description"
+      }
+    }
+  },
+  "n8n_setup": {
+    "step_1": "Criar um HTTP Request node",
+    "step_2": "Configurar método POST",
+    "step_3": "URL: https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/n8n-webhook",
+    "step_4": "Headers: Content-Type: application/json",
+    "step_5": "Body: usar um dos exemplos acima",
+    "step_6": "Conectar ao trigger desejado"
+  }
+}
