@@ -81,12 +81,21 @@ serve(async (req) => {
 
     // Atualizar saldo da conta
     const balanceChange = extractedData.type === 'expense' ? -Math.abs(extractedData.amount) : Math.abs(extractedData.amount);
-    await supabaseClient
+    
+    // Fetch current balance and calculate new balance
+    const { data: currentAccount } = await supabaseClient
       .from('accounts')
-      .update({
-        current_balance: supabaseClient.raw(`current_balance + ${balanceChange}`)
-      })
-      .eq('id', accounts[0].id);
+      .select('current_balance')
+      .eq('id', accounts[0].id)
+      .single();
+    
+    if (currentAccount) {
+      const newBalance = (currentAccount.current_balance || 0) + balanceChange;
+      await supabaseClient
+        .from('accounts')
+        .update({ current_balance: newBalance })
+        .eq('id', accounts[0].id);
+    }
 
     // Buscar saldo atualizado
     const { data: updatedAccount } = await supabaseClient
@@ -121,7 +130,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("Receipt OCR error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

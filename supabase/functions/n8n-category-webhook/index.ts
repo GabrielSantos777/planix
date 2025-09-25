@@ -46,10 +46,11 @@ serve(async (req) => {
       console.log('Parsed JSON body:', body);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
+      const errorMessage = parseError instanceof Error ? parseError.message : 'Invalid JSON format';
       return new Response(
         JSON.stringify({ 
           error: 'Invalid JSON in request body', 
-          details: parseError.message,
+          details: errorMessage,
           receivedContentType: contentType 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -120,8 +121,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in n8n-category-webhook function:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({ error: 'Internal server error', details: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

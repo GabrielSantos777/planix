@@ -58,10 +58,11 @@ serve(async (req) => {
       console.log('Parsed JSON body:', body);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
+      const errorMessage = parseError instanceof Error ? parseError.message : 'Invalid JSON format';
       return new Response(
         JSON.stringify({ 
           error: 'Invalid JSON in request body', 
-          details: parseError.message,
+          details: errorMessage,
           receivedContentType: contentType 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -259,25 +260,45 @@ serve(async (req) => {
     if (accountId) {
       const balanceChange = transactionData.type === 'income' ? transactionData.amount : -transactionData.amount;
       
-      const { error: balanceError } = await supabase
+      // Fetch current balance and calculate new balance
+      const { data: currentAccount } = await supabase
         .from('accounts')
-        .update({ current_balance: supabase.sql`current_balance + ${balanceChange}` })
-        .eq('id', accountId);
+        .select('current_balance')
+        .eq('id', accountId)
+        .single();
+      
+      if (currentAccount) {
+        const newBalance = (currentAccount.current_balance || 0) + balanceChange;
+        const { error: balanceError } = await supabase
+          .from('accounts')
+          .update({ current_balance: newBalance })
+          .eq('id', accountId);
 
-      if (balanceError) {
-        console.error('Error updating account balance:', balanceError);
+        if (balanceError) {
+          console.error('Error updating account balance:', balanceError);
+        }
       }
     }
 
     // Update credit card balance if credit card is specified
     if (creditCardId && transactionData.type === 'expense') {
-      const { error: creditCardError } = await supabase
+      // Fetch current balance and calculate new balance
+      const { data: currentCard } = await supabase
         .from('credit_cards')
-        .update({ current_balance: supabase.sql`current_balance + ${transactionData.amount}` })
-        .eq('id', creditCardId);
+        .select('current_balance')
+        .eq('id', creditCardId)
+        .single();
+      
+      if (currentCard) {
+        const newBalance = (currentCard.current_balance || 0) + transactionData.amount;
+        const { error: creditCardError } = await supabase
+          .from('credit_cards')
+          .update({ current_balance: newBalance })
+          .eq('id', creditCardId);
 
-      if (creditCardError) {
-        console.error('Error updating credit card balance:', creditCardError);
+        if (creditCardError) {
+          console.error('Error updating credit card balance:', creditCardError);
+        }
       }
     }
 
@@ -294,8 +315,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in n8n-webhook function:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({ error: 'Internal server error', details: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

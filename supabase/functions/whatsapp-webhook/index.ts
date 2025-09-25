@@ -70,7 +70,8 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("WhatsApp webhook error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
@@ -251,11 +252,11 @@ async function processFinancialCommand(message: string, userId: string, supabase
         return '💳 Você ainda não possui contas cadastradas.';
       }
 
-      const totalBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0);
+      const totalBalance = accounts.reduce((sum: number, account: any) => sum + (account.current_balance || 0), 0);
       
       let response = `💰 **Saldo Atual: R$ ${totalBalance.toFixed(2).replace('.', ',')}**\n\n`;
       response += '📊 **Por conta:**\n';
-      accounts.forEach(account => {
+      accounts.forEach((account: any) => {
         const balance = account.current_balance || 0;
         const emoji = balance >= 0 ? '✅' : '⚠️';
         response += `${emoji} ${account.name}: R$ ${balance.toFixed(2).replace('.', ',')}\n`;
@@ -344,7 +345,7 @@ async function processFinancialCommand(message: string, userId: string, supabase
       // Listar contas bancárias
       if (accounts.length > 0) {
         response += `\n**💳 Contas Bancárias:**\n`;
-        accounts.forEach(account => {
+        accounts.forEach((account: any) => {
           response += `${optionNumber}. ${account.name} (${account.type})\n`;
           optionNumber++;
         });
@@ -353,7 +354,7 @@ async function processFinancialCommand(message: string, userId: string, supabase
       // Listar cartões de crédito
       if (creditCards.length > 0) {
         response += `\n**💎 Cartões de Crédito:**\n`;
-        creditCards.forEach(card => {
+        creditCards.forEach((card: any) => {
           response += `${optionNumber}. ${card.name} (${card.card_type})\n`;
           optionNumber++;
         });
@@ -541,12 +542,12 @@ async function generateDailyReport(supabase: any, userId: string): Promise<strin
   }
 
   const income = transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    .filter((t: any) => t.type === 'income')
+    .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
     
   const expenses = transactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    .filter((t: any) => t.type === 'expense')
+    .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
 
   let response = `📅 **Resumo de Hoje:**\n\n`;
   response += `💰 Receitas: R$ ${income.toFixed(2).replace('.', ',')}\n`;
@@ -555,8 +556,8 @@ async function generateDailyReport(supabase: any, userId: string): Promise<strin
 
   if (expenses > 0) {
     response += `💸 **Principais gastos:**\n`;
-    const expenseTransactions = transactions.filter(t => t.type === 'expense');
-    expenseTransactions.slice(0, 5).forEach(t => {
+    const expenseTransactions = transactions.filter((t: any) => t.type === 'expense');
+    expenseTransactions.slice(0, 5).forEach((t: any) => {
       const category = t.categories?.name || 'Outros';
       response += `• ${category}: R$ ${Math.abs(t.amount).toFixed(2).replace('.', ',')} - ${t.description}\n`;
     });
@@ -585,18 +586,18 @@ async function generateWeeklyReport(supabase: any, userId: string): Promise<stri
   }
 
   const income = transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    
+    .filter((t: any) => t.type === 'income')
+    .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+     
   const expenses = transactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    .filter((t: any) => t.type === 'expense')
+    .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
 
   // Agrupar por categoria
   const expensesByCategory: { [key: string]: number } = {};
   transactions
-    .filter(t => t.type === 'expense')
-    .forEach(t => {
+    .filter((t: any) => t.type === 'expense')
+    .forEach((t: any) => {
       const category = t.categories?.name || 'Outros';
       expensesByCategory[category] = (expensesByCategory[category] || 0) + Math.abs(t.amount);
     });
@@ -638,18 +639,18 @@ async function generateMonthlyReport(supabase: any, userId: string): Promise<str
   }
 
   const income = transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    
+    .filter((t: any) => t.type === 'income')
+    .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+     
   const expenses = transactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    .filter((t: any) => t.type === 'expense')
+    .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
 
   // Agrupar por categoria
   const expensesByCategory: { [key: string]: number } = {};
   transactions
-    .filter(t => t.type === 'expense')
-    .forEach(t => {
+    .filter((t: any) => t.type === 'expense')
+    .forEach((t: any) => {
       const category = t.categories?.name || 'Outros';
       expensesByCategory[category] = (expensesByCategory[category] || 0) + Math.abs(t.amount);
     });
@@ -693,13 +694,13 @@ async function getCategoryExpenses(supabase: any, userId: string, categoryName: 
     return `📂 **Gastos em "${categoryName}":**\n\nNenhum gasto encontrado nesta categoria este mês.`;
   }
 
-  const total = transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const total = transactions.reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
   
   let response = `📂 **Gastos em "${categoryName}" (este mês):**\n\n`;
   response += `💸 **Total: R$ ${total.toFixed(2).replace('.', ',')}**\n\n`;
   response += `📋 **Últimas transações:**\n`;
   
-  transactions.slice(0, 8).forEach(t => {
+  transactions.slice(0, 8).forEach((t: any) => {
     const date = new Date(t.date).toLocaleDateString('pt-BR');
     response += `• ${date}: R$ ${Math.abs(t.amount).toFixed(2).replace('.', ',')} - ${t.description}\n`;
   });
