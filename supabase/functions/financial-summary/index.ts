@@ -144,12 +144,23 @@ Deno.serve(async (req) => {
     // Buscar contas do usuário
     const { data: accounts, error: accountsError } = await supabase
       .from('accounts')
-      .select('current_balance')
+      .select('id, name, current_balance')
       .eq('user_id', userId)
       .eq('is_active', true)
 
     if (accountsError) {
       console.error('Error fetching accounts:', accountsError)
+    }
+
+    // Buscar cartões de crédito do usuário
+    const { data: creditCards, error: creditCardsError } = await supabase
+      .from('credit_cards')
+      .select('id, name, limit_amount, current_balance')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+
+    if (creditCardsError) {
+      console.error('Error fetching credit cards:', creditCardsError)
     }
 
     // Buscar metas do usuário
@@ -235,6 +246,17 @@ Deno.serve(async (req) => {
         Object.entries(gastosPorCategoria).map(([cat, valor]) => [cat, Number(valor.toFixed(2))])
       ),
       metas: metasProcessadas,
+      contas: accounts?.map(account => ({
+        id: account.id,
+        nome: account.name,
+        saldo: Number(account.current_balance || 0)
+      })) || [],
+      cartoes_credito: creditCards?.map(card => ({
+        id: card.id,
+        nome: card.name,
+        limite: Number(card.limit_amount || 0),
+        saldo_atual: Number(card.current_balance || 0)
+      })) || [],
       resumo_mensal: {
         mes_ano: agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
         total_gastos: Number(gastosMesAtual.toFixed(2)),
@@ -249,6 +271,8 @@ Deno.serve(async (req) => {
         total_transacoes: transactions?.length || 0,
         total_categorias: Object.keys(gastosPorCategoria).length,
         total_metas: metasProcessadas.length,
+        total_contas: accounts?.length || 0,
+        total_cartoes: creditCards?.length || 0,
         ultima_atualizacao: new Date().toISOString()
       }
     }
