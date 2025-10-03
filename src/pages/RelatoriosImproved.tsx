@@ -18,13 +18,15 @@ import {
   PieChart,
   FileText,
   Table as TableIcon,
-  X
+  X,
+  Wallet,
+  LineChart
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useCurrency } from "@/context/CurrencyContext"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import Layout from "@/components/Layout"
-import { ResponsiveContainer, PieChart as RechartsPieChart, Cell, Tooltip, Legend, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { ResponsiveContainer, PieChart as RechartsPieChart, Cell, Tooltip, Legend, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart as RechartsLineChart, Line } from 'recharts'
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
 import { format } from "date-fns"
@@ -45,6 +47,8 @@ const RelatoriosImproved = () => {
   const [accountFilter, setAccountFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [descriptionFilter, setDescriptionFilter] = useState("")
+  const [selectedYear, setSelectedYear] = useState(2025)
+  const [comparisonYears, setComparisonYears] = useState<number[]>([2024])
 
   // Função para limpar todos os filtros
   const clearAllFilters = () => {
@@ -141,6 +145,52 @@ const RelatoriosImproved = () => {
     }
     return Object.values(types).filter(item => item.value > 0)
   }, [totalIncome, totalExpenses])
+
+  // Dados para o gráfico de saldos por conta
+  const accountBalancesData = useMemo(() => {
+    return accounts
+      .filter(acc => acc.is_active)
+      .map(acc => ({
+        name: acc.name,
+        balance: acc.current_balance || 0
+      }))
+      .sort((a, b) => b.balance - a.balance)
+  }, [accounts])
+
+  // Dados para o gráfico de evolução anual
+  const monthlyBalanceData = useMemo(() => {
+    const allYears = [selectedYear, ...comparisonYears]
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    
+    return months.map((month, monthIndex) => {
+      const dataPoint: any = { month }
+      
+      allYears.forEach(year => {
+        // Calcular saldo até este mês do ano
+        const monthTransactions = transactions.filter(t => {
+          const date = new Date(t.date)
+          return date.getFullYear() === year && date.getMonth() <= monthIndex
+        })
+        
+        const balance = monthTransactions.reduce((sum, t) => {
+          return sum + (t.type === 'income' ? t.amount : -Math.abs(t.amount))
+        }, 0)
+        
+        dataPoint[`balance_${year}`] = balance
+      })
+      
+      return dataPoint
+    })
+  }, [transactions, selectedYear, comparisonYears])
+
+  // Anos disponíveis para seleção
+  const availableYears = useMemo(() => {
+    const years = new Set<number>()
+    transactions.forEach(t => {
+      years.add(new Date(t.date).getFullYear())
+    })
+    return Array.from(years).sort((a, b) => b - a)
+  }, [transactions])
 
   const getFilterPeriodText = () => {
     if (startDate && endDate) {
@@ -545,7 +595,156 @@ const RelatoriosImproved = () => {
           </Card>
         </div>
 
-        {/* Gráficos */}
+        {/* Novos Gráficos */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Gráfico de Saldos por Conta */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Saldo por Conta Bancária
+              </CardTitle>
+              <CardDescription>
+                Saldo atual de cada conta cadastrada
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {accountBalancesData.length > 0 ? (
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={accountBalancesData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="name" type="category" width={100} />
+                      <Tooltip 
+                        formatter={(value) => formatCurrency(Number(value))}
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px'
+                        }}
+                      />
+                      <Bar dataKey="balance">
+                        {accountBalancesData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.balance >= 0 ? '#10B981' : '#EF4444'} 
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-80 text-muted-foreground">
+                  Nenhuma conta cadastrada
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Evolução Anual */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <LineChart className="h-5 w-5" />
+                    Evolução Patrimonial
+                  </CardTitle>
+                  <CardDescription>
+                    Comparação de saldo acumulado por ano
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(Number(v))}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableYears.map(year => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {monthlyBalanceData.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart data={monthlyBalanceData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip 
+                          formatter={(value) => formatCurrency(Number(value))}
+                          contentStyle={{ 
+                            backgroundColor: 'hsl(var(--background))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '6px'
+                          }}
+                        />
+                        <Legend />
+                        <Line 
+                          type="monotone" 
+                          dataKey={`balance_${selectedYear}`}
+                          name={selectedYear.toString()}
+                          stroke="#3B82F6" 
+                          strokeWidth={3}
+                          dot={{ r: 4 }}
+                        />
+                        {comparisonYears.map((year, index) => (
+                          <Line 
+                            key={year}
+                            type="monotone" 
+                            dataKey={`balance_${year}`}
+                            name={year.toString()}
+                            stroke={COLORS[index % COLORS.length]}
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            dot={{ r: 3 }}
+                          />
+                        ))}
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {availableYears
+                      .filter(year => year !== selectedYear)
+                      .map(year => (
+                        <Button
+                          key={year}
+                          size="sm"
+                          variant={comparisonYears.includes(year) ? "default" : "outline"}
+                          onClick={() => {
+                            if (comparisonYears.includes(year)) {
+                              setComparisonYears(comparisonYears.filter(y => y !== year))
+                            } else {
+                              setComparisonYears([...comparisonYears, year])
+                            }
+                          }}
+                        >
+                          {year}
+                        </Button>
+                      ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-80 text-muted-foreground">
+                  Nenhum dado disponível
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Gráficos Existentes */}
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Gráfico de Pizza - Despesas por Categoria */}
           <Card>
