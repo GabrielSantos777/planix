@@ -195,7 +195,6 @@ export const useSupabaseData = () => {
 
       if (error) throw error
       setAccounts(prev => [data, ...prev])
-      await fetchAllData() // Refresh all data to ensure sync
       return data
     } catch (error) {
       console.error('Error adding account:', error)
@@ -217,7 +216,6 @@ export const useSupabaseData = () => {
 
       if (error) throw error
       setAccounts(prev => prev.map(acc => acc.id === id ? data : acc))
-      await fetchAllData() // Refresh all data to ensure sync
       return data
     } catch (error) {
       console.error('Error updating account:', error)
@@ -347,7 +345,6 @@ export const useSupabaseData = () => {
       }
       
       setTransactions(prev => [data, ...prev])
-      await fetchAllData() // Refresh all data to ensure sync
       return data
     } catch (error) {
       console.error('Error adding transaction:', error)
@@ -405,7 +402,6 @@ export const useSupabaseData = () => {
       setTransactions(prev => prev.map(transaction => 
         transaction.id === id ? data : transaction
       ))
-      await fetchAllData() // Refresh all data to ensure sync
       return data
     } catch (error) {
       console.error('Error updating transaction:', error)
@@ -444,7 +440,6 @@ export const useSupabaseData = () => {
       }
       
       setTransactions(prev => prev.filter(transaction => transaction.id !== id))
-      await fetchAllData() // Refresh all data to ensure sync
     } catch (error) {
       console.error('Error deleting transaction:', error)
       throw error

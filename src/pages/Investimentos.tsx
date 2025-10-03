@@ -16,7 +16,7 @@ import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw } from "lucide-react"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 
 const Investimentos = () => {
-  const { investments, addInvestment, deleteInvestment, loading } = useSupabaseData()
+  const { investments, addInvestment, deleteInvestment, updateInvestment, loading } = useSupabaseData()
   const { formatCurrency, currencies, selectedCurrency } = useCurrency()
   const { toast } = useToast()
   
@@ -88,11 +88,28 @@ const Investimentos = () => {
   }
 
   const handleUpdatePrices = async () => {
-    // Mock function for price updates - in a real app this would call an API
-    toast({
-      title: "🔄 Preços atualizados",
-      description: "Os preços dos investimentos foram atualizados"
-    })
+    try {
+      // Update each investment with a simulated price variation (±5%)
+      for (const investment of investments) {
+        const priceVariation = 0.95 + Math.random() * 0.1 // Random between 0.95 and 1.05
+        const newPrice = investment.current_price * priceVariation
+        
+        await updateInvestment(investment.id, {
+          current_price: newPrice
+        })
+      }
+      
+      toast({
+        title: "🔄 Preços atualizados",
+        description: "Os preços dos investimentos foram atualizados com sucesso"
+      })
+    } catch (error) {
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao atualizar preços",
+        variant: "destructive"
+      })
+    }
   }
 
   const getTotalValue = () => {
