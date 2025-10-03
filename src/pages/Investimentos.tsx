@@ -89,20 +89,68 @@ const Investimentos = () => {
 
   const handleUpdatePrices = async () => {
     try {
-      // Update each investment with a simulated price variation (±5%)
+      let updatedCount = 0
+      let errorCount = 0
+
       for (const investment of investments) {
-        const priceVariation = 0.95 + Math.random() * 0.1 // Random between 0.95 and 1.05
-        const newPrice = investment.current_price * priceVariation
-        
-        await updateInvestment(investment.id, {
-          current_price: newPrice
+        try {
+          let newPrice = investment.current_price
+
+          // Para ações brasileiras (terminam com número)
+          if (investment.type === 'stocks' && /\d$/.test(investment.symbol)) {
+            const response = await fetch(`https://brapi.dev/api/quote/${investment.symbol}`)
+            const data = await response.json()
+            
+            if (data.results && data.results.length > 0) {
+              newPrice = data.results[0].regularMarketPrice
+              updatedCount++
+            } else {
+              errorCount++
+              console.error(`Preço não encontrado para ${investment.symbol}`)
+            }
+          } 
+          // Para criptomoedas
+          else if (investment.type === 'crypto') {
+            const cryptoSymbol = investment.symbol.replace(/USD$|BRL$/, '').toLowerCase()
+            const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cryptoSymbol}&vs_currencies=brl`)
+            const data = await response.json()
+            
+            if (data[cryptoSymbol] && data[cryptoSymbol].brl) {
+              newPrice = data[cryptoSymbol].brl
+              updatedCount++
+            } else {
+              errorCount++
+              console.error(`Preço não encontrado para ${investment.symbol}`)
+            }
+          } else {
+            errorCount++
+            console.warn(`Tipo de ativo não suportado ou formato inválido: ${investment.symbol}`)
+            continue
+          }
+
+          if (newPrice !== investment.current_price) {
+            await updateInvestment(investment.id, {
+              current_price: newPrice
+            })
+          }
+        } catch (error) {
+          errorCount++
+          console.error(`Erro ao atualizar ${investment.symbol}:`, error)
+        }
+      }
+
+      if (updatedCount > 0) {
+        toast({
+          title: "🔄 Preços atualizados",
+          description: `${updatedCount} investimento(s) atualizado(s) com sucesso${errorCount > 0 ? `. ${errorCount} erro(s).` : ''}`
+        })
+      } else {
+        toast({
+          title: "⚠️ Atenção",
+          description: "Não foi possível atualizar nenhum preço. Verifique os símbolos dos ativos.",
+          variant: "destructive"
         })
       }
-      
-      toast({
-        title: "🔄 Preços atualizados",
-        description: "Os preços dos investimentos foram atualizados com sucesso"
-      })
     } catch (error) {
       toast({
         title: "❌ Erro",
