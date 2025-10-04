@@ -21,7 +21,9 @@ import {
   DollarSign,
   TrendingUp,
   TrendingDown,
-  BarChart3
+  BarChart3,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import Layout from "@/components/Layout"
 import { CreditCardInvoices } from "@/components/CreditCardInvoices"
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from "@/components/ui/carousel"
 
 const accountTypeLabels = {
   bank: "Conta Corrente",
@@ -71,6 +74,42 @@ export default function ContasImproved() {
     deleteCreditCard,
     loading
   } = useSupabaseData()
+
+  // Carousel state
+  const [accountCarouselApi, setAccountCarouselApi] = useState<CarouselApi>()
+  const [creditCardCarouselApi, setCreditCardCarouselApi] = useState<CarouselApi>()
+  const [selectedAccountIndex, setSelectedAccountIndex] = useState(0)
+  const [selectedCreditCardIndex, setSelectedCreditCardIndex] = useState(0)
+
+  // Sync carousel with selected index
+  useEffect(() => {
+    if (accountCarouselApi) {
+      accountCarouselApi.scrollTo(selectedAccountIndex)
+    }
+  }, [selectedAccountIndex, accountCarouselApi])
+
+  useEffect(() => {
+    if (creditCardCarouselApi) {
+      creditCardCarouselApi.scrollTo(selectedCreditCardIndex)
+    }
+  }, [selectedCreditCardIndex, creditCardCarouselApi])
+
+  // Listen to carousel changes
+  useEffect(() => {
+    if (!accountCarouselApi) return
+    
+    accountCarouselApi.on("select", () => {
+      setSelectedAccountIndex(accountCarouselApi.selectedScrollSnap())
+    })
+  }, [accountCarouselApi])
+
+  useEffect(() => {
+    if (!creditCardCarouselApi) return
+    
+    creditCardCarouselApi.on("select", () => {
+      setSelectedCreditCardIndex(creditCardCarouselApi.selectedScrollSnap())
+    })
+  }, [creditCardCarouselApi])
   
   // Get current month invoice for a credit card
   const getCurrentMonthInvoice = (cardId: string) => {
@@ -522,7 +561,7 @@ export default function ContasImproved() {
         </TabsList>
 
         {/* Accounts Tab */}
-        <TabsContent value="accounts" className="space-y-4">
+        <TabsContent value="accounts" className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Contas Bancárias</h2>
             <Button onClick={() => setIsAccountDialogOpen(true)}>
@@ -531,96 +570,134 @@ export default function ContasImproved() {
             </Button>
           </div>
 
-          <div className="grid gap-6">
-            {accounts.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-10">
-                  <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium mb-2">Nenhuma conta cadastrada</p>
-                  <p className="text-muted-foreground mb-4">Comece criando sua primeira conta bancária</p>
-                  <Button onClick={() => setIsAccountDialogOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Criar Primeira Conta
+          {accounts.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-10">
+                <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-medium mb-2">Nenhuma conta cadastrada</p>
+                <p className="text-muted-foreground mb-4">Comece criando sua primeira conta bancária</p>
+                <Button onClick={() => setIsAccountDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Criar Primeira Conta
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Account Selector */}
+              <div className="flex flex-wrap gap-2 justify-center">
+                {accounts.map((account, index) => (
+                  <Button
+                    key={account.id}
+                    variant={selectedAccountIndex === index ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedAccountIndex(index)}
+                    className="transition-all"
+                  >
+                    {(account as any).bank_id ? (
+                      <span className="mr-1.5">
+                        {banks.find(b => b.id === (account as any).bank_id)?.icon || '🏦'}
+                      </span>
+                    ) : (
+                      <Building2 className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    <span className="max-w-[120px] truncate">{account.name}</span>
                   </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              accounts.map((account) => (
-                <Card key={account.id}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          {(account as any).bank_id ? (
-                            <span className="text-lg">
-                              {banks.find(b => b.id === (account as any).bank_id)?.icon || '🏦'}
-                            </span>
-                          ) : (
-                            <Building2 className="h-5 w-5" />
-                          )}
-                          {account.name}
-                        </CardTitle>
-                        <CardDescription>
-                          <Badge variant="outline">{accountTypeLabels[account.type]}</Badge>
-                        </CardDescription>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setViewAccount(account)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEditAccountDialog(account)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(account.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium">Saldo Atual</Label>
-                          <p className="text-2xl font-bold">{formatCurrency(account.current_balance || 0)}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Saldo Inicial</Label>
-                          <p className="text-lg">{formatCurrency(account.initial_balance || 0)}</p>
-                        </div>
-                      </div>
-                      
-                      {/* Recent Transactions */}
-                      <div>
-                        <Label className="text-sm font-medium mb-2 block">Transações Recentes</Label>
-                        <div className="space-y-2 max-h-32 overflow-y-auto">
-                          {getAccountTransactions(account.id).length > 0 ? (
-                            getAccountTransactions(account.id).slice(0, 5).map((transaction) => (
-                              <div key={transaction.id} className="flex justify-between items-center py-2 border-b">
-                                <div>
-                                  <p className="font-medium text-sm">{transaction.description}</p>
-                                  <p className="text-xs text-muted-foreground">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
-                                </div>
-                                <p className={`font-bold text-sm ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                                  {transaction.type === 'income' ? '+' : ''}{formatCurrency(transaction.amount)}
-                                </p>
+                ))}
+              </div>
+
+              {/* Carousel */}
+              <Carousel
+                setApi={setAccountCarouselApi}
+                className="w-full"
+                opts={{
+                  align: "center",
+                  loop: true
+                }}
+              >
+                <CarouselContent>
+                  {accounts.map((account) => (
+                    <CarouselItem key={account.id}>
+                      <Card className="border-2 shadow-lg">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="flex items-center gap-2">
+                                {(account as any).bank_id ? (
+                                  <span className="text-2xl">
+                                    {banks.find(b => b.id === (account as any).bank_id)?.icon || '🏦'}
+                                  </span>
+                                ) : (
+                                  <Building2 className="h-6 w-6" />
+                                )}
+                                {account.name}
+                              </CardTitle>
+                              <CardDescription className="mt-2">
+                                <Badge variant="outline" className="text-sm">{accountTypeLabels[account.type]}</Badge>
+                              </CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => setViewAccount(account)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => openEditAccountDialog(account)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(account.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-1">
+                                <Label className="text-sm font-medium text-muted-foreground">Saldo Atual</Label>
+                                <p className="text-3xl font-bold">{formatCurrency(account.current_balance || 0)}</p>
                               </div>
-                            ))
-                          ) : (
-                            <p className="text-sm text-muted-foreground">Nenhuma transação encontrada</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
+                              <div className="space-y-1">
+                                <Label className="text-sm font-medium text-muted-foreground">Saldo Inicial</Label>
+                                <p className="text-2xl font-semibold">{formatCurrency(account.initial_balance || 0)}</p>
+                              </div>
+                            </div>
+                            
+                            {/* Recent Transactions */}
+                            <div className="space-y-3">
+                              <Label className="text-sm font-medium">Transações Recentes</Label>
+                              <div className="space-y-2 max-h-64 overflow-y-auto rounded-lg border bg-muted/30 p-3">
+                                {getAccountTransactions(account.id).length > 0 ? (
+                                  getAccountTransactions(account.id).slice(0, 5).map((transaction) => (
+                                    <div key={transaction.id} className="flex justify-between items-center p-3 rounded-md bg-background border hover:bg-accent/50 transition-colors">
+                                      <div>
+                                        <p className="font-medium text-sm">{transaction.description}</p>
+                                        <p className="text-xs text-muted-foreground">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                                      </div>
+                                      <p className={`font-bold text-sm ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                        {transaction.type === 'income' ? '+' : ''}{formatCurrency(transaction.amount)}
+                                      </p>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-sm text-muted-foreground text-center py-4">Nenhuma transação encontrada</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselPrevious className="left-2 md:-left-12" />
+                <CarouselNext className="right-2 md:-right-12" />
+              </Carousel>
+            </div>
+          )}
         </TabsContent>
 
         {/* Credit Cards Tab */}
-        <TabsContent value="credit-cards" className="space-y-4">
+        <TabsContent value="credit-cards" className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Cartões de Crédito</h2>
             <Button onClick={() => setIsCreditCardDialogOpen(true)}>
@@ -629,93 +706,122 @@ export default function ContasImproved() {
             </Button>
           </div>
 
-          <div className="grid gap-6">
-            {creditCards.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-10">
-                  <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium mb-2">Nenhum cartão cadastrado</p>
-                  <p className="text-muted-foreground mb-4">Comece adicionando seu primeiro cartão de crédito</p>
-                  <Button onClick={() => setIsCreditCardDialogOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Adicionar Primeiro Cartão
+          {creditCards.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-10">
+                <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-medium mb-2">Nenhum cartão cadastrado</p>
+                <p className="text-muted-foreground mb-4">Comece adicionando seu primeiro cartão de crédito</p>
+                <Button onClick={() => setIsCreditCardDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Adicionar Primeiro Cartão
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Credit Card Selector */}
+              <div className="flex flex-wrap gap-2 justify-center">
+                {creditCards.map((card, index) => (
+                  <Button
+                    key={card.id}
+                    variant={selectedCreditCardIndex === index ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedCreditCardIndex(index)}
+                    className="transition-all"
+                  >
+                    <CreditCard className="h-3.5 w-3.5 mr-1.5" />
+                    <span className="max-w-[120px] truncate">{card.name}</span>
                   </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              creditCards.map((card) => (
-                <Card key={card.id}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <CreditCard className="h-5 w-5" />
-                          {card.name}
-                        </CardTitle>
-                        <CardDescription>
-                          <Badge variant="outline">{cardTypeLabels[card.card_type]}</Badge>
-                        </CardDescription>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setViewCreditCard(card)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEditCreditCardDialog(card)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteCreditCard(card.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium">Fatura Atual</Label>
-                          <p className="text-2xl font-bold text-destructive">{formatCurrency(getCurrentMonthInvoice(card.id))}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Limite</Label>
-                          <p className="text-lg">{formatCurrency(card.limit_amount || 0)}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Limite Usado</Label>
-                          <p className="text-lg text-destructive">{formatCurrency(getUsedLimit(card.id))}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium">Limite Disponível</Label>
-                          <p className="text-lg text-green-600">{formatCurrency(Math.max(0, (card.limit_amount || 0) - getUsedLimit(card.id)))}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Vencimento</Label>
-                          <p className="text-sm">Dia {card.due_day}</p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Fechamento</Label>
-                          <p className="text-sm">Dia {card.closing_day}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium">Melhor Compra</Label>
-                          <p className="text-sm">{card.best_purchase_day ? `Dia ${card.best_purchase_day}` : 'N/A'}</p>
-                        </div>
-                      </div>
+                ))}
+              </div>
 
-                       {/* Credit Card Invoices Component */}
-                      <CreditCardInvoices cardId={card.id} cardName={card.name} />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
+              {/* Carousel */}
+              <Carousel
+                setApi={setCreditCardCarouselApi}
+                className="w-full"
+                opts={{
+                  align: "center",
+                  loop: true
+                }}
+              >
+                <CarouselContent>
+                  {creditCards.map((card) => (
+                    <CarouselItem key={card.id}>
+                      <Card className="border-2 shadow-lg">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="flex items-center gap-2">
+                                <CreditCard className="h-6 w-6" />
+                                {card.name}
+                              </CardTitle>
+                              <CardDescription className="mt-2">
+                                <Badge variant="outline" className="text-sm">{cardTypeLabels[card.card_type]}</Badge>
+                              </CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => setViewCreditCard(card)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => openEditCreditCardDialog(card)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteCreditCard(card.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-sm font-medium text-muted-foreground">Fatura Atual</Label>
+                                <p className="text-2xl font-bold text-destructive">{formatCurrency(getCurrentMonthInvoice(card.id))}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-sm font-medium text-muted-foreground">Limite Total</Label>
+                                <p className="text-xl font-semibold">{formatCurrency(card.limit_amount || 0)}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-sm font-medium text-muted-foreground">Limite Usado</Label>
+                                <p className="text-xl font-semibold text-destructive">{formatCurrency(getUsedLimit(card.id))}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-muted/30 border">
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Disponível</Label>
+                                <p className="text-lg font-bold text-green-600">{formatCurrency(Math.max(0, (card.limit_amount || 0) - getUsedLimit(card.id)))}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Vencimento</Label>
+                                <p className="text-sm font-medium">Dia {card.due_day}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Fechamento</Label>
+                                <p className="text-sm font-medium">Dia {card.closing_day}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Melhor Compra</Label>
+                                <p className="text-sm font-medium">{card.best_purchase_day ? `Dia ${card.best_purchase_day}` : 'N/A'}</p>
+                              </div>
+                            </div>
+
+                            {/* Credit Card Invoices Component */}
+                            <CreditCardInvoices cardId={card.id} cardName={card.name} />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselPrevious className="left-2 md:-left-12" />
+                <CarouselNext className="right-2 md:-right-12" />
+              </Carousel>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
