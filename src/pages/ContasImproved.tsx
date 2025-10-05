@@ -521,7 +521,7 @@ export default function ContasImproved() {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(totalCreditLimit)}</div>
             <p className="text-xs text-muted-foreground">
-              {creditCards.length} cartão{creditCards.length !== 1 ? 'ões' : 'ão'}
+              {creditCards.length} cart{creditCards.length !== 1 ? 'ões' : 'ão'}
             </p>
           </CardContent>
         </Card>
