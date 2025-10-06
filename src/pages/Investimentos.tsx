@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, ArrowDownToLine, ArrowUpFromLine } from "lucide-react"
+import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, ArrowDownToLine, ArrowUpFromLine, Edit } from "lucide-react"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 
 const Investimentos = () => {
@@ -25,10 +25,12 @@ const Investimentos = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false)
   const [isReinvestDialogOpen, setIsReinvestDialogOpen] = useState(false)
+  const [isUpdatePriceDialogOpen, setIsUpdatePriceDialogOpen] = useState(false)
   const [selectedInvestment, setSelectedInvestment] = useState<any>(null)
   const [redeemAmount, setRedeemAmount] = useState(0)
   const [redeemQuantity, setRedeemQuantity] = useState(0)
   const [reinvestAmount, setReinvestAmount] = useState(0)
+  const [newCurrentPrice, setNewCurrentPrice] = useState(0)
   const [selectedAccountId, setSelectedAccountId] = useState<string>("")
   
   const [newInvestment, setNewInvestment] = useState({
@@ -52,8 +54,8 @@ const Investimentos = () => {
       return
     }
 
-    // Validar conta de origem se for renda fixa ou fundo
-    if ((newInvestment.type === 'bonds' || newInvestment.type === 'funds') && !newInvestment.account_id) {
+    // Validar conta de origem
+    if (!newInvestment.account_id) {
       toast({
         title: "❌ Erro",
         description: "Selecione uma conta de origem para o investimento",
@@ -64,16 +66,26 @@ const Investimentos = () => {
 
     try {
       const totalInvestment = newInvestment.quantity * newInvestment.average_price
+      const realBalance = getAccountRealBalance(newInvestment.account_id)
+      
+      if (realBalance < totalInvestment) {
+        toast({
+          title: "❌ Saldo insuficiente",
+          description: `A conta não possui saldo suficiente para este investimento. Necessário: ${formatCurrency(totalInvestment)}`,
+          variant: "destructive"
+        })
+        return
+      }
 
-      // Se for renda fixa ou fundo, criar transação de débito
-      if ((newInvestment.type === 'bonds' || newInvestment.type === 'funds') && newInvestment.account_id) {
+      // Para qualquer tipo de investimento, criar transação de débito
+      if (newInvestment.account_id) {
         const investmentCategory = categories.find(c => c.name === 'Investimentos' && c.type === 'expense')
         
         if (investmentCategory && user) {
           await addTransaction({
             user_id: user.id,
             description: `Investimento: ${newInvestment.name}`,
-            amount: totalInvestment,
+            amount: -totalInvestment,
             type: 'expense',
             category_id: investmentCategory.id,
             account_id: newInvestment.account_id,
@@ -83,6 +95,12 @@ const Investimentos = () => {
             installments: 1,
             installment_number: 1,
             is_installment: false
+          })
+        } else if (!investmentCategory) {
+          toast({
+            title: "⚠️ Aviso",
+            description: "Categoria 'Investimentos' não encontrada. Transação não registrada.",
+            variant: "destructive"
           })
         }
       }
@@ -192,6 +210,38 @@ const Investimentos = () => {
     }
   }
 
+  const handleUpdatePrice = async () => {
+    if (!selectedInvestment || newCurrentPrice <= 0) {
+      toast({
+        title: "❌ Erro",
+        description: "Digite um preço válido",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      await updateInvestment(selectedInvestment.id, {
+        current_price: newCurrentPrice
+      })
+
+      setIsUpdatePriceDialogOpen(false)
+      setSelectedInvestment(null)
+      setNewCurrentPrice(0)
+
+      toast({
+        title: "✅ Preço atualizado",
+        description: `Preço de ${selectedInvestment.symbol} atualizado para ${formatCurrency(newCurrentPrice)}`
+      })
+    } catch (error) {
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao atualizar preço",
+        variant: "destructive"
+      })
+    }
+  }
+
   const handleReinvest = async () => {
     if (!selectedInvestment || !selectedAccountId || reinvestAmount <= 0) {
       toast({
@@ -222,7 +272,7 @@ const Investimentos = () => {
         await addTransaction({
           user_id: user.id,
           description: `Reinvestimento: ${selectedInvestment.name}`,
-          amount: reinvestAmount,
+          amount: -reinvestAmount,
           type: 'expense',
           category_id: investmentCategory.id,
           account_id: selectedAccountId,
@@ -566,26 +616,24 @@ const Investimentos = () => {
                       />
                     </div>
 
-                    {(newInvestment.type === 'bonds' || newInvestment.type === 'funds') && (
-                      <div className="space-y-2">
-                        <Label htmlFor="account">Conta de Origem *</Label>
-                        <Select value={newInvestment.account_id} onValueChange={(value) => setNewInvestment({...newInvestment, account_id: value})}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione a conta" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {accounts.filter(a => a.is_active).map(account => (
-                              <SelectItem key={account.id} value={account.id}>
-                                {account.name} - {formatCurrency(getAccountRealBalance(account.id))}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          O valor do investimento será debitado desta conta
-                        </p>
-                      </div>
-                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="account">Conta de Origem *</Label>
+                      <Select value={newInvestment.account_id} onValueChange={(value) => setNewInvestment({...newInvestment, account_id: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a conta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.filter(a => a.is_active).map(account => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.name} - {formatCurrency(getAccountRealBalance(account.id))}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        O valor do investimento será debitado desta conta
+                      </p>
+                    </div>
                   </div>
 
                   <DialogFooter>
@@ -710,6 +758,18 @@ const Investimentos = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedInvestment(investment)
+                                  setNewCurrentPrice(investment.current_price)
+                                  setIsUpdatePriceDialogOpen(true)
+                                }}
+                                title="Atualizar Preço"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -953,6 +1013,73 @@ const Investimentos = () => {
               </Button>
               <Button onClick={handleReinvest}>
                 Confirmar Reinvestimento
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Atualização Manual de Preço */}
+        <Dialog open={isUpdatePriceDialogOpen} onOpenChange={setIsUpdatePriceDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>💰 Atualizar Preço</DialogTitle>
+              <DialogDescription>
+                Atualize manualmente o preço atual do investimento
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedInvestment && (
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Investimento</Label>
+                  <div className="p-3 bg-muted rounded-md">
+                    <div className="font-medium">{selectedInvestment.symbol} - {selectedInvestment.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Quantidade: {selectedInvestment.quantity}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Preço atual: {formatCurrency(selectedInvestment.current_price, selectedInvestment.currency)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="newPrice">Novo Preço *</Label>
+                  <CurrencyInput
+                    value={newCurrentPrice}
+                    onChange={setNewCurrentPrice}
+                    currency={selectedInvestment.currency === 'BRL' ? 'R$' : selectedInvestment.currency}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Digite o novo preço de mercado do ativo
+                  </p>
+                </div>
+
+                {newCurrentPrice > 0 && (
+                  <div className="p-3 bg-muted rounded-md space-y-1">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Valor total atualizado: </span>
+                      <span className="font-medium">
+                        {formatCurrency(selectedInvestment.quantity * newCurrentPrice, selectedInvestment.currency)}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Variação: </span>
+                      <span className={newCurrentPrice >= selectedInvestment.current_price ? 'text-success font-medium' : 'text-destructive font-medium'}>
+                        {((newCurrentPrice - selectedInvestment.current_price) / selectedInvestment.current_price * 100).toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsUpdatePriceDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleUpdatePrice}>
+                Atualizar Preço
               </Button>
             </DialogFooter>
           </DialogContent>
