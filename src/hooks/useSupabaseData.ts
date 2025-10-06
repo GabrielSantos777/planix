@@ -206,16 +206,14 @@ export const useSupabaseData = () => {
     try {
       const { data, error } = await supabase
         .from('accounts')
-        .update({
-          ...updates,
-          current_balance: updates.initial_balance || updates.current_balance
-        })
+        .update(updates)
         .eq('id', id)
         .select()
         .single()
 
       if (error) throw error
       setAccounts(prev => prev.map(acc => acc.id === id ? data : acc))
+      console.log('Account updated:', data)
       return data
     } catch (error) {
       console.error('Error updating account:', error)
