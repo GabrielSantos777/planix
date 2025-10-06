@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import { useCurrency } from "@/context/CurrencyContext"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/context/AuthContext"
 import Layout from "@/components/Layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,15 +13,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw } from "lucide-react"
+import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, ArrowDownToLine, ArrowUpFromLine } from "lucide-react"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 
 const Investimentos = () => {
-  const { investments, addInvestment, deleteInvestment, updateInvestment, loading } = useSupabaseData()
+  const { investments, addInvestment, deleteInvestment, updateInvestment, loading, accounts, addTransaction, categories } = useSupabaseData()
   const { formatCurrency, currencies, selectedCurrency } = useCurrency()
+  const { user } = useAuth()
   const { toast } = useToast()
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false)
+  const [isReinvestDialogOpen, setIsReinvestDialogOpen] = useState(false)
+  const [selectedInvestment, setSelectedInvestment] = useState<any>(null)
+  const [redeemAmount, setRedeemAmount] = useState(0)
+  const [redeemQuantity, setRedeemQuantity] = useState(0)
+  const [reinvestAmount, setReinvestAmount] = useState(0)
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("")
+  
   const [newInvestment, setNewInvestment] = useState({
     symbol: '',
     name: '',
@@ -28,7 +38,8 @@ const Investimentos = () => {
     quantity: 0,
     average_price: 0,
     current_price: 0,
-    currency: 'BRL'
+    currency: 'BRL',
+    account_id: ''
   })
 
   const handleAddInvestment = async () => {
@@ -41,10 +52,49 @@ const Investimentos = () => {
       return
     }
 
+    // Validar conta de origem se for renda fixa ou fundo
+    if ((newInvestment.type === 'bonds' || newInvestment.type === 'funds') && !newInvestment.account_id) {
+      toast({
+        title: "❌ Erro",
+        description: "Selecione uma conta de origem para o investimento",
+        variant: "destructive"
+      })
+      return
+    }
+
     try {
+      const totalInvestment = newInvestment.quantity * newInvestment.average_price
+
+      // Se for renda fixa ou fundo, criar transação de débito
+      if ((newInvestment.type === 'bonds' || newInvestment.type === 'funds') && newInvestment.account_id) {
+        const investmentCategory = categories.find(c => c.name === 'Investimentos' && c.type === 'expense')
+        
+        if (investmentCategory && user) {
+          await addTransaction({
+            user_id: user.id,
+            description: `Investimento: ${newInvestment.name}`,
+            amount: totalInvestment,
+            type: 'expense',
+            category_id: investmentCategory.id,
+            account_id: newInvestment.account_id,
+            date: new Date().toISOString().split('T')[0],
+            currency: newInvestment.currency,
+            notes: `Aplicação em ${newInvestment.symbol}`,
+            installments: 1,
+            installment_number: 1,
+            is_installment: false
+          })
+        }
+      }
+
       await addInvestment({
-        ...newInvestment,
-        current_price: newInvestment.average_price, // Inicialmente o preço atual é igual ao preço médio
+        symbol: newInvestment.symbol,
+        name: newInvestment.name,
+        type: newInvestment.type,
+        quantity: newInvestment.quantity,
+        average_price: newInvestment.average_price,
+        current_price: newInvestment.average_price,
+        currency: newInvestment.currency
       })
       
       setNewInvestment({
@@ -54,7 +104,8 @@ const Investimentos = () => {
         quantity: 0,
         average_price: 0,
         current_price: 0,
-        currency: 'BRL'
+        currency: 'BRL',
+        account_id: ''
       })
       setIsAddDialogOpen(false)
       
@@ -66,6 +117,146 @@ const Investimentos = () => {
       toast({
         title: "❌ Erro",
         description: "Erro ao adicionar investimento",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleRedeemInvestment = async () => {
+    if (!selectedInvestment || !selectedAccountId || redeemQuantity <= 0) {
+      toast({
+        title: "❌ Erro",
+        description: "Preencha todos os campos para realizar o resgate",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (redeemQuantity > selectedInvestment.quantity) {
+      toast({
+        title: "❌ Erro",
+        description: "Quantidade de resgate não pode ser maior que a quantidade investida",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      const totalRedeem = redeemQuantity * selectedInvestment.current_price
+
+      // Criar transação de receita na conta
+      const investmentCategory = categories.find(c => c.name === 'Investimentos' && c.type === 'income')
+      
+      if (investmentCategory && user) {
+        await addTransaction({
+          user_id: user.id,
+          description: `Resgate: ${selectedInvestment.name}`,
+          amount: totalRedeem,
+          type: 'income',
+          category_id: investmentCategory.id,
+          account_id: selectedAccountId,
+          date: new Date().toISOString().split('T')[0],
+          currency: selectedInvestment.currency,
+          notes: `Resgate de ${redeemQuantity} cotas de ${selectedInvestment.symbol}`,
+          installments: 1,
+          installment_number: 1,
+          is_installment: false
+        })
+      }
+
+      // Atualizar ou remover investimento
+      const newQuantity = selectedInvestment.quantity - redeemQuantity
+      if (newQuantity > 0) {
+        await updateInvestment(selectedInvestment.id, {
+          quantity: newQuantity
+        })
+      } else {
+        await deleteInvestment(selectedInvestment.id)
+      }
+
+      setIsRedeemDialogOpen(false)
+      setSelectedInvestment(null)
+      setRedeemQuantity(0)
+      setSelectedAccountId("")
+
+      toast({
+        title: "💰 Resgate realizado",
+        description: `Resgate de ${formatCurrency(totalRedeem)} creditado na conta`
+      })
+    } catch (error) {
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao realizar resgate",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleReinvest = async () => {
+    if (!selectedInvestment || !selectedAccountId || reinvestAmount <= 0) {
+      toast({
+        title: "❌ Erro",
+        description: "Preencha todos os campos para reinvestir",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const selectedAccount = accounts.find(a => a.id === selectedAccountId)
+    if (!selectedAccount || selectedAccount.current_balance < reinvestAmount) {
+      toast({
+        title: "❌ Erro",
+        description: "Saldo insuficiente na conta selecionada",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      // Criar transação de despesa
+      const investmentCategory = categories.find(c => c.name === 'Investimentos' && c.type === 'expense')
+      
+      if (investmentCategory && user) {
+        await addTransaction({
+          user_id: user.id,
+          description: `Reinvestimento: ${selectedInvestment.name}`,
+          amount: reinvestAmount,
+          type: 'expense',
+          category_id: investmentCategory.id,
+          account_id: selectedAccountId,
+          date: new Date().toISOString().split('T')[0],
+          currency: selectedInvestment.currency,
+          notes: `Reinvestimento em ${selectedInvestment.symbol}`,
+          installments: 1,
+          installment_number: 1,
+          is_installment: false
+        })
+      }
+
+      // Calcular nova quantidade e preço médio
+      const additionalQuantity = reinvestAmount / selectedInvestment.current_price
+      const newQuantity = selectedInvestment.quantity + additionalQuantity
+      const totalCost = (selectedInvestment.quantity * selectedInvestment.average_price) + reinvestAmount
+      const newAveragePrice = totalCost / newQuantity
+
+      await updateInvestment(selectedInvestment.id, {
+        quantity: newQuantity,
+        average_price: newAveragePrice
+      })
+
+      setIsReinvestDialogOpen(false)
+      setSelectedInvestment(null)
+      setReinvestAmount(0)
+      setSelectedAccountId("")
+
+      toast({
+        title: "📊 Reinvestimento realizado",
+        description: `${formatCurrency(reinvestAmount)} reinvestidos com sucesso`
+      })
+    } catch (error) {
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao realizar reinvestimento",
         variant: "destructive"
       })
     }
@@ -93,6 +284,11 @@ const Investimentos = () => {
       let errorCount = 0
 
       for (const investment of investments) {
+        // Pular atualização para renda fixa e fundos
+        if (investment.type === 'bonds' || investment.type === 'funds') {
+          continue
+        }
+
         try {
           let newPrice = investment.current_price
 
@@ -152,14 +348,6 @@ const Investimentos = () => {
               updatedCount++
               console.warn(`Usando preço simulado para ${investment.symbol}: ${newPrice}`)
             }
-          } 
-          // Para outros tipos (bonds, funds)
-          else {
-            // Simular variação pequena para fundos e renda fixa
-            const variation = 0.999 + Math.random() * 0.002 // ±0.1% de variação (mais conservador)
-            newPrice = Number((investment.current_price * variation).toFixed(2))
-            updatedCount++
-            console.warn(`Usando preço simulado para ${investment.symbol}: ${newPrice}`)
           }
 
           if (Math.abs(newPrice - investment.current_price) > 0.001) {
@@ -176,13 +364,12 @@ const Investimentos = () => {
       if (updatedCount > 0) {
         toast({
           title: "🔄 Preços atualizados",
-          description: `${updatedCount} investimento(s) atualizado(s) com sucesso${errorCount > 0 ? `. ${errorCount} erro(s).` : ''}`
+          description: `${updatedCount} ação/cripto atualizada(s) com sucesso${errorCount > 0 ? `. ${errorCount} erro(s).` : ''}`
         })
       } else {
         toast({
-          title: "⚠️ Atenção",
-          description: "Não foi possível atualizar nenhum preço. Verifique os símbolos dos ativos.",
-          variant: "destructive"
+          title: "ℹ️ Informação",
+          description: "Apenas ações e criptomoedas possuem atualização automática de preços.",
         })
       }
     } catch (error) {
@@ -255,7 +442,7 @@ const Investimentos = () => {
             <div className="flex items-center gap-2 lg:justify-end">
               <div className="w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></div>
               <span className="text-xs sm:text-sm text-muted-foreground">
-                Preços atualizados automaticamente
+                Ações e criptos atualizadas automaticamente
               </span>
             </div>
             
@@ -362,6 +549,27 @@ const Investimentos = () => {
                         currency={newInvestment.currency === 'BRL' ? 'R$' : newInvestment.currency}
                       />
                     </div>
+
+                    {(newInvestment.type === 'bonds' || newInvestment.type === 'funds') && (
+                      <div className="space-y-2">
+                        <Label htmlFor="account">Conta de Origem *</Label>
+                        <Select value={newInvestment.account_id} onValueChange={(value) => setNewInvestment({...newInvestment, account_id: value})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a conta" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {accounts.filter(a => a.is_active).map(account => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.name} - {formatCurrency(account.current_balance)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          O valor do investimento será debitado desta conta
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <DialogFooter>
@@ -485,13 +693,41 @@ const Investimentos = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteInvestment(investment.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedInvestment(investment)
+                                  setReinvestAmount(0)
+                                  setIsReinvestDialogOpen(true)
+                                }}
+                                title="Reinvestir"
+                              >
+                                <ArrowUpFromLine className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedInvestment(investment)
+                                  setRedeemQuantity(0)
+                                  setRedeemAmount(0)
+                                  setIsRedeemDialogOpen(true)
+                                }}
+                                title="Resgatar"
+                              >
+                                <ArrowDownToLine className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteInvestment(investment.id)}
+                                title="Excluir"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       )
@@ -557,6 +793,154 @@ const Investimentos = () => {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Dialog de Resgate */}
+        <Dialog open={isRedeemDialogOpen} onOpenChange={setIsRedeemDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Resgatar Investimento</DialogTitle>
+              <DialogDescription>
+                Resgate parte ou todo o investimento em {selectedInvestment?.name}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedInvestment && (
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Investimento</Label>
+                  <div className="p-3 bg-muted rounded-md">
+                    <div className="font-medium">{selectedInvestment.symbol} - {selectedInvestment.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Quantidade disponível: {selectedInvestment.quantity}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Preço atual: {formatCurrency(selectedInvestment.current_price, selectedInvestment.currency)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="redeemQuantity">Quantidade a Resgatar *</Label>
+                  <Input
+                    id="redeemQuantity"
+                    type="number"
+                    placeholder="0"
+                    value={redeemQuantity || ''}
+                    onChange={(e) => {
+                      const qty = Number(e.target.value)
+                      setRedeemQuantity(qty)
+                      setRedeemAmount(qty * selectedInvestment.current_price)
+                    }}
+                    max={selectedInvestment.quantity}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Valor a receber: {formatCurrency(redeemAmount, selectedInvestment.currency)}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="accountDestination">Conta de Destino *</Label>
+                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.filter(a => a.is_active).map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name} - {formatCurrency(account.current_balance)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    O valor do resgate será creditado nesta conta
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsRedeemDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleRedeemInvestment}>
+                Confirmar Resgate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Reinvestimento */}
+        <Dialog open={isReinvestDialogOpen} onOpenChange={setIsReinvestDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Reinvestir</DialogTitle>
+              <DialogDescription>
+                Adicione mais recursos ao investimento em {selectedInvestment?.name}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedInvestment && (
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Investimento Atual</Label>
+                  <div className="p-3 bg-muted rounded-md">
+                    <div className="font-medium">{selectedInvestment.symbol} - {selectedInvestment.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Quantidade atual: {selectedInvestment.quantity}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Preço médio: {formatCurrency(selectedInvestment.average_price, selectedInvestment.currency)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Preço atual: {formatCurrency(selectedInvestment.current_price, selectedInvestment.currency)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="reinvestAmount">Valor a Investir *</Label>
+                  <CurrencyInput
+                    value={reinvestAmount}
+                    onChange={setReinvestAmount}
+                    currency={selectedInvestment.currency === 'BRL' ? 'R$' : selectedInvestment.currency}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Isso adicionará {(reinvestAmount / selectedInvestment.current_price).toFixed(4)} cotas
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="accountSource">Conta de Origem *</Label>
+                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.filter(a => a.is_active).map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name} - {formatCurrency(account.current_balance)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    O valor será debitado desta conta
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsReinvestDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleReinvest}>
+                Confirmar Reinvestimento
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   )
