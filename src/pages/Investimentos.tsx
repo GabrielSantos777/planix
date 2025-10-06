@@ -15,9 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, ArrowDownToLine, ArrowUpFromLine, Edit } from "lucide-react"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
+import { supabase } from "@/integrations/supabase/client"
 
 const Investimentos = () => {
-  const { investments, addInvestment, deleteInvestment, updateInvestment, loading, accounts, transactions, addTransaction, categories } = useSupabaseData()
+  const { investments, addInvestment, deleteInvestment, updateInvestment, loading, accounts, transactions, addTransaction, categories, fetchAllData } = useSupabaseData()
   const { formatCurrency, currencies, selectedCurrency } = useCurrency()
   const { user } = useAuth()
   const { toast } = useToast()
@@ -78,31 +79,22 @@ const Investimentos = () => {
       }
 
       // Para qualquer tipo de investimento, criar transação de débito
-      if (newInvestment.account_id) {
-        const investmentCategory = categories.find(c => c.name === 'Investimentos' && c.type === 'expense')
-        
-        if (investmentCategory && user) {
-          await addTransaction({
-            user_id: user.id,
-            description: `Investimento: ${newInvestment.name}`,
-            amount: -totalInvestment,
-            type: 'expense',
-            category_id: investmentCategory.id,
-            account_id: newInvestment.account_id,
-            date: new Date().toISOString().split('T')[0],
-            currency: newInvestment.currency,
-            notes: `Aplicação em ${newInvestment.symbol}`,
-            installments: 1,
-            installment_number: 1,
-            is_installment: false
-          })
-        } else if (!investmentCategory) {
-          toast({
-            title: "⚠️ Aviso",
-            description: "Categoria 'Investimentos' não encontrada. Transação não registrada.",
-            variant: "destructive"
-          })
-        }
+      if (newInvestment.account_id && user) {
+        const categoryId = await getOrCreateInvestmentCategory('expense')
+        await addTransaction({
+          user_id: user.id,
+          description: `Investimento: ${newInvestment.name}`,
+          amount: -totalInvestment,
+          type: 'expense',
+          category_id: categoryId,
+          account_id: newInvestment.account_id,
+          date: new Date().toISOString().split('T')[0],
+          currency: newInvestment.currency,
+          notes: `Aplicação em ${newInvestment.symbol}`,
+          installments: 1,
+          installment_number: 1,
+          is_installment: false
+        })
       }
 
       await addInvestment({
@@ -163,15 +155,14 @@ const Investimentos = () => {
       const totalRedeem = redeemQuantity * selectedInvestment.current_price
 
       // Criar transação de receita na conta
-      const investmentCategory = categories.find(c => c.name === 'Investimentos' && c.type === 'income')
-      
-      if (investmentCategory && user) {
+      if (user) {
+        const categoryId = await getOrCreateInvestmentCategory('income')
         await addTransaction({
           user_id: user.id,
           description: `Resgate: ${selectedInvestment.name}`,
           amount: totalRedeem,
           type: 'income',
-          category_id: investmentCategory.id,
+          category_id: categoryId,
           account_id: selectedAccountId,
           date: new Date().toISOString().split('T')[0],
           currency: selectedInvestment.currency,
@@ -266,15 +257,14 @@ const Investimentos = () => {
 
     try {
       // Criar transação de despesa
-      const investmentCategory = categories.find(c => c.name === 'Investimentos' && c.type === 'expense')
-      
-      if (investmentCategory && user) {
+      if (user) {
+        const categoryId = await getOrCreateInvestmentCategory('expense')
         await addTransaction({
           user_id: user.id,
           description: `Reinvestimento: ${selectedInvestment.name}`,
           amount: -reinvestAmount,
           type: 'expense',
-          category_id: investmentCategory.id,
+          category_id: categoryId,
           account_id: selectedAccountId,
           date: new Date().toISOString().split('T')[0],
           currency: selectedInvestment.currency,
@@ -433,17 +423,28 @@ const Investimentos = () => {
     }
   }
 
+  // Helper: garantir categoria 'Investimentos' do tipo correto
+  async function getOrCreateInvestmentCategory(type: 'income' | 'expense') {
+    const existing = categories.find(c => c.name === 'Investimentos' && c.type === type)
+    if (existing) return existing.id
+    if (!user) throw new Error('Usuário não autenticado')
+    const { data, error } = await supabase
+      .from('categories')
+      .insert([{ name: 'Investimentos', type, icon: 'trending-up', color: '#F59E0B', user_id: user.id, is_default: false }])
+      .select('*')
+      .single()
+    if (error) throw error
+    await fetchAllData()
+    return data.id
+  }
+
   // Calcular saldo real da conta (initial_balance + transações)
   function getAccountRealBalance(accountId: string) {
     const account = accounts.find(a => a.id === accountId)
     if (!account) return 0
-    
     const initialBalance = account.initial_balance || 0
     const accountTransactions = transactions.filter(t => t.account_id === accountId)
-    const totalMovements = accountTransactions.reduce((sum, t) => {
-      return sum + (t.amount || 0)
-    }, 0)
-    
+    const totalMovements = accountTransactions.reduce((sum, t) => sum + (t.amount || 0), 0)
     return initialBalance + totalMovements
   }
 
