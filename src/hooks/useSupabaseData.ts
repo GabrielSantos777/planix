@@ -332,6 +332,8 @@ export const useSupabaseData = () => {
         if (account) {
           const newBalance = (account.current_balance || 0) + (transaction.amount || 0)
           await updateAccount(transaction.account_id, { current_balance: newBalance })
+          // Refetch accounts to update UI
+          await fetchAccounts()
         }
       }
       
@@ -341,6 +343,8 @@ export const useSupabaseData = () => {
         if (creditCard) {
           const newBalance = (creditCard.current_balance || 0) + Math.abs(transaction.amount || 0)
           await updateCreditCard(transaction.credit_card_id, { current_balance: newBalance })
+          // Refetch credit cards to update UI
+          await fetchCreditCards()
         }
       }
       
@@ -384,6 +388,8 @@ export const useSupabaseData = () => {
           // Apply the new transaction effect
           newBalance += (data.amount || 0)
           await updateAccount(originalTransaction.account_id, { current_balance: newBalance })
+          // Refetch accounts to update UI
+          await fetchAccounts()
         }
       }
       
@@ -396,6 +402,8 @@ export const useSupabaseData = () => {
           // Apply the new transaction effect (add to balance)
           newBalance += Math.abs(data.amount || 0)
           await updateCreditCard(originalTransaction.credit_card_id, { current_balance: newBalance })
+          // Refetch credit cards to update UI
+          await fetchCreditCards()
         }
       }
       
@@ -427,6 +435,8 @@ export const useSupabaseData = () => {
         if (account) {
           const newBalance = (account.current_balance || 0) - (transaction.amount || 0)
           await updateAccount(transaction.account_id, { current_balance: newBalance })
+          // Refetch accounts to update UI
+          await fetchAccounts()
         }
       }
       
@@ -436,6 +446,8 @@ export const useSupabaseData = () => {
         if (creditCard) {
           const newBalance = (creditCard.current_balance || 0) - Math.abs(transaction.amount || 0)
           await updateCreditCard(transaction.credit_card_id, { current_balance: newBalance })
+          // Refetch credit cards to update UI
+          await fetchCreditCards()
         }
       }
       
