@@ -66,6 +66,7 @@ export default function ContasImproved() {
     accounts, 
     creditCards, 
     transactions, 
+    investments,
     addAccount, 
     updateAccount, 
     deleteAccount, 
@@ -410,7 +411,12 @@ export default function ContasImproved() {
   }
 
   // Calculate totals
-  const totalBalance = accounts.reduce((sum, account) => sum + getComputedAccountBalance(account.id), 0)
+  const getTotalInvestmentValue = () => {
+    return investments.reduce((total, investment) => {
+      return total + (investment.quantity * investment.current_price)
+    }, 0)
+  }
+  const totalBalance = accounts.reduce((sum, account) => sum + getComputedAccountBalance(account.id), 0) + getTotalInvestmentValue()
   const totalCreditLimit = creditCards.reduce((sum, card) => sum + (card.limit_amount || 0), 0)
   const totalCreditUsed = creditCards.reduce((sum, card) => sum + getUsedLimit(card.id), 0)
   const totalCreditAvailable = Math.max(0, totalCreditLimit - totalCreditUsed)

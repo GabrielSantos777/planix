@@ -56,8 +56,8 @@ const Dashboard = () => {
   // Total credit card debt
   const totalCreditDebt = creditCards.reduce((sum, card) => sum + (card.current_balance || 0), 0)
 
-  // Net balance (accounts - credit debt)
-  const totalBalance = totalAccountsBalance - totalCreditDebt
+  // Net balance (accounts - credit debt + investments)
+  const totalBalance = totalAccountsBalance - totalCreditDebt + getTotalInvestmentValue()
 
   // Monthly net (income - expenses this month)
   const monthlyNet = monthlyIncome - monthlyExpenses
@@ -137,7 +137,7 @@ const Dashboard = () => {
               {formatCurrency(totalBalance)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Contas menos cartões
+              Contas + investimentos - cartões
             </p>
           </CardContent>
         </Card>
