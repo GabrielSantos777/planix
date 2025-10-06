@@ -44,8 +44,14 @@ const Dashboard = () => {
     .filter(t => t.type === "expense")
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
-  // Total balance from all accounts
-  const totalAccountsBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0)
+  // Total balance from all accounts (initial + all movements)
+  const computeAccountBalance = (accountId: string) => {
+    const acc = accounts.find(a => a.id === accountId)
+    const initial = acc?.initial_balance || 0
+    const movement = transactions.filter(t => t.account_id === accountId).reduce((sum, t) => sum + (t.amount || 0), 0)
+    return initial + movement
+  }
+  const totalAccountsBalance = accounts.reduce((sum, account) => sum + computeAccountBalance(account.id), 0)
 
   // Total credit card debt
   const totalCreditDebt = creditCards.reduce((sum, card) => sum + (card.current_balance || 0), 0)

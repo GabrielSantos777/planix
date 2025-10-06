@@ -42,9 +42,10 @@ const Contas = () => {
     is_active: true
   })
 
-  // Calculate account balance from current_balance
+  // Calculate account balance (initial + all movements)
   const getAccountBalance = (account: any) => {
-    return account.current_balance || 0
+    const movement = transactions.filter(t => t.account_id === account.id).reduce((sum, t) => sum + (t.amount || 0), 0)
+    return (account.initial_balance || 0) + movement
   }
 
   const getAccountTransactions = (accountId: string) => {

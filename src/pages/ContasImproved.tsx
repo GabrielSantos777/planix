@@ -410,16 +410,23 @@ export default function ContasImproved() {
   }
 
   // Calculate totals
-  const totalBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0)
+  const totalBalance = accounts.reduce((sum, account) => sum + getComputedAccountBalance(account.id), 0)
   const totalCreditLimit = creditCards.reduce((sum, card) => sum + (card.limit_amount || 0), 0)
   const totalCreditUsed = creditCards.reduce((sum, card) => sum + getUsedLimit(card.id), 0)
   const totalCreditAvailable = Math.max(0, totalCreditLimit - totalCreditUsed)
 
-  // Get recent transactions for accounts
+  // Get transactions for accounts
   const getAccountTransactions = (accountId) => {
-    return transactions
+    return transactions.filter(t => t.account_id === accountId)
+  }
+
+  const getComputedAccountBalance = (accountId: string) => {
+    const acc = accounts.find(a => a.id === accountId)
+    const initial = acc?.initial_balance || 0
+    const movement = transactions
       .filter(t => t.account_id === accountId)
-      .slice(0, 5)
+      .reduce((sum, t) => sum + (t.amount || 0), 0)
+    return initial + movement
   }
 
   const getCreditCardTransactions = (cardId) => {
@@ -654,7 +661,7 @@ export default function ContasImproved() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <div className="space-y-1">
                                 <Label className="text-sm font-medium text-muted-foreground">Saldo Atual</Label>
-                                <p className="text-3xl font-bold">{formatCurrency(account.current_balance || 0)}</p>
+                                <p className="text-3xl font-bold">{formatCurrency(getComputedAccountBalance(account.id))}</p>
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-sm font-medium text-muted-foreground">Saldo Inicial</Label>
