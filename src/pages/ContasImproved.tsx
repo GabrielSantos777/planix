@@ -420,7 +420,7 @@ export default function ContasImproved() {
     return transactions.filter(t => t.account_id === accountId)
   }
 
-  const getComputedAccountBalance = (accountId: string) => {
+  function getComputedAccountBalance(accountId: string) {
     const acc = accounts.find(a => a.id === accountId)
     const initial = acc?.initial_balance || 0
     const movement = transactions
