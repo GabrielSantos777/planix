@@ -17,7 +17,7 @@ import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, ArrowDownToLine, Arr
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 
 const Investimentos = () => {
-  const { investments, addInvestment, deleteInvestment, updateInvestment, loading, accounts, addTransaction, categories } = useSupabaseData()
+  const { investments, addInvestment, deleteInvestment, updateInvestment, loading, accounts, transactions, addTransaction, categories } = useSupabaseData()
   const { formatCurrency, currencies, selectedCurrency } = useCurrency()
   const { user } = useAuth()
   const { toast } = useToast()
@@ -203,7 +203,9 @@ const Investimentos = () => {
     }
 
     const selectedAccount = accounts.find(a => a.id === selectedAccountId)
-    if (!selectedAccount || selectedAccount.current_balance < reinvestAmount) {
+    const realBalance = getAccountRealBalance(selectedAccountId)
+    
+    if (!selectedAccount || realBalance < reinvestAmount) {
       toast({
         title: "❌ Erro",
         description: "Saldo insuficiente na conta selecionada",
@@ -379,6 +381,20 @@ const Investimentos = () => {
         variant: "destructive"
       })
     }
+  }
+
+  // Calcular saldo real da conta (initial_balance + transações)
+  function getAccountRealBalance(accountId: string) {
+    const account = accounts.find(a => a.id === accountId)
+    if (!account) return 0
+    
+    const initialBalance = account.initial_balance || 0
+    const accountTransactions = transactions.filter(t => t.account_id === accountId)
+    const totalMovements = accountTransactions.reduce((sum, t) => {
+      return sum + (t.amount || 0)
+    }, 0)
+    
+    return initialBalance + totalMovements
   }
 
   const getTotalValue = () => {
@@ -560,7 +576,7 @@ const Investimentos = () => {
                           <SelectContent>
                             {accounts.filter(a => a.is_active).map(account => (
                               <SelectItem key={account.id} value={account.id}>
-                                {account.name} - {formatCurrency(account.current_balance)}
+                                {account.name} - {formatCurrency(getAccountRealBalance(account.id))}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -847,7 +863,7 @@ const Investimentos = () => {
                     <SelectContent>
                       {accounts.filter(a => a.is_active).map(account => (
                         <SelectItem key={account.id} value={account.id}>
-                          {account.name} - {formatCurrency(account.current_balance)}
+                          {account.name} - {formatCurrency(getAccountRealBalance(account.id))}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -919,7 +935,7 @@ const Investimentos = () => {
                     <SelectContent>
                       {accounts.filter(a => a.is_active).map(account => (
                         <SelectItem key={account.id} value={account.id}>
-                          {account.name} - {formatCurrency(account.current_balance)}
+                          {account.name} - {formatCurrency(getAccountRealBalance(account.id))}
                         </SelectItem>
                       ))}
                     </SelectContent>
