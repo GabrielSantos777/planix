@@ -173,16 +173,33 @@ Deno.serve(async (req) => {
       console.error('Error fetching goals:', goalsError)
     }
 
-    // Calcular saldo total
-    const transactionBalance = transactions?.reduce((total, transaction) => {
-      return total + (Number(transaction.amount) || 0)
-    }, 0) || 0
+    // Buscar investimentos do usuário
+    const { data: investments, error: investmentsError } = await supabase
+      .from('investments')
+      .select('*')
+      .eq('user_id', userId)
 
+    if (investmentsError) {
+      console.error('Error fetching investments:', investmentsError)
+    }
+
+    // Calcular saldo total das contas (usar current_balance diretamente)
     const accountsBalance = accounts?.reduce((total, account) => {
       return total + (Number(account.current_balance) || 0)
     }, 0) || 0
 
-    const saldoTotal = transactionBalance + accountsBalance
+    // Calcular valor total dos investimentos
+    const investmentsBalance = investments?.reduce((total, investment) => {
+      return total + (Number(investment.quantity) * Number(investment.current_price))
+    }, 0) || 0
+
+    // Calcular dívida total dos cartões
+    const creditCardsDebt = creditCards?.reduce((total, card) => {
+      return total + (Number(card.current_balance) || 0)
+    }, 0) || 0
+
+    // Saldo total geral: contas + investimentos - cartões
+    const saldoTotal = accountsBalance + investmentsBalance - creditCardsDebt
 
     // Calcular gastos por categoria (apenas despesas)
     const gastosPorCategoria: Record<string, number> = {}
