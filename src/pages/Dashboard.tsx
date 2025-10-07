@@ -51,7 +51,11 @@ const Dashboard = () => {
     const movement = transactions.filter(t => t.account_id === accountId).reduce((sum, t) => sum + (t.amount || 0), 0)
     return initial + movement
   }
-  const totalAccountsBalance = accounts.reduce((sum, account) => sum + computeAccountBalance(account.id), 0)
+  const normalize = (s: any) => (s ?? '').toString().toLowerCase().trim()
+  const isInvestmentAccount = (a: any) => a?.type === 'investment' || normalize(a?.name) === 'investimentos - conta geral'
+  const totalAccountsBalance = accounts
+    .filter(a => !isInvestmentAccount(a))
+    .reduce((sum, account) => sum + computeAccountBalance(account.id), 0)
 
   // Total credit card debt
   const totalCreditDebt = creditCards.reduce((sum, card) => sum + (card.current_balance || 0), 0)
