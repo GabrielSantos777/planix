@@ -678,6 +678,14 @@ export type Database = {
         }
         Returns: string
       }
+      recompute_account_balance: {
+        Args: { p_account_id: string }
+        Returns: undefined
+      }
+      recompute_credit_card_balance: {
+        Args: { p_card_id: string }
+        Returns: undefined
+      }
       sanitize_text_input: {
         Args: { input_text: string }
         Returns: string
