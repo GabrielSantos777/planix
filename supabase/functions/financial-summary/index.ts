@@ -29,8 +29,8 @@ Deno.serve(async (req) => {
       )
     }
 
-    const { user_id, phone_number } = await req.json()
-    console.log('Request data:', { user_id, phone_number })
+    const { user_id, phone_number, account_id, account_name } = await req.json()
+    console.log('Request data:', { user_id, phone_number, account_id, account_name })
 
     if (!user_id && !phone_number) {
       return new Response(
@@ -183,10 +183,25 @@ Deno.serve(async (req) => {
       console.error('Error fetching investments:', investmentsError)
     }
 
-    // Calcular saldo total das contas (usar current_balance diretamente)
-    const accountsBalance = accounts?.reduce((total, account) => {
-      return total + (Number(account.current_balance) || 0)
-    }, 0) || 0
+    // Calcular saldo total das contas com suporte a seleção por conta
+    let accountsBalance = 0
+    let selectedAccount = null as any
+    const normalize = (s: any) => (s ?? '').toString().toLowerCase().trim()
+    if (account_id || account_name) {
+      selectedAccount = accounts?.find((a: any) =>
+        (account_id && a.id === account_id) ||
+        (account_name && normalize(a.name).includes(normalize(account_name))
+      )) as any
+      if (selectedAccount) {
+        accountsBalance = Number(selectedAccount.current_balance) || 0
+      } else {
+        accountsBalance = accounts?.reduce((total, account) => total + (Number(account.current_balance) || 0), 0) || 0
+      }
+    } else {
+      accountsBalance = accounts?.reduce((total, account) => total + (Number(account.current_balance) || 0), 0) || 0
+    }
+    console.log('Accounts list:', accounts?.map(a => ({ id: a.id, name: a.name, current_balance: Number(a.current_balance)||0 })))
+    if (selectedAccount) console.log('Selected account:', { id: selectedAccount.id, name: selectedAccount.name, current_balance: Number(selectedAccount.current_balance)||0 })
 
     // Calcular valor total dos investimentos
     const investmentsBalance = investments?.reduce((total, investment) => {
@@ -277,6 +292,12 @@ Deno.serve(async (req) => {
         Object.entries(gastosPorCategoria).map(([cat, valor]) => [cat, Number(valor.toFixed(2))])
       ),
       metas: metasProcessadas,
+      conta_selecionada: selectedAccount ? {
+        id: selectedAccount.id,
+        nome: selectedAccount.name,
+        saldo_atual: Number(selectedAccount.current_balance || 0),
+        saldo_inicial: Number((selectedAccount as any).initial_balance || 0)
+      } : null,
       contas: accounts?.map(account => ({
         id: account.id,
         nome: account.name,
