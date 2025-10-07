@@ -18,7 +18,7 @@ import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 import { supabase } from "@/integrations/supabase/client"
 
 const Investimentos = () => {
-  const { investments, addInvestment, deleteInvestment, updateInvestment, loading, accounts, transactions, addTransaction, categories, fetchAllData } = useSupabaseData()
+  const { investments, addInvestment, deleteInvestment, updateInvestment, loading, accounts, transactions, addTransaction, categories, fetchAllData, getOrCreateInvestmentAccount, addTransfer } = useSupabaseData()
   const { formatCurrency, currencies, selectedCurrency } = useCurrency()
   const { user } = useAuth()
   const { toast } = useToast()
@@ -78,24 +78,16 @@ const Investimentos = () => {
         return
       }
 
-      // Para qualquer tipo de investimento, criar transação de débito
-      if (newInvestment.account_id && user) {
-        const categoryId = await getOrCreateInvestmentCategory('expense')
-        await addTransaction({
-          user_id: user.id,
-          description: `Investimento: ${newInvestment.name}`,
-          amount: -totalInvestment,
-          type: 'expense',
-          category_id: categoryId,
-          account_id: newInvestment.account_id,
-          date: new Date().toISOString().split('T')[0],
-          currency: newInvestment.currency,
-          notes: `Aplicação em ${newInvestment.symbol}`,
-          installments: 1,
-          installment_number: 1,
-          is_installment: false
-        })
-      }
+      // Transferir da conta bancária para a conta de investimentos (não classificar como despesa)
+      const investmentAccount = await getOrCreateInvestmentAccount()
+      await addTransfer({
+        fromAccountId: newInvestment.account_id,
+        toAccountId: investmentAccount.id,
+        amount: totalInvestment,
+        date: new Date().toISOString().split('T')[0],
+        description: `Aporte em ${newInvestment.name}`,
+        notes: `Aplicação em ${newInvestment.symbol}`,
+      })
 
       await addInvestment({
         symbol: newInvestment.symbol,
@@ -154,24 +146,16 @@ const Investimentos = () => {
     try {
       const totalRedeem = redeemQuantity * selectedInvestment.current_price
 
-      // Criar transação de receita na conta
-      if (user) {
-        const categoryId = await getOrCreateInvestmentCategory('income')
-        await addTransaction({
-          user_id: user.id,
-          description: `Resgate: ${selectedInvestment.name}`,
-          amount: totalRedeem,
-          type: 'income',
-          category_id: categoryId,
-          account_id: selectedAccountId,
-          date: new Date().toISOString().split('T')[0],
-          currency: selectedInvestment.currency,
-          notes: `Resgate de ${redeemQuantity} cotas de ${selectedInvestment.symbol}`,
-          installments: 1,
-          installment_number: 1,
-          is_installment: false
-        })
-      }
+      // Registrar transferência de volta para a conta bancária (não classificar como receita)
+      const investmentAccount = await getOrCreateInvestmentAccount()
+      await addTransfer({
+        fromAccountId: investmentAccount.id,
+        toAccountId: selectedAccountId,
+        amount: totalRedeem,
+        date: new Date().toISOString().split('T')[0],
+        description: `Resgate de ${selectedInvestment.name}`,
+        notes: `Resgate de ${redeemQuantity} cotas de ${selectedInvestment.symbol}`,
+      })
 
       // Atualizar ou remover investimento
       const newQuantity = selectedInvestment.quantity - redeemQuantity

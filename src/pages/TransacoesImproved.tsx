@@ -43,7 +43,9 @@ const TransacoesImproved = () => {
     categories,
     addTransaction,
     updateTransaction,
-    deleteTransaction
+    deleteTransaction,
+    getOrCreateInvestmentAccount,
+    addTransfer,
   } = useSupabaseData()
   const [searchParams] = useSearchParams()
   
@@ -182,18 +184,59 @@ const TransacoesImproved = () => {
             description: `${newTransaction.installments}x de ${formatCurrency(Math.abs(installmentAmount))}`,
           })
         } else {
-          // Single transaction
-          await addTransaction({
-            ...baseTransactionData,
-            installments: 1,
-            installment_number: 1,
-            is_installment: false
-          })
-          
-          toast({
-            title: "✅ Transação Adicionada",
-            description: `${baseTransactionData.description} - ${formatCurrency(Math.abs(baseTransactionData.amount))}`,
-          })
+          // Single transaction ou conversão automática para transferência de investimento
+          const category = categories.find(c => c.id === newTransaction.category_id)
+          const desc = newTransaction.description.toLowerCase()
+          const catName = (category?.name || '').toLowerCase()
+
+          const investmentKeywords = ['investimento','aporte','corretora','aplicação','compra de ativo','ações','etf','cdb','tesouro','cripto','lci','lca','resgate','venda']
+          const feeKeywords = ['taxa','corretagem','custódia','emolumentos','tarifa']
+
+          const isInvestmentRelated = investmentKeywords.some(k => desc.includes(k) || catName.includes(k))
+          const isFee = feeKeywords.some(k => desc.includes(k) || catName.includes(k))
+
+          if (newTransaction.payment_method === 'account' && isInvestmentRelated && !isFee && newTransaction.account_id) {
+            const invAcc = await getOrCreateInvestmentAccount()
+            const date = newTransaction.date
+            const value = Math.abs(newTransaction.amount)
+
+            if (newTransaction.type === 'expense') {
+              await addTransfer({
+                fromAccountId: newTransaction.account_id,
+                toAccountId: invAcc.id,
+                amount: value,
+                date,
+                description: newTransaction.description,
+                notes: newTransaction.notes,
+              })
+            } else if (newTransaction.type === 'income') {
+              await addTransfer({
+                fromAccountId: invAcc.id,
+                toAccountId: newTransaction.account_id,
+                amount: value,
+                date,
+                description: newTransaction.description,
+                notes: newTransaction.notes,
+              })
+            }
+
+            toast({
+              title: '🔁 Transferência registrada',
+              description: 'Movimentação classificada como transferência de/para investimentos',
+            })
+          } else {
+            await addTransaction({
+              ...baseTransactionData,
+              installments: 1,
+              installment_number: 1,
+              is_installment: false
+            })
+            
+            toast({
+              title: "✅ Transação Adicionada",
+              description: `${baseTransactionData.description} - ${formatCurrency(Math.abs(baseTransactionData.amount))}`,
+            })
+          }
         }
       }
 

@@ -627,6 +627,96 @@ export const useSupabaseData = () => {
     }
   }
 
+  // Helper: find or create the general investments account
+  const getOrCreateInvestmentAccount = async (): Promise<Account> => {
+    // Try to find in current state first
+    let investmentAccount = accounts.find(
+      (a) => a.type === 'investment' && a.name === 'Investimentos - Conta Geral'
+    )
+
+    if (investmentAccount) return investmentAccount
+
+    // Fallback: query directly in case state is stale
+    if (user) {
+      const { data } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('type', 'investment')
+        .eq('name', 'Investimentos - Conta Geral')
+        .maybeSingle()
+
+      if (data) {
+        investmentAccount = data as Account
+        return investmentAccount
+      }
+    }
+
+    // Create if it doesn't exist
+    const created = await addAccount({
+      name: 'Investimentos - Conta Geral',
+      type: 'investment' as any,
+      initial_balance: 0,
+      currency: 'BRL',
+      is_active: true,
+    } as Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+
+    if (!created) throw new Error('Falha ao criar conta de investimentos')
+
+    // Ensure accounts state is fresh
+    await fetchAllData()
+
+    return created
+  }
+
+  // Helper: create a transfer between two accounts (records two transactions of type 'transfer')
+  const addTransfer = async (params: {
+    fromAccountId: string
+    toAccountId: string
+    amount: number // positive value
+    date: string
+    description: string
+    notes?: string
+  }) => {
+    if (!user) return
+
+    const value = Math.abs(params.amount)
+
+    // Outbound (from source account)
+    await addTransaction({
+      user_id: user.id,
+      description: params.description,
+      amount: -value,
+      type: 'transfer' as any,
+      category_id: null,
+      account_id: params.fromAccountId,
+      credit_card_id: null,
+      date: params.date,
+      currency: 'BRL',
+      notes: params.notes,
+      installments: 1,
+      installment_number: 1,
+      is_installment: false,
+    })
+
+    // Inbound (to destination account)
+    await addTransaction({
+      user_id: user.id,
+      description: params.description,
+      amount: value,
+      type: 'transfer' as any,
+      category_id: null,
+      account_id: params.toAccountId,
+      credit_card_id: null,
+      date: params.date,
+      currency: 'BRL',
+      notes: params.notes,
+      installments: 1,
+      installment_number: 1,
+      is_installment: false,
+    })
+  }
+
   return {
     // Data
     accounts,
@@ -657,6 +747,9 @@ export const useSupabaseData = () => {
     deleteGoal,
     addCreditCardInvoice,
     updateCreditCardInvoice,
-    upsertCreditCardInvoice
+    upsertCreditCardInvoice,
+    // New helpers
+    getOrCreateInvestmentAccount,
+    addTransfer,
   }
 }
