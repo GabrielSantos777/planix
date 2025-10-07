@@ -46,6 +46,7 @@ const TransacoesImproved = () => {
     deleteTransaction,
     getOrCreateInvestmentAccount,
     addTransfer,
+    fetchAllData,
   } = useSupabaseData()
   const [searchParams] = useSearchParams()
   
@@ -221,6 +222,7 @@ const TransacoesImproved = () => {
                   group_id: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`
                 }
               })
+              await fetchAllData()
             } else if (newTransaction.type === 'income') {
               await addTransfer({
                 fromAccountId: invAcc.id,
@@ -235,6 +237,7 @@ const TransacoesImproved = () => {
                   group_id: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`
                 }
               })
+              await fetchAllData()
             }
 
             toast({

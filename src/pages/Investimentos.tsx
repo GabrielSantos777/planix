@@ -106,6 +106,9 @@ const Investimentos = () => {
         current_price: newInvestment.average_price,
         currency: newInvestment.currency
       })
+
+      await fetchAllData()
+      
       
       setNewInvestment({
         symbol: '',
@@ -182,6 +185,9 @@ const Investimentos = () => {
       } else {
         await deleteInvestment(selectedInvestment.id)
       }
+
+      await fetchAllData()
+      
 
       setIsRedeemDialogOpen(false)
       setSelectedInvestment(null)
