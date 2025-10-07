@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
     // Buscar contas do usuário
     const { data: accounts, error: accountsError } = await supabase
       .from('accounts')
-      .select('id, name, current_balance')
+      .select('id, name, current_balance, initial_balance')
       .eq('user_id', userId)
       .eq('is_active', true)
 
@@ -280,7 +280,9 @@ Deno.serve(async (req) => {
       contas: accounts?.map(account => ({
         id: account.id,
         nome: account.name,
-        saldo: Number(account.current_balance || 0)
+        saldo: Number(account.current_balance || 0), // alias para compatibilidade
+        saldo_atual: Number(account.current_balance || 0),
+        saldo_inicial: Number((account as any).initial_balance || 0)
       })) || [],
       cartoes_credito: creditCards?.map(card => ({
         id: card.id,
