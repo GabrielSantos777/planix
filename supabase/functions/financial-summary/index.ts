@@ -190,6 +190,16 @@ Deno.serve(async (req) => {
 
     const isInvestmentAccount = (a: any) => (a?.type === 'investment') || (normalize(a?.name) === 'investimentos - conta geral')
 
+    // Mapear movimentações por conta e calcular saldo a partir do saldo inicial + transações
+    const movementByAccount: Record<string, number> = {}
+    transactions?.forEach((t: any) => {
+      if (t.account_id) {
+        const amt = Number(t.amount) || 0
+        movementByAccount[t.account_id] = (movementByAccount[t.account_id] || 0) + amt
+      }
+    })
+    const computedBalance = (a: any) => (Number((a as any).initial_balance) || 0) + (movementByAccount[a.id] || 0)
+
     if (account_id || account_name) {
       selectedAccount = accounts?.find((a: any) =>
         (account_id && a.id === account_id) ||
@@ -200,20 +210,20 @@ Deno.serve(async (req) => {
         // Se a conta selecionada é de investimento, não incluir no saldo de contas para evitar dupla contagem
         accountsBalance = isInvestmentAccount(selectedAccount)
           ? 0
-          : (Number(selectedAccount.current_balance) || 0)
+          : computedBalance(selectedAccount)
       } else {
         accountsBalance = accounts
           ?.filter((a: any) => !isInvestmentAccount(a))
-          ?.reduce((total: number, a: any) => total + (Number(a.current_balance) || 0), 0) || 0
+          ?.reduce((total: number, a: any) => total + computedBalance(a), 0) || 0
       }
     } else {
       accountsBalance = accounts
         ?.filter((a: any) => !isInvestmentAccount(a))
-        ?.reduce((total: number, a: any) => total + (Number(a.current_balance) || 0), 0) || 0
+        ?.reduce((total: number, a: any) => total + computedBalance(a), 0) || 0
     }
 
-    console.log('Accounts list (excluindo investimento na soma):', accounts?.map(a => ({ id: a.id, name: a.name, type: a.type, current_balance: Number(a.current_balance)||0 })))
-    if (selectedAccount) console.log('Selected account:', { id: selectedAccount.id, name: selectedAccount.name, type: selectedAccount.type, current_balance: Number(selectedAccount.current_balance)||0 })
+    console.log('Accounts list (excluindo investimento na soma):', accounts?.map(a => ({ id: a.id, name: a.name, type: a.type, current_balance: Number(a.current_balance)||0, computed_balance: Number(computedBalance(a).toFixed(2)) })))
+    if (selectedAccount) console.log('Selected account:', { id: selectedAccount.id, name: selectedAccount.name, type: selectedAccount.type, current_balance: Number(selectedAccount.current_balance)||0, computed_balance: Number(computedBalance(selectedAccount).toFixed(2)) })
 
     // Calcular valor total dos investimentos
     const investmentsBalance = investments?.reduce((total, investment) => {
@@ -307,14 +317,14 @@ Deno.serve(async (req) => {
       conta_selecionada: selectedAccount ? {
         id: selectedAccount.id,
         nome: selectedAccount.name,
-        saldo_atual: Number(selectedAccount.current_balance || 0),
+        saldo_atual: Number(computedBalance(selectedAccount).toFixed(2)),
         saldo_inicial: Number((selectedAccount as any).initial_balance || 0)
       } : null,
       contas: accounts?.map(account => ({
         id: account.id,
         nome: account.name,
-        saldo: Number(account.current_balance || 0), // alias para compatibilidade
-        saldo_atual: Number(account.current_balance || 0),
+        saldo: Number(computedBalance(account).toFixed(2)), // alias para compatibilidade
+        saldo_atual: Number(computedBalance(account).toFixed(2)),
         saldo_inicial: Number((account as any).initial_balance || 0)
       })) || [],
       cartoes_credito: creditCards?.map(card => ({
