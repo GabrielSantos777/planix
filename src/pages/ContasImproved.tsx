@@ -416,7 +416,7 @@ export default function ContasImproved() {
       return total + (investment.quantity * investment.current_price)
     }, 0)
   }
-  const totalBalance = accounts.reduce((sum, account) => sum + getComputedAccountBalance(account.id), 0) + getTotalInvestmentValue()
+  const totalBalance = accounts.reduce((sum, account) => sum + (account.current_balance || 0), 0)
   const totalCreditLimit = creditCards.reduce((sum, card) => sum + (card.limit_amount || 0), 0)
   const totalCreditUsed = creditCards.reduce((sum, card) => sum + getUsedLimit(card.id), 0)
   const totalCreditAvailable = Math.max(0, totalCreditLimit - totalCreditUsed)
