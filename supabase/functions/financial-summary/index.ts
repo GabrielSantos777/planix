@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
         .from('profiles')
         .select('user_id')
         .eq('phone', phone_number)
-        .single()
+        .maybeSingle()
 
       // Se não encontrar, tentar na tabela whatsapp_integrations
       if (profileError || !profileData) {
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
           .from('whatsapp_integrations')
           .select('user_id')
           .eq('phone_number', phone_number)
-          .single()
+          .maybeSingle()
         
         if (whatsappData) {
           profileData = whatsappData
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
               .from('whatsapp_integrations')
               .select('user_id')
               .ilike('phone_number', `%${variation.slice(-10)}%`) // Últimos 10 dígitos
-              .single()
+              .maybeSingle()
             
             if (flexData) {
               profileData = flexData
@@ -201,6 +201,16 @@ Deno.serve(async (req) => {
     // Saldo total geral: contas + investimentos - cartões
     const saldoTotal = accountsBalance + investmentsBalance - creditCardsDebt
 
+    console.log('Balances computed:', {
+      accountsBalance,
+      investmentsBalance,
+      creditCardsDebt,
+      saldoTotal,
+      accountsCount: accounts?.length || 0,
+      investmentsCount: investments?.length || 0,
+      creditCardsCount: creditCards?.length || 0,
+    })
+
     // Calcular gastos por categoria (apenas despesas)
     const gastosPorCategoria: Record<string, number> = {}
     
@@ -259,6 +269,10 @@ Deno.serve(async (req) => {
     // Preparar resposta final
     const response = {
       saldo: Number(saldoTotal.toFixed(2)),
+      saldo_total_geral: Number(saldoTotal.toFixed(2)),
+      saldo_contas: Number(accountsBalance.toFixed(2)),
+      total_investimentos: Number(investmentsBalance.toFixed(2)),
+      total_divida_cartoes: Number(creditCardsDebt.toFixed(2)),
       gastos_por_categoria: Object.fromEntries(
         Object.entries(gastosPorCategoria).map(([cat, valor]) => [cat, Number(valor.toFixed(2))])
       ),
