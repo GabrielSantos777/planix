@@ -87,15 +87,22 @@ const TransacoesImproved = () => {
   }, [accounts, creditCards])
 
   const filteredTransactions = transactions.filter(transaction => {
+    // Ocultar a perna da transferência na conta de investimentos para evitar "duplicados"
+    if (
+      transaction.type === 'transfer' &&
+      transaction.account &&
+      (transaction.account.name === 'Investimentos - Conta Geral' || transaction.account.type === 'investment')
+    ) {
+      return false
+    }
+
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
-    
     const matchesType = filterType === "all" || transaction.type === filterType
     const matchesCategory = filterCategory === "all" || transaction.category_id === filterCategory
-    
     const transactionDate = new Date(transaction.date)
     const matchesDateFrom = !dateFrom || transactionDate >= new Date(dateFrom)
     const matchesDateTo = !dateTo || transactionDate <= new Date(dateTo)
-    
+
     return matchesSearch && matchesType && matchesCategory && matchesDateFrom && matchesDateTo
   })
 
@@ -208,6 +215,11 @@ const TransacoesImproved = () => {
                 date,
                 description: newTransaction.description,
                 notes: newTransaction.notes,
+                investmentMetadata: {
+                  kind: 'investment_transfer',
+                  action: 'aporte',
+                  group_id: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`
+                }
               })
             } else if (newTransaction.type === 'income') {
               await addTransfer({
@@ -217,6 +229,11 @@ const TransacoesImproved = () => {
                 date,
                 description: newTransaction.description,
                 notes: newTransaction.notes,
+                investmentMetadata: {
+                  kind: 'investment_transfer',
+                  action: 'resgate',
+                  group_id: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`
+                }
               })
             }
 

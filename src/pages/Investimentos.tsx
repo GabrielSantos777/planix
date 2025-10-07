@@ -87,6 +87,14 @@ const Investimentos = () => {
         date: new Date().toISOString().split('T')[0],
         description: `Aporte em ${newInvestment.name}`,
         notes: `Aplicação em ${newInvestment.symbol}`,
+        investmentMetadata: {
+          kind: 'investment_transfer',
+          action: 'aporte',
+          symbol: newInvestment.symbol,
+          quantity: newInvestment.quantity,
+          price: newInvestment.average_price,
+          group_id: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`
+        }
       })
 
       await addInvestment({
@@ -155,6 +163,14 @@ const Investimentos = () => {
         date: new Date().toISOString().split('T')[0],
         description: `Resgate de ${selectedInvestment.name}`,
         notes: `Resgate de ${redeemQuantity} cotas de ${selectedInvestment.symbol}`,
+        investmentMetadata: {
+          kind: 'investment_transfer',
+          action: 'resgate',
+          symbol: selectedInvestment.symbol,
+          quantity: redeemQuantity,
+          price: selectedInvestment.current_price,
+          group_id: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`
+        }
       })
 
       // Atualizar ou remover investimento

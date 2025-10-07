@@ -677,6 +677,7 @@ export const useSupabaseData = () => {
     date: string
     description: string
     notes?: string
+    investmentMetadata?: any | null
   }) => {
     if (!user) return
 
@@ -697,6 +698,7 @@ export const useSupabaseData = () => {
       installments: 1,
       installment_number: 1,
       is_installment: false,
+      investment_metadata: params.investmentMetadata ?? null,
     })
 
     // Inbound (to destination account)
@@ -714,6 +716,7 @@ export const useSupabaseData = () => {
       installments: 1,
       installment_number: 1,
       is_installment: false,
+      investment_metadata: params.investmentMetadata ?? null,
     })
   }
 
