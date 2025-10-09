@@ -868,12 +868,12 @@ const TransacoesImproved = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="contact">Responsável (opcional)</Label>
-                <Select value={newTransaction.contact_id} onValueChange={(value) => setNewTransaction({...newTransaction, contact_id: value})}>
+                <Select value={newTransaction.contact_id || "none"} onValueChange={(value) => setNewTransaction({...newTransaction, contact_id: value === "none" ? "" : value})}>
                   <SelectTrigger>
                     <SelectValue placeholder="Você (padrão)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Você</SelectItem>
+                    <SelectItem value="none">Você</SelectItem>
                     {contacts.map((contact) => (
                       <SelectItem key={contact.id} value={contact.id}>
                         {contact.name}
