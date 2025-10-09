@@ -55,6 +55,7 @@ const TransacoesImproved = () => {
   const [filterType, setFilterType] = useState<string>("all")
   const [filterCategory, setFilterCategory] = useState<string>("all")
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM format
+  const [filterContact, setFilterContact] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
   
@@ -103,12 +104,15 @@ const TransacoesImproved = () => {
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesType = filterType === "all" || transaction.type === filterType
     const matchesCategory = filterCategory === "all" || transaction.category_id === filterCategory
+    const matchesContact = filterContact === "all" || 
+                          (filterContact === "me" && !transaction.contact_id) ||
+                          transaction.contact_id === filterContact
     
     // Filter by month (YYYY-MM)
     const transactionMonth = transaction.date.slice(0, 7) // Get YYYY-MM from date
     const matchesMonth = transactionMonth === filterMonth
 
-    return matchesSearch && matchesType && matchesCategory && matchesMonth
+    return matchesSearch && matchesType && matchesCategory && matchesMonth && matchesContact
   })
 
   const handleAddTransaction = async () => {
@@ -642,12 +646,28 @@ const TransacoesImproved = () => {
                 </Select>
               </div>
               <div>
-                <Input
+                 <Input
                   type="month"
                   value={filterMonth}
                   onChange={(e) => setFilterMonth(e.target.value)}
                   className="w-full"
                 />
+              </div>
+              <div>
+                <Select value={filterContact} onValueChange={setFilterContact}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="me">Você</SelectItem>
+                    {contacts.map(contact => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>

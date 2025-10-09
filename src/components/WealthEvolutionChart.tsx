@@ -2,60 +2,56 @@ import { useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp } from 'lucide-react'
-import { useApp } from '@/context/AppContext'
 import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { useCurrency } from '@/context/CurrencyContext'
+import { usePrivacy } from '@/context/PrivacyContext'
 
 interface WealthEvolutionChartProps {
   className?: string
 }
 
 export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) => {
-  const { transactions, accounts } = useApp()
-  const { investments } = useSupabaseData()
+  const { transactions, accounts } = useSupabaseData()
   const { formatCurrency } = useCurrency()
+  const { isPrivacyEnabled } = usePrivacy()
 
-  const getInvestmentValue = () => {
-    return investments.reduce((total, investment) => {
-      return total + (investment.quantity * investment.current_price)
-    }, 0)
-  }
-
+  // Cálculo do saldo total mensal nos últimos 12 meses
   const evolutionData = useMemo(() => {
-    const last6Months = Array.from({ length: 6 }, (_, i) => {
+    const last12Months = Array.from({ length: 12 }, (_, i) => {
       const date = new Date()
-      date.setMonth(date.getMonth() - (5 - i))
+      date.setMonth(date.getMonth() - (11 - i))
       return {
-        month: date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
-        date: new Date(date.getFullYear(), date.getMonth(), 1)
+        month: date.toLocaleDateString('pt-BR', { month: 'short' }),
+        year: date.getFullYear(),
+        monthIndex: date.getMonth()
       }
     })
 
-    return last6Months.map(({ month, date }) => {
-      // Calculate accumulated balance up to this month
-      const transactionsUpToMonth = transactions.filter(t => new Date(t.date) <= date)
-      const balance = transactionsUpToMonth.reduce((sum, t) => sum + t.amount, 0)
+    return last12Months.map(({ month, year, monthIndex }) => {
+      // Calcular todas as transações até o final deste mês
+      const endOfMonth = new Date(year, monthIndex + 1, 0)
+      const transactionsUpToMonth = transactions.filter(t => new Date(t.date) <= endOfMonth)
       
-      // Add initial account balances
-      const accountsBalance = accounts.reduce((sum, account) => sum + (account.balance || 0), 0)
+      // Somar saldos iniciais das contas
+      const accountsBalance = accounts.reduce((sum, account) => sum + (account.initial_balance || 0), 0)
       
-      // Simulate investment growth (in real app, this would come from historical data)
-      const investmentValue = getInvestmentValue() * (0.8 + Math.random() * 0.4)
+      // Somar movimentações das transações
+      const movementsBalance = transactionsUpToMonth.reduce((sum, t) => {
+        return sum + (t.amount || 0)
+      }, 0)
       
-      const totalWealth = balance + accountsBalance + investmentValue
+      const totalBalance = accountsBalance + movementsBalance
 
       return {
         month,
-        wealth: Math.max(0, totalWealth),
-        balance: Math.max(0, balance + accountsBalance),
-        investments: Math.max(0, investmentValue)
+        balance: totalBalance
       }
     })
-  }, [transactions, accounts, investments])
+  }, [transactions, accounts])
 
-  const currentWealth = evolutionData[evolutionData.length - 1]?.wealth || 0
-  const previousWealth = evolutionData[evolutionData.length - 2]?.wealth || 0
-  const growthPercentage = previousWealth > 0 ? ((currentWealth - previousWealth) / previousWealth) * 100 : 0
+  const currentBalance = evolutionData[evolutionData.length - 1]?.balance || 0
+  const previousBalance = evolutionData[evolutionData.length - 2]?.balance || 0
+  const growthPercentage = previousBalance !== 0 ? ((currentBalance - previousBalance) / Math.abs(previousBalance)) * 100 : 0
 
   return (
     <Card className={className}>
@@ -65,11 +61,11 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
           Evolução Patrimonial
         </CardTitle>
         <CardDescription>
-          Crescimento do patrimônio nos últimos 6 meses
+          Comparação de saldo acumulado por ano
         </CardDescription>
         <div className="flex items-center gap-2">
           <span className="text-2xl font-bold">
-            {formatCurrency(currentWealth)}
+            {!isPrivacyEnabled ? formatCurrency(currentBalance) : '•'.repeat(12)}
           </span>
           <span className={`text-sm ${growthPercentage >= 0 ? 'text-success' : 'text-destructive'}`}>
             {growthPercentage >= 0 ? '+' : ''}{growthPercentage.toFixed(1)}%
@@ -104,44 +100,14 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
               />
               <Line 
                 type="monotone" 
-                dataKey="wealth" 
+                dataKey="balance" 
                 stroke="hsl(var(--primary))" 
                 strokeWidth={3}
                 dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
                 activeDot={{ r: 6 }}
               />
-              <Line 
-                type="monotone" 
-                dataKey="balance" 
-                stroke="hsl(var(--success))" 
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={false}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="investments" 
-                stroke="hsl(var(--warning))" 
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={false}
-              />
             </LineChart>
           </ResponsiveContainer>
-        </div>
-        <div className="flex justify-center gap-6 mt-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-0.5 bg-primary"></div>
-            <span>Patrimônio Total</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-0.5 bg-success border-dashed"></div>
-            <span>Saldo</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-0.5 bg-warning border-dashed"></div>
-            <span>Investimentos</span>
-          </div>
         </div>
       </CardContent>
     </Card>

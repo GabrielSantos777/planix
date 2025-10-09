@@ -7,7 +7,10 @@ import {
   DollarSign,
   CreditCard,
   PlusCircle,
-  Wallet
+  Wallet,
+  Eye,
+  EyeOff,
+  Landmark
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
@@ -15,18 +18,29 @@ import { useCurrency } from "@/context/CurrencyContext"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import Layout from "@/components/Layout"
 import { useAuth } from "@/context/AuthContext"
+import { usePrivacy } from "@/context/PrivacyContext"
+import { useMemo } from "react"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { WealthEvolutionChart } from "@/components/WealthEvolutionChart"
 
 const Dashboard = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { user } = useAuth()
   const { accounts, creditCards, transactions, investments, contacts } = useSupabaseData()
+  const { formatCurrency } = useCurrency()
+  const { isPrivacyEnabled, togglePrivacy, hideValue } = usePrivacy()
+  
   const getTotalInvestmentValue = () => {
     return investments.reduce((total, investment) => {
       return total + (investment.quantity * investment.current_price)
     }, 0)
   }
-  const { formatCurrency } = useCurrency()
+  
+  const formatPrivacyCurrency = (amount: number) => {
+    const formatted = formatCurrency(amount)
+    return isPrivacyEnabled ? hideValue(formatted) : formatted
+  }
 
   // Get current month transactions
   const currentMonth = new Date().getMonth()
@@ -83,9 +97,36 @@ const Dashboard = () => {
   // Monthly net (income - expenses this month)
   const monthlyNet = monthlyIncome - monthlyExpenses
 
+  // Dados para gráfico de saldo por conta (invertido - contas no eixo X)
+  const accountBalancesData = useMemo(() => {
+    return accounts
+      .filter(acc => acc.is_active)
+      .map(acc => ({
+        name: acc.name,
+        balance: acc.current_balance || 0
+      }))
+      .sort((a, b) => b.balance - a.balance)
+  }, [accounts])
+
   return (
     <Layout>
       <div className="p-6 space-y-6">
+        {/* Header com botão de privacidade */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Visão geral das suas finanças</p>
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={togglePrivacy}
+            title={isPrivacyEnabled ? "Mostrar valores" : "Ocultar valores"}
+          >
+            {isPrivacyEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>
+
         {/* Summary Cards - First Row */}
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -95,7 +136,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-success">
-                {formatCurrency(getTotalInvestmentValue())}
+                {formatPrivacyCurrency(getTotalInvestmentValue())}
               </div>
               <p className="text-xs text-muted-foreground">
                 Valor total investido
@@ -110,7 +151,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-success">
-                {formatCurrency(monthlyIncome)}
+                {formatPrivacyCurrency(monthlyIncome)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Total Entradas do mês atual
@@ -125,7 +166,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-destructive">
-                {formatCurrency(monthlyExpenses)}
+                {formatPrivacyCurrency(monthlyExpenses)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Total Gastos do mês atual
@@ -140,7 +181,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-500">
-                {formatCurrency(monthlyCreditCardExpenses)}
+                {formatPrivacyCurrency(monthlyCreditCardExpenses)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Total Gastos no cartão (mês atual)
@@ -151,7 +192,7 @@ const Dashboard = () => {
         </div>
 
         {/* Summary Cards - Second Row */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Saldo Total Geral</CardTitle>
@@ -159,7 +200,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatCurrency(totalBalance)}
+                {formatPrivacyCurrency(totalBalance)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Soma de todas as contas
@@ -174,7 +215,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${monthlyNet >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatCurrency(monthlyNet)}
+                {formatPrivacyCurrency(monthlyNet)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Receitas - Despesas (mês atual)
@@ -189,13 +230,68 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-500">
-                {formatCurrency(myCreditCardExpenses)}
+                {formatPrivacyCurrency(myCreditCardExpenses)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Do mês atual feitas por mim como responsável
               </p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Gráficos */}
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          {/* Gráfico de Saldo por Conta */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Landmark className="h-5 w-5" />
+                Saldo por Conta Bancária
+              </CardTitle>
+              <CardDescription>
+                Saldo atual de cada conta cadastrada
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={accountBalancesData} layout="horizontal">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      type="category"
+                      dataKey="name" 
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      type="number"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => !isPrivacyEnabled ? `R$ ${(value / 1000).toFixed(0)}k` : '***'}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [!isPrivacyEnabled ? formatCurrency(value) : '***', 'Saldo']}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    />
+                    <Bar 
+                      dataKey="balance" 
+                      fill="hsl(var(--primary))" 
+                      radius={[8, 8, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Evolução Patrimonial */}
+          <WealthEvolutionChart />
         </div>
 
         {/* Quick Actions */}
@@ -271,11 +367,11 @@ const Dashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className={`font-bold text-sm sm:text-base ${transaction.type === "income" ? "text-success" : "text-destructive"
+                     <div className="text-right flex-shrink-0">
+                       <p className={`font-bold text-sm sm:text-base ${transaction.type === "income" ? "text-success" : "text-destructive"
                          }`}>
                          {transaction.type === "income" ? "+" : ""}
-                         {formatCurrency(transaction.amount)}
+                         {formatPrivacyCurrency(transaction.amount)}
                        </p>
                       <p className="text-xs sm:text-sm text-muted-foreground">
                         {new Date(transaction.date).toLocaleDateString('pt-BR')}

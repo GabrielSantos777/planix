@@ -9,6 +9,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { AppProvider } from "./context/AppContext";
 import { CurrencyProvider } from "./context/CurrencyContext";
 import { CategoriesProvider } from "./context/CategoriesContext";
+import { PrivacyProvider } from "./context/PrivacyContext";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -47,12 +48,13 @@ const App = () => (
     <ThemeProvider defaultTheme="system" storageKey="finance-tracker-theme">
       <AuthProvider>
         <CurrencyProvider>
-          <CategoriesProvider>
-            <AppProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Sonner />
-                  <BrowserRouter>
+          <PrivacyProvider>
+            <CategoriesProvider>
+              <AppProvider>
+                  <TooltipProvider>
+                    <Toaster />
+                    <Sonner />
+                    <BrowserRouter>
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/landing" element={<Landing />} />
@@ -119,10 +121,11 @@ const App = () => (
                        <Route path="/contato" element={<Contact />} />
                        <Route path="*" element={<NotFound />} />
                     </Routes>
-                  </BrowserRouter>
-                </TooltipProvider>
-            </AppProvider>
-          </CategoriesProvider>
+                    </BrowserRouter>
+                  </TooltipProvider>
+              </AppProvider>
+            </CategoriesProvider>
+          </PrivacyProvider>
         </CurrencyProvider>
       </AuthProvider>
     </ThemeProvider>

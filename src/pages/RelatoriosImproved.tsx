@@ -40,8 +40,7 @@ const RelatoriosImproved = () => {
   const { transactions, categories, accounts, creditCards } = useSupabaseData()
   
   // Estados para filtros
-  const [startDate, setStartDate] = useState<Date>()
-  const [endDate, setEndDate] = useState<Date>()
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM format
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
   const [accountFilter, setAccountFilter] = useState("all")
@@ -52,8 +51,7 @@ const RelatoriosImproved = () => {
 
   // Função para limpar todos os filtros
   const clearAllFilters = () => {
-    setStartDate(undefined)
-    setEndDate(undefined)
+    setFilterMonth(new Date().toISOString().slice(0, 7))
     setCategoryFilter("all")
     setTypeFilter("all")
     setAccountFilter("all")
@@ -62,22 +60,15 @@ const RelatoriosImproved = () => {
   }
 
   // Verificar se há filtros ativos
-  const hasActiveFilters = startDate || endDate || categoryFilter !== "all" || 
+  const hasActiveFilters = categoryFilter !== "all" || 
     typeFilter !== "all" || accountFilter !== "all" || statusFilter !== "all" || descriptionFilter
 
   // Filter transactions based on all filters
   const filteredTransactions = useMemo(() => {
     let filtered = transactions.filter(transaction => {
-      const transactionDate = new Date(transaction.date)
-      
-      // Filtro de data
-      let dateMatch = true
-      if (startDate) {
-        dateMatch = dateMatch && transactionDate >= startDate
-      }
-      if (endDate) {
-        dateMatch = dateMatch && transactionDate <= endDate
-      }
+      // Filtro de mês (YYYY-MM)
+      const transactionMonth = transaction.date.slice(0, 7)
+      const dateMatch = transactionMonth === filterMonth
 
       // Filtro de descrição
       const descriptionMatch = !descriptionFilter || 
@@ -99,6 +90,7 @@ const RelatoriosImproved = () => {
       let statusMatch = true
       if (statusFilter !== "all") {
         const today = new Date()
+        const transactionDate = new Date(transaction.date)
         const isPaid = transactionDate <= today
         if (statusFilter === "paid" && !isPaid) statusMatch = false
         if (statusFilter === "pending" && isPaid) statusMatch = false
@@ -108,7 +100,7 @@ const RelatoriosImproved = () => {
     })
 
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [transactions, startDate, endDate, categoryFilter, typeFilter, accountFilter, statusFilter, descriptionFilter])
+  }, [transactions, filterMonth, categoryFilter, typeFilter, accountFilter, statusFilter, descriptionFilter])
 
   const totalIncome = filteredTransactions
     .filter(t => t.type === "income")
@@ -193,14 +185,10 @@ const RelatoriosImproved = () => {
   }, [transactions])
 
   const getFilterPeriodText = () => {
-    if (startDate && endDate) {
-      return `${format(startDate, "dd/MM/yyyy")} até ${format(endDate, "dd/MM/yyyy")}`
-    } else if (startDate) {
-      return `A partir de ${format(startDate, "dd/MM/yyyy")}`
-    } else if (endDate) {
-      return `Até ${format(endDate, "dd/MM/yyyy")}`
-    }
-    return "Todos os períodos"
+    const [year, month] = filterMonth.split('-')
+    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+    return `${monthNames[parseInt(month) - 1]} de ${year}`
   }
 
   const handleExportPDF = () => {
@@ -289,7 +277,7 @@ const RelatoriosImproved = () => {
       doc.text(`Página ${i} de ${totalPages}`, 170, 290)
     }
     
-    const fileName = `Relatorio_Financeiro_${startDate ? format(startDate, "dd-MM-yyyy") : 'inicio'}_a_${endDate ? format(endDate, "dd-MM-yyyy") : 'fim'}.pdf`
+    const fileName = `Relatorio_Financeiro_${filterMonth.replace('-', '_')}.pdf`
     doc.save(fileName)
     
     toast({
@@ -331,7 +319,7 @@ const RelatoriosImproved = () => {
     const summarySheet = XLSX.utils.json_to_sheet(summaryData)
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumo')
     
-    const fileName = `Relatorio_Financeiro_${startDate ? format(startDate, "dd-MM-yyyy") : 'inicio'}_a_${endDate ? format(endDate, "dd-MM-yyyy") : 'fim'}.xlsx`
+    const fileName = `Relatorio_Financeiro_${filterMonth.replace('-', '_')}.xlsx`
     XLSX.writeFile(workbook, fileName)
     
     toast({
@@ -380,8 +368,6 @@ const RelatoriosImproved = () => {
                 {hasActiveFilters && (
                   <Badge variant="secondary" className="ml-2">
                     {[
-                      startDate && "Data início",
-                      endDate && "Data fim", 
                       categoryFilter !== "all" && "Categoria",
                       typeFilter !== "all" && "Tipo",
                       accountFilter !== "all" && "Conta",
@@ -400,61 +386,17 @@ const RelatoriosImproved = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {/* Período - Data Inicial */}
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {/* Filtro de Mês */}
               <div className="space-y-2">
-                <Label>Data Inicial</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !startDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, "dd/MM/yyyy") : "Selecionar"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={setStartDate}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Período - Data Final */}
-              <div className="space-y-2">
-                <Label>Data Final</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !endDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(endDate, "dd/MM/yyyy") : "Selecionar"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={endDate}
-                      onSelect={setEndDate}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label htmlFor="filterMonth">Mês</Label>
+                <Input
+                  id="filterMonth"
+                  type="month"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className="w-full"
+                />
               </div>
 
               {/* Categoria */}

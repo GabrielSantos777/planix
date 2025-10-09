@@ -4,15 +4,17 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import { useAuth } from "@/context/AuthContext"
 import { useCurrency } from "@/context/CurrencyContext"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { MessageCircle, TrendingDown, Copy } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
-import { format } from "date-fns"
+import { format, startOfMonth, endOfMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 
 interface Contact {
   id: string
@@ -41,6 +43,7 @@ export default function Social() {
   const { toast } = useToast()
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false)
   const [selectedContactData, setSelectedContactData] = useState<ContactWithTransactions | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'))
 
   const { data: contactsWithTransactions = [], isLoading } = useQuery({
     queryKey: ['social-contacts', user?.id],
@@ -98,6 +101,44 @@ export default function Social() {
     enabled: !!user?.id,
   })
 
+  // Filtrar transações por mês selecionado
+  const filteredContactsWithTransactions = useMemo(() => {
+    if (!contactsWithTransactions || !selectedMonth) return contactsWithTransactions
+
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const monthStart = startOfMonth(new Date(year, month - 1))
+    const monthEnd = endOfMonth(new Date(year, month - 1))
+
+    return contactsWithTransactions.map(({ contact, transactions, total }) => {
+      const filteredTransactions = transactions.filter(t => {
+        const transDate = new Date(t.date)
+        return transDate >= monthStart && transDate <= monthEnd
+      })
+
+      const filteredTotal = filteredTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0)
+
+      return {
+        contact,
+        transactions: filteredTransactions,
+        total: filteredTotal
+      }
+    }).filter(item => item.transactions.length > 0)
+  }, [contactsWithTransactions, selectedMonth])
+
+  // Gerar lista de meses disponíveis (últimos 12 meses)
+  const availableMonths = useMemo(() => {
+    const months: { value: string; label: string }[] = []
+    for (let i = 0; i < 12; i++) {
+      const date = new Date()
+      date.setMonth(date.getMonth() - i)
+      months.push({
+        value: format(date, 'yyyy-MM'),
+        label: format(date, 'MMMM yyyy', { locale: ptBR })
+      })
+    }
+    return months
+  }, [])
+
   const handleSendWhatsApp = (contactData: ContactWithTransactions) => {
     setSelectedContactData(contactData)
     setWhatsappModalOpen(true)
@@ -139,9 +180,28 @@ export default function Social() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Social</h1>
-          <p className="text-muted-foreground">Acompanhe as transações dos seus contatos</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Social</h1>
+            <p className="text-muted-foreground">Acompanhe as transações dos seus contatos</p>
+          </div>
+          
+          {/* Filtro de Mês */}
+          <div className="w-64">
+            <Label>Filtrar por Mês</Label>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableMonths.map(month => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {isLoading ? (
@@ -150,20 +210,20 @@ export default function Social() {
               <p className="text-center text-muted-foreground">Carregando...</p>
             </CardContent>
           </Card>
-        ) : contactsWithTransactions.length === 0 ? (
+        ) : filteredContactsWithTransactions.length === 0 ? (
           <Card>
             <CardContent className="py-8">
               <p className="text-center text-muted-foreground">
-                Nenhuma transação vinculada a contatos ainda.
+                Nenhuma transação encontrada para o mês selecionado.
               </p>
               <p className="text-center text-sm text-muted-foreground mt-2">
-                Vincule contatos às transações para vê-los aqui.
+                Tente selecionar outro mês ou vincule contatos às transações.
               </p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-6">
-            {contactsWithTransactions.map(({ contact, transactions, total }) => (
+            {filteredContactsWithTransactions.map(({ contact, transactions, total }) => (
               <Card key={contact.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
