@@ -26,6 +26,8 @@ import SettingsImproved from "./pages/SettingsImproved";
 import NotFound from "./pages/NotFound";
 import WhatsAppConnection from "./pages/WhatsAppConnection";
 import Categorias from "./pages/Categorias";
+import Contacts from "./pages/Contacts";
+import Social from "./pages/Social";
 import AboutUs from "./pages/AboutUs";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -99,6 +101,16 @@ const App = () => (
                        <Route path="/categorias" element={
                          <ProtectedRoute>
                            <Categorias />
+                         </ProtectedRoute>
+                       } />
+                       <Route path="/contatos" element={
+                         <ProtectedRoute>
+                           <Contacts />
+                         </ProtectedRoute>
+                       } />
+                       <Route path="/social" element={
+                         <ProtectedRoute>
+                           <Social />
                          </ProtectedRoute>
                        } />
                        <Route path="/sobre" element={<AboutUs />} />

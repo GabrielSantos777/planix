@@ -10,11 +10,13 @@ export type Transaction = Database['public']['Tables']['transactions']['Row']
 export type Investment = Database['public']['Tables']['investments']['Row']
 export type Goal = Database['public']['Tables']['goals']['Row']
 export type CreditCardInvoice = Database['public']['Tables']['credit_card_invoices']['Row']
+export type Contact = Database['public']['Tables']['contacts']['Row']
 
 export interface TransactionWithRelations extends Transaction {
   category?: Category
   account?: Account
   credit_card?: CreditCard
+  contact?: Contact
 }
 
 export const useSupabaseData = () => {
@@ -26,6 +28,7 @@ export const useSupabaseData = () => {
   const [investments, setInvestments] = useState<Investment[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [creditCardInvoices, setCreditCardInvoices] = useState<CreditCardInvoice[]>([])
+  const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
 
   // Fetch accounts
@@ -91,7 +94,8 @@ export const useSupabaseData = () => {
           *,
           category:categories(*),
           account:accounts(*),
-          credit_card:credit_cards(*)
+          credit_card:credit_cards(*),
+          contact:contacts(*)
         `)
         .eq('user_id', user.id)
         .order('date', { ascending: false })
@@ -160,6 +164,23 @@ export const useSupabaseData = () => {
     }
   }
 
+  // Fetch contacts
+  const fetchContacts = async () => {
+    if (!user) return
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name')
+
+      if (error) throw error
+      setContacts(data || [])
+    } catch (error) {
+      console.error('Error fetching contacts:', error)
+    }
+  }
+
   const fetchAllData = async () => {
     if (!user) return
     setLoading(true)
@@ -170,7 +191,8 @@ export const useSupabaseData = () => {
       fetchTransactions(),
       fetchInvestments(),
       fetchGoals(),
-      fetchCreditCardInvoices()
+      fetchCreditCardInvoices(),
+      fetchContacts()
     ])
     setLoading(false)
   }
@@ -729,10 +751,12 @@ export const useSupabaseData = () => {
     investments,
     goals,
     creditCardInvoices,
+    contacts,
     loading,
     
     // Methods
     fetchAllData,
+    fetchContacts,
     addAccount,
     updateAccount,
     deleteAccount,

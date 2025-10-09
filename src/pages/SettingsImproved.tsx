@@ -153,8 +153,9 @@ const SettingsImproved = () => {
         </div>
 
         <Tabs defaultValue="profile" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile">Perfil</TabsTrigger>
+            <TabsTrigger value="contacts">Contatos</TabsTrigger>
             <TabsTrigger value="account">Conta</TabsTrigger>
             <TabsTrigger value="subscription">Assinatura</TabsTrigger>
           </TabsList>
@@ -269,6 +270,27 @@ const SettingsImproved = () => {
                 <Button onClick={handleProfileUpdate} className="w-full sm:w-auto">
                   Salvar Alterações
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="contacts" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Gerenciar Contatos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    Acesse a página de contatos para gerenciar suas conexões
+                  </p>
+                  <Button onClick={() => window.location.href = '/contatos'}>
+                    Ir para Contatos
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

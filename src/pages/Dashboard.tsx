@@ -40,8 +40,14 @@ const Dashboard = () => {
     .filter(t => t.type === "income")
     .reduce((sum, t) => sum + (t.amount || 0), 0)
 
+  // Monthly expenses (only account transactions, not credit card)
   const monthlyExpenses = currentMonthTransactions
-    .filter(t => t.type === "expense")
+    .filter(t => t.type === "expense" && t.account_id)
+    .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+
+  // Monthly credit card expenses
+  const monthlyCreditCardExpenses = currentMonthTransactions
+    .filter(t => t.type === "expense" && t.credit_card_id)
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
   // Total balance from all accounts (initial + all movements)
@@ -61,7 +67,7 @@ const Dashboard = () => {
     <Layout>
       <div className="p-6 space-y-6">
         {/* Summary Cards */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Saldo Mensal</CardTitle>
@@ -103,6 +109,21 @@ const Dashboard = () => {
               </div>
               <p className="text-xs text-muted-foreground">
                 Gastos do mês atual
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Cartão de Crédito</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-500">
+                {formatCurrency(monthlyCreditCardExpenses)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Gastos no cartão (mês atual)
               </p>
             </CardContent>
           </Card>
@@ -186,10 +207,10 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="max-h-[500px] overflow-y-auto space-y-4 pr-2">
               {transactions
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .slice(0, 7)
+                .slice(0, 10)
                 .map((transaction) => (
                   <div key={transaction.id} className="flex items-center justify-between p-3 sm:p-4 border rounded-lg">
                     <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">

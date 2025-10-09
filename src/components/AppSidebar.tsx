@@ -9,7 +9,9 @@ import {
   TrendingUp,
   Target,
   MessageSquare,
-  X
+  X,
+  Users,
+  Share2
 } from "lucide-react"
 
 import { useSidebar } from "@/components/ui/sidebar"
@@ -51,6 +53,11 @@ const items = [
     title: "Conexão", 
     url: "/conexao", 
     icon: MessageSquare 
+  },
+  { 
+    title: "Social", 
+    url: "/social", 
+    icon: Share2 
   },
   { 
     title: "Configurações", 
