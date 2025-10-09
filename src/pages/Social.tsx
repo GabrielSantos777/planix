@@ -3,14 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAuth } from "@/context/AuthContext"
 import { useCurrency } from "@/context/CurrencyContext"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
-import { MessageCircle, TrendingDown } from "lucide-react"
+import { MessageCircle, TrendingDown, Copy } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { useState } from "react"
 
 interface Contact {
   id: string
@@ -37,6 +39,8 @@ export default function Social() {
   const { user } = useAuth()
   const { formatCurrency } = useCurrency()
   const { toast } = useToast()
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false)
+  const [selectedContactData, setSelectedContactData] = useState<ContactWithTransactions | null>(null)
 
   const { data: contactsWithTransactions = [], isLoading } = useQuery({
     queryKey: ['social-contacts', user?.id],
@@ -94,10 +98,15 @@ export default function Social() {
     enabled: !!user?.id,
   })
 
-  const handleSendWhatsApp = async (contactData: ContactWithTransactions) => {
-    const { contact, transactions, total } = contactData
+  const handleSendWhatsApp = (contactData: ContactWithTransactions) => {
+    setSelectedContactData(contactData)
+    setWhatsappModalOpen(true)
+  }
 
-    // Sempre abrir o WhatsApp Web diretamente (sem usar Edge Function)
+  const copyMessageToClipboard = () => {
+    if (!selectedContactData) return
+    
+    const { contact, transactions, total } = selectedContactData
     const transactionList = transactions
       .map((t, index) => 
         `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(new Date(t.date), "dd/MM/yyyy", { locale: ptBR })})`
@@ -105,16 +114,26 @@ export default function Social() {
       .join('\n')
 
     const message = `Olá ${contact.name}! 👋\n\nAqui está o resumo das suas compras:\n\n${transactionList}\n\n💰 *Total: ${formatCurrency(total)}*\n\nPor favor, realize o pagamento quando possível. Obrigado!`
-    const cleanPhone = contact.phone.replace(/\D/g, '')
-
-    // Forçar abertura no WhatsApp Web
-    const whatsappUrl = `https://web.whatsapp.com/send?phone=55${cleanPhone}&text=${encodeURIComponent(message)}`
-    window.open(whatsappUrl, '_blank')
-
+    
+    navigator.clipboard.writeText(message)
+    
     toast({
-      title: "WhatsApp Web aberto",
-      description: `Mensagem preparada para ${contact.name}`,
+      title: "Mensagem copiada!",
+      description: "Cole no WhatsApp e envie para o contato",
     })
+  }
+
+  const getWhatsAppMessage = () => {
+    if (!selectedContactData) return ""
+    
+    const { contact, transactions, total } = selectedContactData
+    const transactionList = transactions
+      .map((t, index) => 
+        `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(new Date(t.date), "dd/MM/yyyy", { locale: ptBR })})`
+      )
+      .join('\n')
+
+    return `Olá ${contact.name}! 👋\n\nAqui está o resumo das suas compras:\n\n${transactionList}\n\n💰 *Total: ${formatCurrency(total)}*\n\nPor favor, realize o pagamento quando possível. Obrigado!`
   }
 
   return (
@@ -219,6 +238,52 @@ export default function Social() {
           </div>
         )}
       </div>
+
+      <Dialog open={whatsappModalOpen} onOpenChange={setWhatsappModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Mensagem para {selectedContactData?.contact.name}</DialogTitle>
+            <DialogDescription>
+              Telefone: {selectedContactData?.contact.phone}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-muted p-4 rounded-lg">
+              <pre className="whitespace-pre-wrap text-sm font-mono">
+                {getWhatsAppMessage()}
+              </pre>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={copyMessageToClipboard}
+                className="flex-1 gap-2"
+              >
+                <Copy className="h-4 w-4" />
+                Copiar Mensagem
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  if (selectedContactData) {
+                    const cleanPhone = selectedContactData.contact.phone.replace(/\D/g, '')
+                    window.open(`https://wa.me/55${cleanPhone}`, '_blank')
+                  }
+                }}
+                className="flex-1 gap-2"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Abrir WhatsApp
+              </Button>
+            </div>
+            
+            <p className="text-xs text-muted-foreground text-center">
+              Copie a mensagem e cole no WhatsApp do contato
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   )
 }
