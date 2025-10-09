@@ -14,11 +14,13 @@ import { useToast } from "@/hooks/use-toast"
 import { useCurrency } from "@/context/CurrencyContext"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import Layout from "@/components/Layout"
+import { useAuth } from "@/context/AuthContext"
 
 const Dashboard = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { accounts, creditCards, transactions, investments } = useSupabaseData()
+  const { user } = useAuth()
+  const { accounts, creditCards, transactions, investments, contacts } = useSupabaseData()
   const getTotalInvestmentValue = () => {
     return investments.reduce((total, investment) => {
       return total + (investment.quantity * investment.current_price)
@@ -49,6 +51,24 @@ const Dashboard = () => {
   const monthlyCreditCardExpenses = currentMonthTransactions
     .filter(t => t.type === "expense" && t.credit_card_id)
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+
+  // Total expenses + credit card
+  const totalExpenses = monthlyExpenses + monthlyCreditCardExpenses
+
+  // Expenses made by me (without contact_id)
+  const myExpenses = currentMonthTransactions
+    .filter(t => t.type === "expense" && !t.contact_id && t.account_id)
+    .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+
+  const myCreditCardExpenses = currentMonthTransactions
+    .filter(t => t.type === "expense" && !t.contact_id && t.credit_card_id)
+    .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+
+  const myTotalExpenses = myExpenses + myCreditCardExpenses
+
+  // Transaction counts
+  const totalTransactionCount = currentMonthTransactions.filter(t => t.type === "expense").length
+  const myTransactionCount = currentMonthTransactions.filter(t => t.type === "expense" && !t.contact_id).length
 
   // Total balance from all accounts (initial + all movements)
   const computeAccountBalance = (accountId: string) => {
@@ -143,20 +163,52 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Total Geral</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {formatCurrency(totalBalance)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Soma de todas as contas
-            </p>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Saldo Total Geral</CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {formatCurrency(totalBalance)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Soma de todas as contas
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Despesas + Cartão</CardTitle>
+              <DollarSign className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                {formatCurrency(totalExpenses)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {totalTransactionCount} transações • {myTransactionCount} por mim
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Minhas Despesas</CardTitle>
+              <DollarSign className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                {formatCurrency(myTotalExpenses)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Apenas transações sem responsável
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Quick Actions */}
         <Card>
