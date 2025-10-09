@@ -197,7 +197,17 @@ export default function Social() {
                     </Table>
                   </div>
                   
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        window.location.href = `/transacoes?type=income&contact=${contact.name}&amount=${total}`
+                      }}
+                      className="gap-2"
+                    >
+                      <TrendingDown className="h-4 w-4" />
+                      Marcar como Pago
+                    </Button>
                     <Button 
                       onClick={() => handleSendWhatsApp({ contact, transactions, total })}
                       className="gap-2"

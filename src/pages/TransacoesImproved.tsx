@@ -41,6 +41,7 @@ const TransacoesImproved = () => {
     accounts, 
     creditCards,
     categories,
+    contacts,
     addTransaction,
     updateTransaction,
     deleteTransaction,
@@ -66,6 +67,7 @@ const TransacoesImproved = () => {
     date: new Date().toISOString().split('T')[0],
     account_id: "",
     credit_card_id: "",
+    contact_id: "",
     payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
     installments: 1,
     is_installment: false,
@@ -268,7 +270,8 @@ const TransacoesImproved = () => {
         date: new Date().toISOString().split('T')[0],
         account_id: "",
         credit_card_id: "",
-                payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
+        contact_id: "",
+        payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
         installments: 1,
         is_installment: false,
         notes: ""
@@ -311,6 +314,7 @@ const TransacoesImproved = () => {
       date: transaction.date,
       account_id: transaction.account_id || "",
       credit_card_id: transaction.credit_card_id || "",
+      contact_id: transaction.contact_id || "",
       payment_method: transaction.account_id ? "account" : "credit_card",
       installments: transaction.installments || 1,
       is_installment: transaction.is_installment || false,
@@ -483,6 +487,7 @@ const TransacoesImproved = () => {
                     date: new Date().toISOString().split('T')[0],
                     account_id: "",
                     credit_card_id: "",
+                    contact_id: "",
                     payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
                     installments: 1,
                     is_installment: false,
@@ -574,7 +579,7 @@ const TransacoesImproved = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div className="max-h-[600px] overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -582,13 +587,14 @@ const TransacoesImproved = () => {
                     <TableHead>Descrição</TableHead>
                     <TableHead>Categoria</TableHead>
                     <TableHead>Conta</TableHead>
+                    <TableHead>Responsável</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTransactions.map((transaction) => (
+                  {filteredTransactions.slice(0, 10).map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -599,8 +605,15 @@ const TransacoesImproved = () => {
                       <TableCell className="font-medium">
                         {transaction.description}
                       </TableCell>
-                      <TableCell>Categoria</TableCell>
-                      <TableCell>Conta</TableCell>
+                      <TableCell>
+                        {transaction.category?.name || 'Sem categoria'}
+                      </TableCell>
+                      <TableCell>
+                        {transaction.account?.name || transaction.credit_card?.name || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {transaction.contact?.name || 'Você'}
+                      </TableCell>
                       <TableCell>
                         {new Date(transaction.date).toLocaleDateString('pt-BR')}
                       </TableCell>
@@ -852,6 +865,23 @@ const TransacoesImproved = () => {
                   </Select>
                 </div>
               )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="contact">Responsável (opcional)</Label>
+                <Select value={newTransaction.contact_id} onValueChange={(value) => setNewTransaction({...newTransaction, contact_id: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Você (padrão)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Você</SelectItem>
+                    {contacts.map((contact) => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               
               <div className="space-y-2">
                 <Label htmlFor="notes">Observações (opcional)</Label>
