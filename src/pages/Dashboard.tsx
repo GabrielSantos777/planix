@@ -105,7 +105,7 @@ const Dashboard = () => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Receitas</CardTitle>
               <TrendingUp className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
@@ -113,14 +113,14 @@ const Dashboard = () => {
                 {formatCurrency(monthlyIncome)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Entradas do mês atual
+                Total Entradas do mês atual
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Despesas</CardTitle>
               <TrendingDown className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
@@ -128,7 +128,7 @@ const Dashboard = () => {
                 {formatCurrency(monthlyExpenses)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Gastos do mês atual
+                Total Gastos do mês atual
               </p>
             </CardContent>
           </Card>
@@ -143,7 +143,7 @@ const Dashboard = () => {
                 {formatCurrency(monthlyCreditCardExpenses)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Gastos no cartão (mês atual)
+                Total Gastos no cartão (mês atual)
               </p>
             </CardContent>
           </Card>
@@ -196,15 +196,15 @@ const Dashboard = () => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Minhas Despesas</CardTitle>
-              <DollarSign className="h-4 w-4 text-destructive" />
+              <CardTitle className="text-sm font-medium">Total Cartão</CardTitle>
+              <CreditCard className="h-4 w-4 text-orange-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">
-                {formatCurrency(myTotalExpenses)}
+              <div className="text-2xl font-bold text-orange-500">
+                {formatCurrency(myCreditCardExpenses)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Apenas transações sem responsável
+                Do mês atual feitas por mim como responsável
               </p>
             </CardContent>
           </Card>
