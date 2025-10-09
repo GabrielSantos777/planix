@@ -94,30 +94,51 @@ export default function Social() {
     enabled: !!user?.id,
   })
 
-  const handleSendWhatsApp = (contactData: ContactWithTransactions) => {
+  const handleSendWhatsApp = async (contactData: ContactWithTransactions) => {
     const { contact, transactions, total } = contactData
     
-    // Formatar lista de transações
-    const transactionList = transactions
-      .map((t, index) => 
-        `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(new Date(t.date), "dd/MM/yyyy", { locale: ptBR })})`
-      )
-      .join('\n')
+    try {
+      // Chamar edge function para enviar via WhatsApp Business API
+      const { data, error } = await supabase.functions.invoke('send-whatsapp-charge', {
+        body: {
+          phoneNumber: contact.phone,
+          contactName: contact.name,
+          transactions: transactions.map(t => ({
+            description: t.description,
+            amount: t.amount,
+            date: t.date
+          })),
+          total: total
+        }
+      })
 
-    // Montar mensagem
-    const message = `Olá ${contact.name}! 👋\n\nAqui está o resumo das suas compras:\n\n${transactionList}\n\n💰 *Total: ${formatCurrency(total)}*\n\nPor favor, realize o pagamento quando possível. Obrigado!`
+      if (error) throw error
 
-    // Limpar número de telefone (remover caracteres especiais)
-    const cleanPhone = contact.phone.replace(/\D/g, '')
-    
-    // Abrir WhatsApp
-    const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`
-    window.open(whatsappUrl, '_blank')
+      toast({
+        title: "Mensagem enviada!",
+        description: `Cobrança enviada para ${contact.name} via WhatsApp`,
+      })
+    } catch (error: any) {
+      console.error('Erro ao enviar WhatsApp:', error)
+      
+      // Fallback: abrir WhatsApp Web
+      const transactionList = transactions
+        .map((t, index) => 
+          `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(new Date(t.date), "dd/MM/yyyy", { locale: ptBR })})`
+        )
+        .join('\n')
 
-    toast({
-      title: "WhatsApp aberto",
-      description: `Mensagem preparada para ${contact.name}`,
-    })
+      const message = `Olá ${contact.name}! 👋\n\nAqui está o resumo das suas compras:\n\n${transactionList}\n\n💰 *Total: ${formatCurrency(total)}*\n\nPor favor, realize o pagamento quando possível. Obrigado!`
+      const cleanPhone = contact.phone.replace(/\D/g, '')
+      const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`
+      window.open(whatsappUrl, '_blank')
+
+      toast({
+        title: "WhatsApp Web aberto",
+        description: `Prepare a mensagem manualmente para ${contact.name}`,
+        variant: "default"
+      })
+    }
   }
 
   return (
