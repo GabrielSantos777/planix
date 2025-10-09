@@ -594,7 +594,7 @@ const TransacoesImproved = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTransactions.slice(0, 10).map((transaction) => (
+                  {filteredTransactions.map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
