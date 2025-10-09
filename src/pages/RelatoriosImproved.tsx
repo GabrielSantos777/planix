@@ -46,8 +46,6 @@ const RelatoriosImproved = () => {
   const [accountFilter, setAccountFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [descriptionFilter, setDescriptionFilter] = useState("")
-  const [selectedYear, setSelectedYear] = useState(2025)
-  const [comparisonYears, setComparisonYears] = useState<number[]>([2024])
 
   // Função para limpar todos os filtros
   const clearAllFilters = () => {
@@ -149,40 +147,39 @@ const RelatoriosImproved = () => {
       .sort((a, b) => b.balance - a.balance)
   }, [accounts])
 
-  // Dados para o gráfico de evolução anual
-  const monthlyBalanceData = useMemo(() => {
-    const allYears = [selectedYear, ...comparisonYears]
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-    
-    return months.map((month, monthIndex) => {
-      const dataPoint: any = { month }
-      
-      allYears.forEach(year => {
-        // Calcular saldo até este mês do ano
-        const monthTransactions = transactions.filter(t => {
-          const date = new Date(t.date)
-          return date.getFullYear() === year && date.getMonth() <= monthIndex
-        })
-        
-        const balance = monthTransactions.reduce((sum, t) => {
-          return sum + (t.type === 'income' ? t.amount : -Math.abs(t.amount))
-        }, 0)
-        
-        dataPoint[`balance_${year}`] = balance
-      })
-      
-      return dataPoint
+  // Dados para o gráfico de evolução patrimonial mensal
+  const monthlyEvolutionData = useMemo(() => {
+    const last12Months = Array.from({ length: 12 }, (_, i) => {
+      const date = new Date()
+      date.setMonth(date.getMonth() - (11 - i))
+      return {
+        month: date.toLocaleDateString('pt-BR', { month: 'short' }),
+        year: date.getFullYear(),
+        monthIndex: date.getMonth()
+      }
     })
-  }, [transactions, selectedYear, comparisonYears])
 
-  // Anos disponíveis para seleção
-  const availableYears = useMemo(() => {
-    const years = new Set<number>()
-    transactions.forEach(t => {
-      years.add(new Date(t.date).getFullYear())
+    return last12Months.map(({ month, year, monthIndex }) => {
+      // Calcular todas as transações até o final deste mês
+      const endOfMonth = new Date(year, monthIndex + 1, 0)
+      const transactionsUpToMonth = transactions.filter(t => new Date(t.date) <= endOfMonth)
+      
+      // Somar saldos iniciais das contas
+      const accountsBalance = accounts.reduce((sum, account) => sum + (account.initial_balance || 0), 0)
+      
+      // Somar movimentações das transações
+      const movementsBalance = transactionsUpToMonth.reduce((sum, t) => {
+        return sum + (t.amount || 0)
+      }, 0)
+      
+      const totalBalance = accountsBalance + movementsBalance
+
+      return {
+        month,
+        balance: totalBalance
+      }
     })
-    return Array.from(years).sort((a, b) => b - a)
-  }, [transactions])
+  }, [transactions, accounts])
 
   const getFilterPeriodText = () => {
     const [year, month] = filterMonth.split('-')
@@ -537,7 +534,7 @@ const RelatoriosImproved = () => {
           </Card>
         </div>
 
-        {/* Novos Gráficos */}
+        {/* Gráficos - Saldo por Conta e Evolução Patrimonial */}
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Gráfico de Saldos por Conta */}
           <Card>
@@ -556,21 +553,21 @@ const RelatoriosImproved = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={accountBalancesData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
+                      <XAxis type="number" tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
                       <YAxis dataKey="name" type="category" width={100} />
                       <Tooltip 
                         formatter={(value) => formatCurrency(Number(value))}
                         contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))',
+                          backgroundColor: 'hsl(var(--card))',
                           border: '1px solid hsl(var(--border))',
-                          borderRadius: '6px'
+                          borderRadius: 'var(--radius)'
                         }}
                       />
                       <Bar dataKey="balance">
                         {accountBalancesData.map((entry, index) => (
                           <Cell 
                             key={`cell-${index}`} 
-                            fill={entry.balance >= 0 ? '#10B981' : '#EF4444'} 
+                            fill={entry.balance >= 0 ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'} 
                           />
                         ))}
                       </Bar>
@@ -585,108 +582,59 @@ const RelatoriosImproved = () => {
             </CardContent>
           </Card>
 
-          {/* Gráfico de Evolução Anual */}
+          {/* Gráfico de Evolução Patrimonial */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <LineChart className="h-5 w-5" />
-                    Evolução Patrimonial
-                  </CardTitle>
-                  <CardDescription>
-                    Comparação de saldo acumulado por ano
-                  </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(Number(v))}>
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableYears.map(year => (
-                        <SelectItem key={year} value={year.toString()}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Evolução Patrimonial
+              </CardTitle>
+              <CardDescription>
+                Saldo total acumulado nos últimos 12 meses
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {monthlyBalanceData.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsLineChart data={monthlyBalanceData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip 
-                          formatter={(value) => formatCurrency(Number(value))}
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '6px'
-                          }}
-                        />
-                        <Legend />
-                        <Line 
-                          type="monotone" 
-                          dataKey={`balance_${selectedYear}`}
-                          name={selectedYear.toString()}
-                          stroke="#3B82F6" 
-                          strokeWidth={3}
-                          dot={{ r: 4 }}
-                        />
-                        {comparisonYears.map((year, index) => (
-                          <Line 
-                            key={year}
-                            type="monotone" 
-                            dataKey={`balance_${year}`}
-                            name={year.toString()}
-                            stroke={COLORS[index % COLORS.length]}
-                            strokeWidth={2}
-                            strokeDasharray="5 5"
-                            dot={{ r: 3 }}
-                          />
-                        ))}
-                      </RechartsLineChart>
-                    </ResponsiveContainer>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {availableYears
-                      .filter(year => year !== selectedYear)
-                      .map(year => (
-                        <Button
-                          key={year}
-                          size="sm"
-                          variant={comparisonYears.includes(year) ? "default" : "outline"}
-                          onClick={() => {
-                            if (comparisonYears.includes(year)) {
-                              setComparisonYears(comparisonYears.filter(y => y !== year))
-                            } else {
-                              setComparisonYears([...comparisonYears, year])
-                            }
-                          }}
-                        >
-                          {year}
-                        </Button>
-                      ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-80 text-muted-foreground">
-                  Nenhum dado disponível
-                </div>
-              )}
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsLineChart data={monthlyEvolutionData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="month" 
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [formatCurrency(value), '']}
+                      labelFormatter={(label) => `Mês: ${label}`}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="balance" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={3}
+                      dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </RechartsLineChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Gráficos Existentes */}
+        {/* Gráficos de Categoria - Despesas e Receitas vs Despesas */}
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Gráfico de Pizza - Despesas por Categoria */}
           <Card>
@@ -790,7 +738,7 @@ const RelatoriosImproved = () => {
           </CardHeader>
           <CardContent>
             {filteredTransactions.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="max-h-[600px] overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
