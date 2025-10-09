@@ -735,7 +735,6 @@ const TransacoesImproved = () => {
                              className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3"
                            >
                              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-                             <span className="sr-only sm:not-sr-only sm:ml-2 hidden sm:inline">Editar</span>
                            </Button>
                            <Button
                              variant="outline"
@@ -744,7 +743,6 @@ const TransacoesImproved = () => {
                              className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3"
                            >
                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                             <span className="sr-only sm:not-sr-only sm:ml-2 hidden sm:inline">Excluir</span>
                            </Button>
                          </div>
                        </TableCell>
