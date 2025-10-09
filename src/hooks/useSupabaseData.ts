@@ -93,7 +93,7 @@ export const useSupabaseData = () => {
         .select(`
           *,
           category:categories(*),
-          account:accounts(*),
+          account:accounts!account_id(*),
           credit_card:credit_cards(*),
           contact:contacts(*)
         `)
@@ -102,7 +102,7 @@ export const useSupabaseData = () => {
         .limit(100)
 
       if (error) throw error
-      setTransactions(data || [])
+      setTransactions(data as any || [])
     } catch (error) {
       console.error('Error fetching transactions:', error)
     }
@@ -339,8 +339,9 @@ export const useSupabaseData = () => {
         .select(`
           *,
           category:categories(*),
-          account:accounts(*),
-          credit_card:credit_cards(*)
+          account:accounts!account_id(*),
+          credit_card:credit_cards(*),
+          contact:contacts(*)
         `)
         .single()
 
@@ -368,7 +369,7 @@ export const useSupabaseData = () => {
         }
       }
       
-      setTransactions(prev => [data, ...prev])
+      setTransactions(prev => [data as any, ...prev])
       return data
     } catch (error) {
       console.error('Error adding transaction:', error)
@@ -392,8 +393,9 @@ export const useSupabaseData = () => {
         .select(`
           *,
           category:categories(*),
-          account:accounts(*),
-          credit_card:credit_cards(*)
+          account:accounts!account_id(*),
+          credit_card:credit_cards(*),
+          contact:contacts(*)
         `)
         .single()
 
@@ -428,7 +430,7 @@ export const useSupabaseData = () => {
       }
       
       setTransactions(prev => prev.map(transaction => 
-        transaction.id === id ? data : transaction
+        transaction.id === id ? data as any : transaction
       ))
       return data
     } catch (error) {

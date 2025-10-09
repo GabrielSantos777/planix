@@ -528,12 +528,15 @@ export type Database = {
           currency: string | null
           date: string
           description: string
+          destination_account_id: string | null
           id: string
           installment_number: number | null
           installments: number | null
           investment_metadata: Json | null
           is_installment: boolean | null
+          is_transfer: boolean | null
           notes: string | null
+          source_account_id: string | null
           type: Database["public"]["Enums"]["transaction_type"]
           updated_at: string
           user_id: string
@@ -548,12 +551,15 @@ export type Database = {
           currency?: string | null
           date?: string
           description: string
+          destination_account_id?: string | null
           id?: string
           installment_number?: number | null
           installments?: number | null
           investment_metadata?: Json | null
           is_installment?: boolean | null
+          is_transfer?: boolean | null
           notes?: string | null
+          source_account_id?: string | null
           type: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
           user_id: string
@@ -568,12 +574,15 @@ export type Database = {
           currency?: string | null
           date?: string
           description?: string
+          destination_account_id?: string | null
           id?: string
           installment_number?: number | null
           installments?: number | null
           investment_metadata?: Json | null
           is_installment?: boolean | null
+          is_transfer?: boolean | null
           notes?: string | null
+          source_account_id?: string | null
           type?: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
           user_id?: string
@@ -605,6 +614,20 @@ export type Database = {
             columns: ["credit_card_id"]
             isOneToOne: false
             referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_destination_account_id_fkey"
+            columns: ["destination_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_source_account_id_fkey"
+            columns: ["source_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]

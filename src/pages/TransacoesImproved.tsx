@@ -61,7 +61,7 @@ const TransacoesImproved = () => {
   const [newTransaction, setNewTransaction] = useState({
     description: "",
     amount: 0,
-    type: "expense" as "income" | "expense",
+    type: "expense" as "income" | "expense" | "transfer",
     category_id: "",
     date: new Date().toISOString().split('T')[0],
     account_id: "",
@@ -70,7 +70,9 @@ const TransacoesImproved = () => {
     payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
     installments: 1,
     is_installment: false,
-    notes: ""
+    notes: "",
+    source_account_id: "",
+    destination_account_id: ""
   })
 
   // Handle quick action from dashboard
@@ -110,7 +112,83 @@ const TransacoesImproved = () => {
   })
 
   const handleAddTransaction = async () => {
-    // Validation
+    // Validação para transferência
+    if (newTransaction.type === "transfer") {
+      if (!newTransaction.description || !newTransaction.amount) {
+        toast({
+          title: "Erro de Validação",
+          description: "Por favor, preencha todos os campos obrigatórios.",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      if (!newTransaction.source_account_id || !newTransaction.destination_account_id) {
+        toast({
+          title: "Erro de Validação",
+          description: "Selecione a conta de origem e destino para a transferência.",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      if (newTransaction.source_account_id === newTransaction.destination_account_id) {
+        toast({
+          title: "Erro de Validação",
+          description: "A conta de origem e destino não podem ser as mesmas.",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      // Execute transfer
+      try {
+        await addTransfer({
+          fromAccountId: newTransaction.source_account_id,
+          toAccountId: newTransaction.destination_account_id,
+          amount: newTransaction.amount,
+          date: newTransaction.date,
+          description: newTransaction.description,
+          notes: newTransaction.notes
+        })
+        
+        await fetchAllData()
+        
+        toast({
+          title: "✅ Transferência Realizada",
+          description: `${formatCurrency(newTransaction.amount)} transferido com sucesso`,
+        })
+
+        setNewTransaction({
+          description: "",
+          amount: 0,
+          type: "expense",
+          category_id: "",
+          date: new Date().toISOString().split('T')[0],
+          account_id: "",
+          credit_card_id: "",
+          contact_id: "",
+          payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
+          installments: 1,
+          is_installment: false,
+          notes: "",
+          source_account_id: "",
+          destination_account_id: ""
+        })
+        setEditingTransaction(null)
+        setIsDialogOpen(false)
+        return
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Erro ao realizar transferência. Tente novamente.",
+          variant: "destructive"
+        })
+        return
+      }
+    }
+    
+    // Validation for normal transactions
     if (!newTransaction.description || !newTransaction.amount || !newTransaction.category_id) {
       toast({
         title: "Erro de Validação",
@@ -276,7 +354,9 @@ const TransacoesImproved = () => {
         payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
         installments: 1,
         is_installment: false,
-        notes: ""
+        notes: "",
+        source_account_id: "",
+        destination_account_id: ""
       })
       setEditingTransaction(null)
       setIsDialogOpen(false)
@@ -320,7 +400,9 @@ const TransacoesImproved = () => {
       payment_method: transaction.account_id ? "account" : "credit_card",
       installments: transaction.installments || 1,
       is_installment: transaction.is_installment || false,
-      notes: transaction.notes || ""
+      notes: transaction.notes || "",
+      source_account_id: transaction.source_account_id || "",
+      destination_account_id: transaction.destination_account_id || ""
     })
     setIsDialogOpen(true)
   }
@@ -405,6 +487,8 @@ const TransacoesImproved = () => {
         return <TrendingUp className="h-4 w-4 text-success" />
       case "expense":
         return <TrendingDown className="h-4 w-4 text-destructive" />
+      case "transfer":
+        return <ArrowUpDown className="h-4 w-4 text-blue-500" />
       default:
         return null
     }
@@ -416,6 +500,8 @@ const TransacoesImproved = () => {
         return <Badge className="bg-success/10 text-success hover:bg-success/20">Receita</Badge>
       case "expense":
         return <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/20">Despesa</Badge>
+      case "transfer":
+        return <Badge className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20">Transferência</Badge>
       default:
         return null
     }
@@ -493,7 +579,9 @@ const TransacoesImproved = () => {
                     payment_method: accounts.length > 0 ? "account" : creditCards.length > 0 ? "credit_card" : "account",
                     installments: 1,
                     is_installment: false,
-                    notes: ""
+                    notes: "",
+                    source_account_id: "",
+                    destination_account_id: ""
                   })
                   setIsDialogOpen(true)
                 }} 
@@ -530,11 +618,12 @@ const TransacoesImproved = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Tipo" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os tipos</SelectItem>
-                    <SelectItem value="income">Receitas</SelectItem>
-                    <SelectItem value="expense">Despesas</SelectItem>
-                  </SelectContent>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os tipos</SelectItem>
+                      <SelectItem value="income">Receitas</SelectItem>
+                      <SelectItem value="expense">Despesas</SelectItem>
+                      <SelectItem value="transfer">Transferências</SelectItem>
+                    </SelectContent>
                 </Select>
               </div>
               <div>
@@ -693,6 +782,7 @@ const TransacoesImproved = () => {
                     <SelectContent>
                       <SelectItem value="income">Receita</SelectItem>
                       <SelectItem value="expense">Despesa</SelectItem>
+                      <SelectItem value="transfer">Transferência</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -707,63 +797,99 @@ const TransacoesImproved = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="category">Categoria</Label>
-                  <Select value={newTransaction.category_id} onValueChange={(value) => setNewTransaction({...newTransaction, category_id: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {newTransaction.type === "income" 
-                        ? incomeCategories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))
-                        : expenseCategories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))
-                      }
-                    </SelectContent>
-                  </Select>
+              {/* Transfer Fields */}
+              {newTransaction.type === "transfer" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="source_account">Conta de Origem</Label>
+                    <Select value={newTransaction.source_account_id} onValueChange={(value) => setNewTransaction({...newTransaction, source_account_id: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a conta de origem" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="destination_account">Conta de Destino</Label>
+                    <Select value={newTransaction.destination_account_id} onValueChange={(value) => setNewTransaction({...newTransaction, destination_account_id: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a conta de destino" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id} disabled={account.id === newTransaction.source_account_id}>
+                            {account.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="payment_method">Forma de Pagamento</Label>
-                  <Select value={newTransaction.payment_method} onValueChange={(value: any) => setNewTransaction({...newTransaction, payment_method: value, account_id: "", credit_card_id: ""})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.length > 0 && (
-                        <SelectItem value="account">Conta Bancária</SelectItem>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Categoria</Label>
+                      <Select value={newTransaction.category_id} onValueChange={(value) => setNewTransaction({...newTransaction, category_id: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {newTransaction.type === "income" 
+                            ? incomeCategories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))
+                            : expenseCategories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))
+                          }
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="payment_method">Forma de Pagamento</Label>
+                      <Select value={newTransaction.payment_method} onValueChange={(value: any) => setNewTransaction({...newTransaction, payment_method: value, account_id: "", credit_card_id: ""})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.length > 0 && (
+                            <SelectItem value="account">Conta Bancária</SelectItem>
+                          )}
+                          {creditCards.length > 0 && (
+                            <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {accounts.length === 0 && creditCards.length === 0 && (
+                        <p className="text-xs text-muted-foreground text-destructive">
+                          Nenhuma conta ou cartão cadastrado. Cadastre primeiro em "Contas".
+                        </p>
                       )}
-                      {creditCards.length > 0 && (
-                        <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                      {accounts.length === 0 && creditCards.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Apenas cartões de crédito disponíveis.
+                        </p>
                       )}
-                    </SelectContent>
-                  </Select>
-                  {accounts.length === 0 && creditCards.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-destructive">
-                      Nenhuma conta ou cartão cadastrado. Cadastre primeiro em "Contas".
-                    </p>
-                  )}
-                  {accounts.length === 0 && creditCards.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Apenas cartões de crédito disponíveis.
-                    </p>
-                  )}
-                  {creditCards.length === 0 && accounts.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Apenas contas bancárias disponíveis. Cadastre cartões em "Contas" para mais opções.
-                    </p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="space-y-4">
+                      {creditCards.length === 0 && accounts.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Apenas contas bancárias disponíveis. Cadastre cartões em "Contas" para mais opções.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
                 {newTransaction.payment_method === "account" ? (
                   <div className="space-y-2">
                     <Label htmlFor="account">Conta</Label>
@@ -841,8 +967,10 @@ const TransacoesImproved = () => {
                   </div>
                 )}
               </div>
+              </>
+              )}
               
-              {newTransaction.payment_method === "credit_card" && newTransaction.is_installment && !editingTransaction && (
+              {newTransaction.type !== "transfer" && newTransaction.payment_method === "credit_card" && newTransaction.is_installment && !editingTransaction && (
                 <div className="space-y-2">
                   <Label htmlFor="installments">Quantidade de Parcelas</Label>
                   <Select value={newTransaction.installments.toString()} onValueChange={(value) => setNewTransaction({...newTransaction, installments: parseInt(value)})}>
