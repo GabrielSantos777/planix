@@ -54,8 +54,7 @@ const TransacoesImproved = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
   const [filterCategory, setFilterCategory] = useState<string>("all")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM format
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
   
@@ -102,11 +101,12 @@ const TransacoesImproved = () => {
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesType = filterType === "all" || transaction.type === filterType
     const matchesCategory = filterCategory === "all" || transaction.category_id === filterCategory
-    const transactionDate = new Date(transaction.date)
-    const matchesDateFrom = !dateFrom || transactionDate >= new Date(dateFrom)
-    const matchesDateTo = !dateTo || transactionDate <= new Date(dateTo)
+    
+    // Filter by month (YYYY-MM)
+    const transactionMonth = transaction.date.slice(0, 7) // Get YYYY-MM from date
+    const matchesMonth = transactionMonth === filterMonth
 
-    return matchesSearch && matchesType && matchesCategory && matchesDateFrom && matchesDateTo
+    return matchesSearch && matchesType && matchesCategory && matchesMonth
   })
 
   const handleAddTransaction = async () => {
@@ -166,6 +166,7 @@ const TransacoesImproved = () => {
 
       if (editingTransaction) {
         await updateTransaction(editingTransaction.id, baseTransactionData)
+        await fetchAllData() // Refresh data after update
         toast({
           title: "✅ Transação Atualizada",
           description: `${baseTransactionData.description} foi atualizada com sucesso`,
@@ -512,7 +513,7 @@ const TransacoesImproved = () => {
             <CardTitle className="text-lg">Filtros</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="sm:col-span-2 lg:col-span-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -553,18 +554,10 @@ const TransacoesImproved = () => {
               </div>
               <div>
                 <Input
-                  type="date"
-                  placeholder="Data início"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                />
-              </div>
-              <div>
-                <Input
-                  type="date"
-                  placeholder="Data fim"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
+                  type="month"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className="w-full"
                 />
               </div>
             </div>
