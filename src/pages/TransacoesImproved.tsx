@@ -160,7 +160,8 @@ const TransacoesImproved = () => {
         user_id: user?.id,
         currency: 'BRL',
         account_id: newTransaction.payment_method === "account" ? newTransaction.account_id : null,
-        credit_card_id: newTransaction.payment_method === "credit_card" ? newTransaction.credit_card_id : null
+        credit_card_id: newTransaction.payment_method === "credit_card" ? newTransaction.credit_card_id : null,
+        contact_id: newTransaction.contact_id || null
       }
 
       if (editingTransaction) {
