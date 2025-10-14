@@ -54,7 +54,7 @@ const TransacoesImproved = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
   const [filterCategory, setFilterCategory] = useState<string>("all")
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM format
+  const [filterMonth, setFilterMonth] = useState<string>("all") // "all" or YYYY-MM format
   const [filterContact, setFilterContact] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
@@ -108,9 +108,9 @@ const TransacoesImproved = () => {
                           (filterContact === "me" && !transaction.contact_id) ||
                           transaction.contact_id === filterContact
     
-    // Filter by month (YYYY-MM)
+    // Filter by month (YYYY-MM) - only if not "all"
     const transactionMonth = transaction.date.slice(0, 7) // Get YYYY-MM from date
-    const matchesMonth = transactionMonth === filterMonth
+    const matchesMonth = filterMonth === "all" || transactionMonth === filterMonth
 
     return matchesSearch && matchesType && matchesCategory && matchesMonth && matchesContact
   })
@@ -646,12 +646,25 @@ const TransacoesImproved = () => {
                 </Select>
               </div>
               <div>
-                 <Input
-                  type="month"
-                  value={filterMonth}
-                  onChange={(e) => setFilterMonth(e.target.value)}
-                  className="w-full"
-                />
+                <Select value={filterMonth} onValueChange={setFilterMonth}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os meses</SelectItem>
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const date = new Date()
+                      date.setMonth(date.getMonth() - i)
+                      const monthValue = date.toISOString().slice(0, 7)
+                      const monthLabel = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+                      return (
+                        <SelectItem key={monthValue} value={monthValue}>
+                          {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Select value={filterContact} onValueChange={setFilterContact}>
