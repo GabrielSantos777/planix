@@ -99,7 +99,6 @@ export const useSupabaseData = () => {
         `)
         .eq('user_id', user.id)
         .order('date', { ascending: false })
-        .limit(100)
 
       if (error) throw error
       setTransactions(data as any || [])
