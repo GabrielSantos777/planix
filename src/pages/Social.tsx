@@ -243,25 +243,23 @@ export default function Social() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Mobile - Cards */}
-                  <div className="md:hidden space-y-3 max-h-64 overflow-y-auto">
+                  <div className="md:hidden space-y-2 max-h-64 overflow-y-auto">
                     {transactions.map((transaction) => (
                       <div 
                         key={transaction.id}
-                        className="border rounded-lg p-4 space-y-2 bg-card"
+                        className="border rounded-md p-3 space-y-1 bg-card"
                       >
-                        <div className="flex justify-between items-start">
-                          <div className="font-medium flex-1">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="font-medium text-sm flex-1 line-clamp-2">
                             {transaction.description}
                           </div>
-                          <div className="text-destructive font-semibold ml-2">
+                          <div className="text-destructive font-semibold text-sm shrink-0">
                             {formatCurrency(Math.abs(transaction.amount))}
                           </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {transaction.categories?.name || 'Sem categoria'}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {format(new Date(transaction.date), "dd/MM/yyyy", { locale: ptBR })}
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                          <span>{transaction.categories?.name || 'Sem categoria'}</span>
+                          <span>{format(new Date(transaction.date), "dd/MM/yyyy", { locale: ptBR })}</span>
                         </div>
                       </div>
                     ))}
