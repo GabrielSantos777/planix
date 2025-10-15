@@ -54,62 +54,48 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
   const growthPercentage = previousBalance !== 0 ? ((currentBalance - previousBalance) / Math.abs(previousBalance)) * 100 : 0
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          Evolução Patrimonial
-        </CardTitle>
-        <CardDescription>
-          Comparação de saldo acumulado por ano
-        </CardDescription>
-        <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold">
-            {!isPrivacyEnabled ? formatCurrency(currentBalance) : '•'.repeat(12)}
-          </span>
-          <span className={`text-sm ${growthPercentage >= 0 ? 'text-success' : 'text-destructive'}`}>
-            {growthPercentage >= 0 ? '+' : ''}{growthPercentage.toFixed(1)}%
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={evolutionData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="month" 
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis 
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-              />
-              <Tooltip 
-                formatter={(value: number) => [formatCurrency(value), '']}
-                labelFormatter={(label) => `Mês: ${label}`}
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: 'var(--radius)',
-                }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="balance" 
-                stroke="hsl(var(--primary))" 
-                strokeWidth={3}
-                dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="h-full w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart 
+          data={evolutionData}
+          margin={{ top: 5, right: 5, bottom: 5, left: -10 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+          <XAxis 
+            dataKey="month" 
+            tick={{ fontSize: 10 }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis 
+            tick={{ fontSize: 10 }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => {
+              if (value >= 1000) return `${(value / 1000).toFixed(0)}k`
+              return `${value}`
+            }}
+          />
+          <Tooltip 
+            formatter={(value: number) => [!isPrivacyEnabled ? formatCurrency(value) : '•'.repeat(12), '']}
+            labelFormatter={(label) => `${label}`}
+            contentStyle={{
+              backgroundColor: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: 'var(--radius)',
+              fontSize: '12px'
+            }}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="balance" 
+            stroke="hsl(var(--primary))" 
+            strokeWidth={2}
+            dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 3 }}
+            activeDot={{ r: 5 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   )
 }

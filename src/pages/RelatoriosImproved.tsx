@@ -333,12 +333,12 @@ const RelatoriosImproved = () => {
 
   return (
     <Layout>
-      <div className="space-y-6 p-6">
+      <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Relatórios Financeiros</h1>
-            <p className="text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold truncate">Relatórios Financeiros</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
               Análise completa das suas finanças com filtros avançados
             </p>
           </div>
@@ -383,7 +383,7 @@ const RelatoriosImproved = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               {/* Filtro de Mês */}
               <div className="space-y-2">
                 <Label htmlFor="filterMonth">Mês</Label>
@@ -535,7 +535,7 @@ const RelatoriosImproved = () => {
         </div>
 
         {/* Gráficos - Saldo por Conta e Evolução Patrimonial */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Gráfico de Saldos por Conta */}
           <Card>
             <CardHeader>
@@ -549,18 +549,32 @@ const RelatoriosImproved = () => {
             </CardHeader>
             <CardContent>
               {accountBalancesData.length > 0 ? (
-                <div className="h-80">
+                <div className="h-[280px] sm:h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={accountBalancesData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
-                      <YAxis dataKey="name" type="category" width={100} />
+                    <BarChart 
+                      data={accountBalancesData} 
+                      layout="vertical"
+                      margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        type="number" 
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                      />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        width={80}
+                        tick={{ fontSize: 10 }}
+                      />
                       <Tooltip 
                         formatter={(value) => formatCurrency(Number(value))}
                         contentStyle={{ 
                           backgroundColor: 'hsl(var(--card))',
                           border: '1px solid hsl(var(--border))',
-                          borderRadius: 'var(--radius)'
+                          borderRadius: 'var(--radius)',
+                          fontSize: '12px'
                         }}
                       />
                       <Bar dataKey="balance">
@@ -594,38 +608,42 @@ const RelatoriosImproved = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-80">
+              <div className="h-[280px] sm:h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={monthlyEvolutionData}>
-                    <CartesianGrid strokeDasharray="3 3" />
+                  <RechartsLineChart 
+                    data={monthlyEvolutionData}
+                    margin={{ top: 5, right: 5, bottom: 5, left: -10 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis 
                       dataKey="month" 
-                      fontSize={12}
+                      tick={{ fontSize: 10 }}
                       tickLine={false}
                       axisLine={false}
                     />
                     <YAxis 
-                      fontSize={12}
+                      tick={{ fontSize: 10 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                     />
                     <Tooltip 
                       formatter={(value: number) => [formatCurrency(value), '']}
-                      labelFormatter={(label) => `Mês: ${label}`}
+                      labelFormatter={(label) => `${label}`}
                       contentStyle={{
                         backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: 'var(--radius)',
+                        fontSize: '12px'
                       }}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="balance" 
                       stroke="hsl(var(--primary))" 
-                      strokeWidth={3}
-                      dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 3 }}
+                      activeDot={{ r: 5 }}
                     />
                   </RechartsLineChart>
                 </ResponsiveContainer>
@@ -635,7 +653,7 @@ const RelatoriosImproved = () => {
         </div>
 
         {/* Gráficos de Categoria - Despesas e Receitas vs Despesas */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Gráfico de Pizza - Despesas por Categoria */}
           <Card>
             <CardHeader>
@@ -649,24 +667,33 @@ const RelatoriosImproved = () => {
             </CardHeader>
             <CardContent>
               {expensesByCategory.length > 0 ? (
-                <div className="space-y-6">
-                  <div className="h-64">
+                <div className="space-y-4">
+                  <div className="h-[280px] sm:h-[320px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
+                      <RechartsPieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                         <Pie
                           data={expensesByCategory}
                           dataKey="value"
                           nameKey="name"
                           cx="50%"
                           cy="50%"
-                          outerRadius={80}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius="60%"
+                          innerRadius="0%"
+                          label={false}
                         >
                           {expensesByCategory.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                        <Tooltip 
+                          formatter={(value) => formatCurrency(Number(value))}
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: 'var(--radius)',
+                            fontSize: '12px'
+                          }}
+                        />
                       </RechartsPieChart>
                     </ResponsiveContainer>
                   </div>
