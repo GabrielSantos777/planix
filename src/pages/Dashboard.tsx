@@ -341,19 +341,19 @@ const Dashboard = () => {
             <CardDescription className="text-xs sm:text-sm">Últimas 5 transações realizadas</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {recentTransactions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhuma transação recente
-                </p>
-              ) : (
-                recentTransactions.map((transaction) => (
+            {recentTransactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma transação recente
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentTransactions.map((transaction) => (
                   <div 
                     key={transaction.id} 
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className={`mt-0.5 rounded-full p-2 ${
+                      <div className={`mt-0.5 rounded-full p-2 flex-shrink-0 ${
                         transaction.type === 'income' 
                           ? 'bg-success/10 text-success' 
                           : 'bg-destructive/10 text-destructive'
@@ -372,15 +372,15 @@ const Dashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <div className={`text-right font-semibold text-sm sm:text-base ${
+                    <div className={`text-right font-semibold text-sm sm:text-base flex-shrink-0 ${
                       transaction.type === 'income' ? 'text-success' : 'text-destructive'
                     }`}>
                       {transaction.type === 'income' ? '+' : '-'} {formatPrivacyCurrency(Math.abs(transaction.amount))}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
