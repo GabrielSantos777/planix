@@ -180,14 +180,14 @@ export default function Social() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Social</h1>
             <p className="text-muted-foreground">Acompanhe as transações dos seus contatos</p>
           </div>
           
           {/* Filtro de Mês */}
-          <div className="w-64">
+          <div className="w-full md:w-64">
             <Label>Filtrar por Mês</Label>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger>
@@ -226,12 +226,12 @@ export default function Social() {
             {filteredContactsWithTransactions.map(({ contact, transactions, total }) => (
               <Card key={contact.id}>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <CardTitle>{contact.name}</CardTitle>
                       <CardDescription>{contact.phone}</CardDescription>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left sm:text-right">
                       <div className="text-2xl font-bold text-destructive">
                         {formatCurrency(total)}
                       </div>
@@ -242,7 +242,33 @@ export default function Social() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="max-h-64 overflow-y-auto">
+                  {/* Mobile - Cards */}
+                  <div className="md:hidden space-y-3 max-h-64 overflow-y-auto">
+                    {transactions.map((transaction) => (
+                      <div 
+                        key={transaction.id}
+                        className="border rounded-lg p-4 space-y-2 bg-card"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="font-medium flex-1">
+                            {transaction.description}
+                          </div>
+                          <div className="text-destructive font-semibold ml-2">
+                            {formatCurrency(Math.abs(transaction.amount))}
+                          </div>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {transaction.categories?.name || 'Sem categoria'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {format(new Date(transaction.date), "dd/MM/yyyy", { locale: ptBR })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop - Table */}
+                  <div className="hidden md:block max-h-64 overflow-y-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -273,20 +299,20 @@ export default function Social() {
                     </Table>
                   </div>
                   
-                  <div className="flex justify-end gap-2">
+                  <div className="flex flex-col sm:flex-row justify-end gap-2">
                     <Button 
                       variant="outline"
                       onClick={() => {
                         window.location.href = `/transacoes?type=income&contact=${contact.name}&amount=${total}`
                       }}
-                      className="gap-2"
+                      className="gap-2 w-full sm:w-auto"
                     >
                       <TrendingDown className="h-4 w-4" />
                       Marcar como Pago
                     </Button>
                     <Button 
                       onClick={() => handleSendWhatsApp({ contact, transactions, total })}
-                      className="gap-2"
+                      className="gap-2 w-full sm:w-auto"
                     >
                       <MessageCircle className="h-4 w-4" />
                       Cobrar via WhatsApp
