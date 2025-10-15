@@ -10,6 +10,7 @@ import { AppProvider } from "./context/AppContext";
 import { CurrencyProvider } from "./context/CurrencyContext";
 import { CategoriesProvider } from "./context/CategoriesContext";
 import { PrivacyProvider } from "./context/PrivacyContext";
+import { InstallPrompt } from "./components/InstallPrompt";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -17,6 +18,7 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Plans from "./pages/Plans";
+import Install from "./pages/Install";
 import Dashboard from "./pages/Dashboard";
 import TransacoesImproved from "./pages/TransacoesImproved";
 import ContasImproved from "./pages/ContasImproved";
@@ -54,12 +56,14 @@ const App = () => (
                   <TooltipProvider>
                     <Toaster />
                     <Sonner />
+                    <InstallPrompt />
                     <BrowserRouter>
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/landing" element={<Landing />} />
                       <Route path="/auth" element={<Auth />} />
                       <Route path="/plans" element={<Plans />} />
+                      <Route path="/install" element={<Install />} />
                       <Route path="/dashboard" element={
                         <ProtectedRoute>
                           <Dashboard />
