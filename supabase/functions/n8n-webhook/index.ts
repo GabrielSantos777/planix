@@ -1,11 +1,42 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
+
+// SECURITY: Input validation schemas
+const transactionSchema = z.object({
+  user_id: z.string().uuid('Invalid user ID format'),
+  amount: z.number().min(-1000000).max(1000000),
+  type: z.enum(['income', 'expense']),
+  description: z.string().trim().min(1).max(200),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(d => {
+    const date = new Date(d);
+    const now = new Date();
+    const twoYearsAgo = new Date();
+    twoYearsAgo.setFullYear(now.getFullYear() - 2);
+    const oneYearAhead = new Date();
+    oneYearAhead.setFullYear(now.getFullYear() + 1);
+    return date >= twoYearsAgo && date <= oneYearAhead;
+  }, 'Date must be within 2 years ago and 1 year ahead').optional(),
+  category_name: z.string().trim().max(50).optional(),
+  payment_method: z.string().max(50).optional(),
+  account_name: z.string().max(100).optional(),
+  credit_card_name: z.string().max(100).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+const categorySchema = z.object({
+  user_id: z.string().uuid('Invalid user ID format'),
+  name: z.string().trim().min(1).max(50),
+  type: z.enum(['income', 'expense']),
+  icon: z.string().max(50).optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+});
 
 interface N8NTransaction {
   user_id: string;
@@ -30,18 +61,27 @@ interface N8NCategory {
 serve(async (req) => {
   console.log('N8N webhook called:', req.method);
 
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Initialize Supabase client
+    // SECURITY: Require API key authentication
+    const apiKey = req.headers.get('x-api-key');
+    const expectedApiKey = Deno.env.get('N8N_API_KEY');
+    
+    if (!apiKey || !expectedApiKey || apiKey !== expectedApiKey) {
+      console.error('Invalid or missing API key');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Invalid or missing API key' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check if request has body
     const contentType = req.headers.get('content-type');
     console.log('Content-Type:', contentType);
     
@@ -69,25 +109,32 @@ serve(async (req) => {
       );
     }
 
-    // Check if it's a category creation request
+    // Handle category creation
     if (body.action === 'create_category') {
-      const categoryData: N8NCategory = body;
-      
-      // Validate required fields for category
-      if (!categoryData.user_id || !categoryData.name || !categoryData.type) {
+      // SECURITY: Validate input
+      let validatedCategory;
+      try {
+        validatedCategory = categorySchema.parse({
+          user_id: body.user_id,
+          name: body.name,
+          type: body.type,
+          icon: body.icon,
+          color: body.color,
+        });
+      } catch (error) {
+        console.error('Category validation failed:', error);
         return new Response(
-          JSON.stringify({ error: 'Missing required fields for category: user_id, name, type' }),
+          JSON.stringify({ error: 'Invalid category data', details: error.errors }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Check if category already exists
       const { data: existingCategory } = await supabase
         .from('categories')
         .select('id')
-        .eq('user_id', categoryData.user_id)
-        .eq('name', categoryData.name)
-        .eq('type', categoryData.type)
+        .eq('user_id', validatedCategory.user_id)
+        .eq('name', validatedCategory.name)
+        .eq('type', validatedCategory.type)
         .single();
 
       if (existingCategory) {
@@ -101,15 +148,14 @@ serve(async (req) => {
         );
       }
 
-      // Create new category
       const { data: newCategory, error: categoryError } = await supabase
         .from('categories')
         .insert({
-          user_id: categoryData.user_id,
-          name: categoryData.name,
-          type: categoryData.type,
-          icon: categoryData.icon || 'folder',
-          color: categoryData.color || '#6B7280'
+          user_id: validatedCategory.user_id,
+          name: validatedCategory.name,
+          type: validatedCategory.type,
+          icon: validatedCategory.icon || 'folder',
+          color: validatedCategory.color || '#6B7280'
         })
         .select('id')
         .single();
@@ -134,19 +180,20 @@ serve(async (req) => {
       );
     }
 
-    // Handle transaction creation (existing logic)
-    const transactionData: N8NTransaction = body;
-
-    // Validate required fields
-    if (!transactionData.user_id || !transactionData.amount || !transactionData.type || !transactionData.description) {
+    // SECURITY: Validate transaction input
+    let validatedTransaction;
+    try {
+      validatedTransaction = transactionSchema.parse(body);
+    } catch (error) {
+      console.error('Transaction validation failed:', error);
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: user_id, amount, type, description' }),
+        JSON.stringify({ error: 'Invalid transaction data', details: error.errors }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Validate that account or credit card is specified
-    if (!transactionData.account_name && !transactionData.credit_card_name) {
+    if (!validatedTransaction.account_name && !validatedTransaction.credit_card_name) {
       return new Response(
         JSON.stringify({ error: 'Either account_name or credit_card_name must be specified' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -155,25 +202,24 @@ serve(async (req) => {
 
     // Get or create category
     let categoryId = null;
-    if (transactionData.category_name) {
+    if (validatedTransaction.category_name) {
       const { data: existingCategory } = await supabase
         .from('categories')
         .select('id')
-        .eq('user_id', transactionData.user_id)
-        .eq('name', transactionData.category_name)
-        .eq('type', transactionData.type)
+        .eq('user_id', validatedTransaction.user_id)
+        .eq('name', validatedTransaction.category_name)
+        .eq('type', validatedTransaction.type)
         .single();
 
       if (existingCategory) {
         categoryId = existingCategory.id;
       } else {
-        // Create new category
         const { data: newCategory, error: categoryError } = await supabase
           .from('categories')
           .insert({
-            user_id: transactionData.user_id,
-            name: transactionData.category_name,
-            type: transactionData.type,
+            user_id: validatedTransaction.user_id,
+            name: validatedTransaction.category_name,
+            type: validatedTransaction.type,
             icon: 'folder',
             color: '#6B7280'
           })
@@ -188,41 +234,41 @@ serve(async (req) => {
       }
     }
 
-    // Get account ID if specified
+    // Get account ID
     let accountId = null;
-    if (transactionData.account_name) {
+    if (validatedTransaction.account_name) {
       const { data: account } = await supabase
         .from('accounts')
         .select('id')
-        .eq('user_id', transactionData.user_id)
-        .eq('name', transactionData.account_name)
+        .eq('user_id', validatedTransaction.user_id)
+        .eq('name', validatedTransaction.account_name)
         .single();
 
       if (account) {
         accountId = account.id;
       } else {
         return new Response(
-          JSON.stringify({ error: `Account '${transactionData.account_name}' not found` }),
+          JSON.stringify({ error: `Account '${validatedTransaction.account_name}' not found` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
 
-    // Get credit card ID if specified
+    // Get credit card ID
     let creditCardId = null;
-    if (transactionData.credit_card_name) {
+    if (validatedTransaction.credit_card_name) {
       const { data: creditCard } = await supabase
         .from('credit_cards')
         .select('id')
-        .eq('user_id', transactionData.user_id)
-        .eq('name', transactionData.credit_card_name)
+        .eq('user_id', validatedTransaction.user_id)
+        .eq('name', validatedTransaction.credit_card_name)
         .single();
 
       if (creditCard) {
         creditCardId = creditCard.id;
       } else {
         return new Response(
-          JSON.stringify({ error: `Credit card '${transactionData.credit_card_name}' not found` }),
+          JSON.stringify({ error: `Credit card '${validatedTransaction.credit_card_name}' not found` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -230,15 +276,15 @@ serve(async (req) => {
 
     // Create transaction
     const transactionInsert = {
-      user_id: transactionData.user_id,
-      amount: Math.abs(transactionData.amount),
-      type: transactionData.type,
-      description: transactionData.description,
+      user_id: validatedTransaction.user_id,
+      amount: Math.abs(validatedTransaction.amount),
+      type: validatedTransaction.type,
+      description: validatedTransaction.description,
       category_id: categoryId,
       account_id: accountId,
       credit_card_id: creditCardId,
-      date: transactionData.date || new Date().toISOString().split('T')[0],
-      notes: transactionData.notes,
+      date: validatedTransaction.date || new Date().toISOString().split('T')[0],
+      notes: validatedTransaction.notes,
       currency: 'BRL'
     };
 
@@ -254,52 +300,6 @@ serve(async (req) => {
         JSON.stringify({ error: 'Failed to create transaction', details: transactionError }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    // Update account balance if account is specified
-    if (accountId) {
-      const balanceChange = transactionData.type === 'income' ? transactionData.amount : -transactionData.amount;
-      
-      // Fetch current balance and calculate new balance
-      const { data: currentAccount } = await supabase
-        .from('accounts')
-        .select('current_balance')
-        .eq('id', accountId)
-        .single();
-      
-      if (currentAccount) {
-        const newBalance = (currentAccount.current_balance || 0) + balanceChange;
-        const { error: balanceError } = await supabase
-          .from('accounts')
-          .update({ current_balance: newBalance })
-          .eq('id', accountId);
-
-        if (balanceError) {
-          console.error('Error updating account balance:', balanceError);
-        }
-      }
-    }
-
-    // Update credit card balance if credit card is specified
-    if (creditCardId && transactionData.type === 'expense') {
-      // Fetch current balance and calculate new balance
-      const { data: currentCard } = await supabase
-        .from('credit_cards')
-        .select('current_balance')
-        .eq('id', creditCardId)
-        .single();
-      
-      if (currentCard) {
-        const newBalance = (currentCard.current_balance || 0) + transactionData.amount;
-        const { error: creditCardError } = await supabase
-          .from('credit_cards')
-          .update({ current_balance: newBalance })
-          .eq('id', creditCardId);
-
-        if (creditCardError) {
-          console.error('Error updating credit card balance:', creditCardError);
-        }
-      }
     }
 
     console.log('Transaction created successfully:', transaction.id);

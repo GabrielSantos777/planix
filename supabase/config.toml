@@ -30,10 +30,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.process-receipt-ocr]
-verify_jwt = false
+verify_jwt = true
 
 [functions.financial-summary]
 verify_jwt = true
 
-[functions.get-user-by-phone]
-verify_jwt = false
+[functions.transaction-manager]
+verify_jwt = true

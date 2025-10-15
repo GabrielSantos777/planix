@@ -1,28 +1,71 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// SECURITY: Input validation schema
+const requestSchema = z.object({
+  imageBase64: z.string().max(10485760, 'Image too large (max 10MB)').regex(/^[A-Za-z0-9+/=]+$/, 'Invalid base64'),
+  userId: z.string().uuid('Invalid user ID'),
+  phoneNumber: z.string().regex(/^\+?55[1-9]{2}9[0-9]{8}$|^[1-9]{2}9[0-9]{8}$/, 'Invalid phone number'),
+});
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    { auth: { persistSession: false } }
-  );
-
   try {
-    const { imageBase64, userId, phoneNumber } = await req.json();
+    // SECURITY: Require authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    const body = await req.json();
+    
+    // SECURITY: Validate input
+    let validatedInput;
+    try {
+      validatedInput = requestSchema.parse(body);
+    } catch (error) {
+      console.error('Input validation failed:', error);
+      return new Response(
+        JSON.stringify({ error: 'Invalid input data', details: error.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { imageBase64, userId, phoneNumber } = validatedInput;
+
+    // SECURITY: Verify user from JWT matches userId in request
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    
+    if (userError || !user || user.id !== userId) {
+      console.error('User verification failed:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: User ID mismatch' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log("Processing receipt OCR for user:", userId);
 
-    // Processar imagem com OpenAI Vision
     const extractedData = await processReceiptWithAI(imageBase64);
     
     if (!extractedData.amount || !extractedData.type) {
@@ -33,7 +76,6 @@ serve(async (req) => {
       });
     }
 
-    // Buscar conta padrão do usuário
     const { data: accounts } = await supabaseClient
       .from('accounts')
       .select('id')
@@ -49,13 +91,11 @@ serve(async (req) => {
       });
     }
 
-    // Buscar ou criar categoria
     let categoryId = null;
     if (extractedData.category) {
       categoryId = await getOrCreateCategory(supabaseClient, userId, extractedData.category);
     }
 
-    // Criar transação
     const { data: transaction, error } = await supabaseClient
       .from('transactions')
       .insert({
@@ -79,25 +119,6 @@ serve(async (req) => {
       });
     }
 
-    // Atualizar saldo da conta
-    const balanceChange = extractedData.type === 'expense' ? -Math.abs(extractedData.amount) : Math.abs(extractedData.amount);
-    
-    // Fetch current balance and calculate new balance
-    const { data: currentAccount } = await supabaseClient
-      .from('accounts')
-      .select('current_balance')
-      .eq('id', accounts[0].id)
-      .single();
-    
-    if (currentAccount) {
-      const newBalance = (currentAccount.current_balance || 0) + balanceChange;
-      await supabaseClient
-        .from('accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', accounts[0].id);
-    }
-
-    // Buscar saldo atualizado
     const { data: updatedAccount } = await supabaseClient
       .from('accounts')
       .select('current_balance')
@@ -105,7 +126,6 @@ serve(async (req) => {
       .single();
 
     const newBalance = updatedAccount?.current_balance || 0;
-    const typeEmoji = extractedData.type === 'expense' ? '💸' : '💰';
     const typeText = extractedData.type === 'expense' ? 'Despesa' : 'Receita';
     
     let response = `📷 **${typeText} registrada via comprovante!**\n\n`;
@@ -121,7 +141,6 @@ serve(async (req) => {
     }
     response += `\n💳 **Saldo atual: R$ ${newBalance.toFixed(2).replace('.', ',')}**`;
     
-    // Enviar resposta via WhatsApp
     await sendWhatsAppMessage(phoneNumber, response);
 
     return new Response(JSON.stringify({ success: true, transaction, response }), {
@@ -215,7 +234,6 @@ async function processReceiptWithAI(imageBase64: string): Promise<{
 
 async function getOrCreateCategory(supabase: any, userId: string, categoryName: string): Promise<string | null> {
   try {
-    // Buscar categoria existente
     const { data: existingCategory } = await supabase
       .from('categories')
       .select('id')
@@ -227,7 +245,6 @@ async function getOrCreateCategory(supabase: any, userId: string, categoryName: 
       return existingCategory.id;
     }
 
-    // Criar nova categoria se não existir
     const categoryMap: { [key: string]: { icon: string; color: string; type: string } } = {
       'alimentação': { icon: 'utensils', color: '#EF4444', type: 'expense' },
       'transporte': { icon: 'car', color: '#F59E0B', type: 'expense' },

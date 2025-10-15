@@ -1,9 +1,35 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// SECURITY: Input validation schemas
+const transactionDataSchema = z.object({
+  amount: z.number().min(-1000000).max(1000000).optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(d => {
+    const date = new Date(d);
+    const now = new Date();
+    const twoYearsAgo = new Date();
+    twoYearsAgo.setFullYear(now.getFullYear() - 2);
+    const oneYearAhead = new Date();
+    oneYearAhead.setFullYear(now.getFullYear() + 1);
+    return date >= twoYearsAgo && date <= oneYearAhead;
+  }, 'Date must be within 2 years ago and 1 year ahead').optional(),
+  description: z.string().trim().min(1).max(200).optional(),
+  forma_pagamento: z.string().max(50).optional(),
+  conta: z.string().max(100).optional(),
+  category_name: z.string().trim().max(50).optional(),
+  type: z.enum(['income', 'expense']).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+const complementSchema = z.object({
+  pending_transaction_id: z.string().uuid(),
+  complementary_data: transactionDataSchema,
+});
 
 interface TransactionData {
   amount?: number;
@@ -30,32 +56,53 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
+    // SECURITY: Require authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+    // SECURITY: Get authenticated user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    
+    if (userError || !user) {
+      console.error('User verification failed:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = user.id;
     const url = new URL(req.url);
     const path = url.pathname;
 
-    // POST /transaction - Criar transação (pode ser incompleta)
+    // POST /transaction - Create new transaction
     if (req.method === 'POST' && path.endsWith('/transaction')) {
       const body = await req.json();
-      const { user_id, ...transactionData }: { user_id: string } & TransactionData = body;
-
-      if (!user_id) {
+      
+      // SECURITY: Validate input
+      let validatedData;
+      try {
+        validatedData = transactionDataSchema.parse(body);
+      } catch (error) {
+        console.error('Transaction validation failed:', error);
         return new Response(
-          JSON.stringify({ error: 'user_id é obrigatório' }),
+          JSON.stringify({ error: 'Invalid transaction data', details: error.errors }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Verificar campos obrigatórios
+      const transactionData: TransactionData = validatedData;
+
       const requiredFields: RequiredFields = {
         amount: !!transactionData.amount,
         date: !!transactionData.date,
@@ -69,8 +116,7 @@ Deno.serve(async (req) => {
         .map(([field]) => field);
 
       if (missingFields.length === 0) {
-        // Transação completa - inserir diretamente na tabela final
-        const finalTransaction = await processCompleteTransaction(supabaseClient, user_id, transactionData);
+        const finalTransaction = await processCompleteTransaction(supabaseClient, userId, transactionData);
         return new Response(
           JSON.stringify({
             success: true,
@@ -81,11 +127,10 @@ Deno.serve(async (req) => {
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } else {
-        // Transação incompleta - salvar na tabela transitória
         const { data, error } = await supabaseClient
           .from('pending_transactions')
           .insert({
-            user_id,
+            user_id: userId,
             transaction_data: transactionData,
             missing_fields: missingFields,
             status: 'pending'
@@ -108,26 +153,29 @@ Deno.serve(async (req) => {
       }
     }
 
-    // POST /transaction/complement - Enviar informações faltantes
+    // POST /transaction/complement - Update pending transaction
     if (req.method === 'POST' && path.endsWith('/transaction/complement')) {
       const body = await req.json();
-      const { pending_transaction_id, complementary_data }: {
-        pending_transaction_id: string;
-        complementary_data: Partial<TransactionData>;
-      } = body;
-
-      if (!pending_transaction_id) {
+      
+      // SECURITY: Validate input
+      let validatedInput;
+      try {
+        validatedInput = complementSchema.parse(body);
+      } catch (error) {
+        console.error('Complement validation failed:', error);
         return new Response(
-          JSON.stringify({ error: 'pending_transaction_id é obrigatório' }),
+          JSON.stringify({ error: 'Invalid complement data', details: error.errors }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Buscar transação pendente
+      const { pending_transaction_id, complementary_data } = validatedInput;
+
       const { data: pendingTransaction, error: fetchError } = await supabaseClient
         .from('pending_transactions')
         .select('*')
         .eq('id', pending_transaction_id)
+        .eq('user_id', userId)  // SECURITY: Ensure user owns this transaction
         .eq('status', 'pending')
         .single();
 
@@ -138,10 +186,8 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Mesclar dados existentes com complementares
       const updatedData = { ...pendingTransaction.transaction_data, ...complementary_data };
 
-      // Verificar se agora está completa
       const requiredFields: RequiredFields = {
         amount: !!updatedData.amount,
         date: !!updatedData.date,
@@ -155,14 +201,12 @@ Deno.serve(async (req) => {
         .map(([field]) => field);
 
       if (missingFields.length === 0) {
-        // Agora está completa - processar e mover para tabela final
         const finalTransaction = await processCompleteTransaction(
           supabaseClient, 
-          pendingTransaction.user_id, 
+          userId, 
           updatedData
         );
 
-        // Marcar como processada
         await supabaseClient
           .from('pending_transactions')
           .update({ status: 'processed' })
@@ -178,7 +222,6 @@ Deno.serve(async (req) => {
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } else {
-        // Ainda incompleta - atualizar dados
         await supabaseClient
           .from('pending_transactions')
           .update({
@@ -200,19 +243,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // GET /transaction/pending - Listar transações pendentes
+    // GET /transaction/pending - List pending transactions
     if (req.method === 'GET' && path.endsWith('/transaction/pending')) {
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
-        return new Response(
-          JSON.stringify({ error: 'Authorization header obrigatório' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
       const { data, error } = await supabaseClient
         .from('pending_transactions')
         .select('*')
+        .eq('user_id', userId)  // SECURITY: Only user's own transactions
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
@@ -228,16 +264,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // GET /transaction/final - Listar transações finais
+    // GET /transaction/final - List final transactions
     if (req.method === 'GET' && path.endsWith('/transaction/final')) {
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
-        return new Response(
-          JSON.stringify({ error: 'Authorization header obrigatório' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
       const { data, error } = await supabaseClient
         .from('transactions')
         .select(`
@@ -246,6 +274,7 @@ Deno.serve(async (req) => {
           accounts (name),
           credit_cards (name)
         `)
+        .eq('user_id', userId)  // SECURITY: Only user's own transactions
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -345,29 +374,6 @@ async function processCompleteTransaction(
     .single();
 
   if (error) throw error;
-
-  // Atualizar saldo da conta se for transação de conta
-  if (accountId) {
-    const balanceChange = transactionData.type === 'income' 
-      ? transactionData.amount 
-      : -transactionData.amount!;
-
-    // Buscar saldo atual
-    const { data: currentAccount } = await supabaseClient
-      .from('accounts')
-      .select('current_balance')
-      .eq('id', accountId)
-      .single();
-
-    if (currentAccount) {
-      const newBalance = (currentAccount.current_balance || 0) + balanceChange;
-      
-      await supabaseClient
-        .from('accounts')
-        .update({ current_balance: newBalance })
-        .eq('id', accountId);
-    }
-  }
 
   return transaction;
 }
