@@ -632,6 +632,30 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          granted_at: string | null
+          granted_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_integrations: {
         Row: {
           created_at: string
@@ -722,9 +746,20 @@ export type Database = {
           value: number
         }[]
       }
+      get_user_roles: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
       get_user_whatsapp_token: {
         Args: { user_uuid: string }
         Returns: string
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
       }
       is_profile_owner: {
         Args: { profile_user_id: string }
@@ -773,6 +808,7 @@ export type Database = {
     }
     Enums: {
       account_type: "bank" | "savings" | "investment"
+      app_role: "admin" | "moderator" | "user"
       card_type: "visa" | "mastercard" | "elo" | "amex"
       goal_status: "active" | "completed" | "paused"
       investment_type: "stocks" | "crypto" | "bonds" | "funds"
@@ -906,6 +942,7 @@ export const Constants = {
   public: {
     Enums: {
       account_type: ["bank", "savings", "investment"],
+      app_role: ["admin", "moderator", "user"],
       card_type: ["visa", "mastercard", "elo", "amex"],
       goal_status: ["active", "completed", "paused"],
       investment_type: ["stocks", "crypto", "bonds", "funds"],

@@ -12,11 +12,11 @@ export interface PlanLimits {
 }
 
 export const usePlanLimits = (): PlanLimits => {
-  const { profile, hasActiveSubscription, isTrialExpired } = useAuth()
+  const { profile, isAdmin, hasActiveSubscription, isTrialExpired } = useAuth()
 
   return useMemo(() => {
     // Se é admin, tem acesso ilimitado
-    if (profile?.is_admin) {
+    if (isAdmin) {
       return {
         maxAccounts: Infinity,
         maxTransactions: Infinity,
@@ -89,7 +89,7 @@ export const usePlanLimits = (): PlanLimits => {
       hasUnlimitedFeatures: false,
       planName: 'Expirado'
     }
-  }, [profile, hasActiveSubscription, isTrialExpired])
+  }, [profile, isAdmin, hasActiveSubscription, isTrialExpired])
 }
 
 export default usePlanLimits

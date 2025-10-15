@@ -1,27 +1,45 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
+
+// SECURITY FIX: Input validation schema
+const phoneSchema = z.string()
+  .trim()
+  .regex(/^\+?55[1-9]{2}9[0-9]{8}$|^[1-9]{2}9[0-9]{8}$/, 'Invalid Brazilian phone number format')
+  .transform(phone => {
+    const digits = phone.replace(/\D/g, '');
+    return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
+  });
 
 serve(async (req) => {
   console.log('Get user by phone called:', req.method);
 
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Initialize Supabase client
+    // SECURITY FIX: Require API key authentication
+    const apiKey = req.headers.get('x-api-key');
+    const expectedApiKey = Deno.env.get('N8N_API_KEY');
+    
+    if (!apiKey || apiKey !== expectedApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or missing API key' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get phone number from URL params
     const url = new URL(req.url);
     const rawPhone = url.searchParams.get('phone');
 
@@ -32,21 +50,23 @@ serve(async (req) => {
       );
     }
 
-    // Normalize: decode, trim, remove non-digits and build variants with/without "+"
-    const decoded = decodeURIComponent(rawPhone);
-    const trimmed = decoded.trim();
-    const digits = trimmed.replace(/\D/g, '');
-    const variants = [digits, `+${digits}`];
+    // SECURITY FIX: Validate phone number format
+    let normalizedPhone: string;
+    try {
+      normalizedPhone = phoneSchema.parse(rawPhone);
+    } catch (error) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid phone number format. Use Brazilian format: +5511999999999' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    console.log('Looking up user for phone (normalized):', {
-      raw: rawPhone,
-      decoded,
-      trimmed,
-      digits,
-      variants,
-    });
+    // Search for user with normalized phone
+    const digits = normalizedPhone.replace(/\D/g, '');
+    const variants = [digits, `+${digits}`, normalizedPhone];
 
-    // Search for user by phone number (accept both formats)
+    console.log('Looking up user for phone (normalized):', normalizedPhone);
+
     const { data: integration, error } = await supabase
       .from('whatsapp_integrations')
       .select('user_id, phone_number')
@@ -55,9 +75,9 @@ serve(async (req) => {
       .maybeSingle();
 
     if (error || !integration) {
-      console.log('No active integration found for phone variants:', variants);
+      console.log('No active integration found for phone');
       return new Response(
-        JSON.stringify({ error: 'No active WhatsApp integration found for this phone number' }),
+        JSON.stringify({ error: 'No active WhatsApp integration found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -67,7 +87,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         user_id: integration.user_id,
-        phone_number: integration.phone_number ?? `+${digits}`,
+        phone_number: integration.phone_number,
         success: true 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -75,9 +95,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in get-user-by-phone function:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: errorMessage }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

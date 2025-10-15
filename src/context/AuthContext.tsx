@@ -5,11 +5,14 @@ import { useToast } from '@/hooks/use-toast'
 import type { Database } from '@/integrations/supabase/types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
+type UserRole = 'admin' | 'moderator' | 'user'
 
 interface AuthContextType {
   user: User | null
   session: Session | null
   profile: Profile | null
+  userRoles: UserRole[]
+  isAdmin: boolean
   loading: boolean
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
@@ -39,6 +42,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [userRoles, setUserRoles] = useState<UserRole[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
@@ -62,10 +66,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
+  const fetchUserRoles = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+
+      if (error) {
+        console.error('Error fetching user roles:', error)
+        return []
+      }
+
+      return (data || []).map(r => r.role as UserRole)
+    } catch (error) {
+      console.error('Error in fetchUserRoles:', error)
+      return []
+    }
+  }
+
   const refreshProfile = async () => {
     if (user) {
       const profileData = await fetchProfile(user.id)
+      const roles = await fetchUserRoles(user.id)
       setProfile(profileData)
+      setUserRoles(roles)
     }
   }
 
@@ -77,14 +102,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(session?.user ?? null)
 
         if (session?.user) {
-          // Fetch profile data
+          // Fetch profile data and roles
           setTimeout(async () => {
             const profileData = await fetchProfile(session.user.id)
+            const roles = await fetchUserRoles(session.user.id)
             setProfile(profileData)
+            setUserRoles(roles)
             setLoading(false)
           }, 0)
         } else {
           setProfile(null)
+          setUserRoles([])
           setLoading(false)
         }
       }
@@ -98,7 +126,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (session?.user) {
         setTimeout(async () => {
           const profileData = await fetchProfile(session.user.id)
+          const roles = await fetchUserRoles(session.user.id)
           setProfile(profileData)
+          setUserRoles(roles)
           setLoading(false)
         }, 0)
       } else {
@@ -234,6 +264,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null)
       setSession(null)
       setProfile(null)
+      setUserRoles([])
 
       toast({
         title: "Logout realizado",
@@ -251,11 +282,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const isTrialExpired = profile?.trial_end ? new Date(profile.trial_end) < new Date() : false
   const hasActiveSubscription = profile?.subscription_end ? new Date(profile.subscription_end) > new Date() : false
   const isSubscriptionExpired = profile?.subscription_end ? new Date(profile.subscription_end) < new Date() : true
+  const isAdmin = userRoles.includes('admin')
 
   const value: AuthContextType = {
     user,
     session,
     profile,
+    userRoles,
+    isAdmin,
     loading,
     signUp,
     signIn,

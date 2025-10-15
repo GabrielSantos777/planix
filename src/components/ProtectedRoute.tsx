@@ -15,7 +15,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children, 
   requireSubscription = false 
 }) => {
-  const { user, profile, loading, isTrialExpired, hasActiveSubscription } = useAuth()
+  const { user, profile, isAdmin, loading, isTrialExpired, hasActiveSubscription } = useAuth()
   const navigate = useNavigate()
 
   if (loading) {
@@ -31,7 +31,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Se requer assinatura e não é admin
-  if (requireSubscription && !profile?.is_admin) {
+  if (requireSubscription && !isAdmin) {
     // Se o trial expirou e não tem assinatura ativa
     if (isTrialExpired && !hasActiveSubscription) {
       return (
