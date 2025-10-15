@@ -1,38 +1,39 @@
-import { useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  CreditCard,
-  PlusCircle,
-  Wallet,
-  Eye,
-  EyeOff,
-  Landmark
-} from "lucide-react"
-import { useNavigate } from "react-router-dom"
-import { useToast } from "@/hooks/use-toast"
+import { Eye, EyeOff } from "lucide-react"
 import { useCurrency } from "@/context/CurrencyContext"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import Layout from "@/components/Layout"
 import { useAuth } from "@/context/AuthContext"
 import { usePrivacy } from "@/context/PrivacyContext"
-import { useMemo } from "react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { WealthEvolutionChart } from "@/components/WealthEvolutionChart"
 import { useCapacitor } from "@/hooks/useCapacitor"
 import { usePushNotifications } from "@/hooks/usePushNotifications"
+import { useDashboardLayout } from "@/hooks/useDashboardLayout"
+import { DashboardCustomizer } from "@/components/DashboardCustomizer"
+import ReactGridLayout, { Layout as GridLayout } from "react-grid-layout"
+import "react-grid-layout/css/styles.css"
+import { InvestmentsCard } from "@/components/dashboard/InvestmentsCard"
+import { IncomeCard } from "@/components/dashboard/IncomeCard"
+import { ExpensesCard } from "@/components/dashboard/ExpensesCard"
+import { CreditCardCard } from "@/components/dashboard/CreditCardCard"
+import { TotalBalanceCard } from "@/components/dashboard/TotalBalanceCard"
+import { MonthlyNetCard } from "@/components/dashboard/MonthlyNetCard"
+import { MyCreditCardCard } from "@/components/dashboard/MyCreditCardCard"
+import { AccountBalancesCard } from "@/components/dashboard/AccountBalancesCard"
+import { QuickActionsCard } from "@/components/dashboard/QuickActionsCard"
+import { RecentTransactionsCard } from "@/components/dashboard/RecentTransactionsCard"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 const Dashboard = () => {
-  const navigate = useNavigate()
-  const { toast } = useToast()
   const { user } = useAuth()
-  const { accounts, creditCards, transactions, investments, contacts } = useSupabaseData()
+  const { accounts, transactions, investments } = useSupabaseData()
   const { isNative, platform } = useCapacitor()
   const { isRegistered } = usePushNotifications()
+  const { formatCurrency } = useCurrency()
+  const { isPrivacyEnabled, togglePrivacy } = usePrivacy()
+  const { layout, cards, isEditMode, setIsEditMode, toggleCardVisibility, resetLayout, onLayoutChange } = useDashboardLayout()
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     if (isNative) {
@@ -42,18 +43,11 @@ const Dashboard = () => {
       }
     }
   }, [isNative, platform, isRegistered])
-  const { formatCurrency } = useCurrency()
-  const { isPrivacyEnabled, togglePrivacy, hideValue } = usePrivacy()
   
   const getTotalInvestmentValue = () => {
     return investments.reduce((total, investment) => {
       return total + (investment.quantity * investment.current_price)
     }, 0)
-  }
-  
-  const formatPrivacyCurrency = (amount: number) => {
-    const formatted = formatCurrency(amount)
-    return isPrivacyEnabled ? hideValue(formatted) : formatted
   }
 
   // Get current month transactions
@@ -111,7 +105,6 @@ const Dashboard = () => {
   // Monthly net (income - expenses this month)
   const monthlyNet = monthlyIncome - monthlyExpenses
 
-  // Dados para gráfico de saldo por conta (invertido - contas no eixo X)
   const accountBalancesData = useMemo(() => {
     return accounts
       .filter(acc => acc.is_active)
@@ -122,280 +115,98 @@ const Dashboard = () => {
       .sort((a, b) => b.balance - a.balance)
   }, [accounts])
 
+  const visibleCards = cards.filter(card => card.visible)
+  const visibleLayout = layout.filter(l => visibleCards.some(c => c.id === l.i))
+
+  const cardComponents: Record<string, JSX.Element> = {
+    investments: <InvestmentsCard totalValue={getTotalInvestmentValue()} isEditMode={isEditMode} />,
+    income: <IncomeCard amount={monthlyIncome} isEditMode={isEditMode} />,
+    expenses: <ExpensesCard amount={monthlyExpenses} isEditMode={isEditMode} />,
+    creditCard: <CreditCardCard amount={monthlyCreditCardExpenses} isEditMode={isEditMode} />,
+    totalBalance: <TotalBalanceCard balance={totalBalance} isEditMode={isEditMode} />,
+    monthlyNet: <MonthlyNetCard net={monthlyNet} isEditMode={isEditMode} />,
+    myCreditCard: <MyCreditCardCard amount={myCreditCardExpenses} isEditMode={isEditMode} />,
+    accountBalances: <AccountBalancesCard data={accountBalancesData} isEditMode={isEditMode} />,
+    wealthEvolution: (
+      <div className="h-full">
+        <WealthEvolutionChart />
+      </div>
+    ),
+    quickActions: <QuickActionsCard isEditMode={isEditMode} />,
+    recentTransactions: <RecentTransactionsCard transactions={transactions} isEditMode={isEditMode} />,
+  }
+
   return (
     <Layout>
-      <div className="p-6 space-y-6">
-        {/* Header com botão de privacidade */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Visão geral das suas finanças</p>
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+        {/* Header com controles */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold truncate">Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Visão geral das suas finanças</p>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={togglePrivacy}
-            title={isPrivacyEnabled ? "Mostrar valores" : "Ocultar valores"}
-          >
-            {isPrivacyEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={togglePrivacy}
+              title={isPrivacyEnabled ? "Mostrar valores" : "Ocultar valores"}
+              className="flex-1 sm:flex-none"
+            >
+              {isPrivacyEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              <span className="ml-2 sm:hidden">Privacidade</span>
+            </Button>
+            <DashboardCustomizer 
+              cards={cards}
+              onToggleCard={toggleCardVisibility}
+              onResetLayout={resetLayout}
+            />
+            <Button
+              variant={isEditMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsEditMode(!isEditMode)}
+              className="flex-1 sm:flex-none"
+            >
+              {isEditMode ? "Salvar" : "Editar Layout"}
+            </Button>
+          </div>
         </div>
 
-        {/* Summary Cards - First Row */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Investimentos</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">
-                {formatPrivacyCurrency(getTotalInvestmentValue())}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Valor total investido
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Receitas</CardTitle>
-              <TrendingUp className="h-4 w-4 text-success" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">
-                {formatPrivacyCurrency(monthlyIncome)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total Entradas do mês atual
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Despesas</CardTitle>
-              <TrendingDown className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">
-                {formatPrivacyCurrency(monthlyExpenses)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total Gastos do mês atual
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Cartão de Crédito</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-500">
-                {formatPrivacyCurrency(monthlyCreditCardExpenses)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total Gastos no cartão (mês atual)
-              </p>
-            </CardContent>
-          </Card>
-
-        </div>
-
-        {/* Summary Cards - Second Row */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Saldo Total Geral</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatPrivacyCurrency(totalBalance)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Soma de todas as contas
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Saldo Mensal</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${monthlyNet >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatPrivacyCurrency(monthlyNet)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Receitas - Despesas (mês atual)
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Cartão</CardTitle>
-              <CreditCard className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-500">
-                {formatPrivacyCurrency(myCreditCardExpenses)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Do mês atual feitas por mim como responsável
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Gráficos */}
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-          {/* Gráfico de Saldo por Conta */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Landmark className="h-5 w-5" />
-                Saldo por Conta Bancária
-              </CardTitle>
-              <CardDescription>
-                Saldo atual de cada conta cadastrada
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={accountBalancesData} layout="horizontal">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      type="category"
-                      dataKey="name" 
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis 
-                      type="number"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => !isPrivacyEnabled ? `R$ ${(value / 1000).toFixed(0)}k` : '***'}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => [!isPrivacyEnabled ? formatCurrency(value) : '***', 'Saldo']}
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: 'var(--radius)',
-                      }}
-                    />
-                    <Bar 
-                      dataKey="balance" 
-                      fill="hsl(var(--primary))" 
-                      radius={[8, 8, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Gráfico de Evolução Patrimonial */}
-          <WealthEvolutionChart />
-        </div>
-
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Ações Rápidas</CardTitle>
-            <CardDescription>
-              Adicione novas transações ou gerencie suas contas
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2 sm:gap-4 flex-wrap">
-              <Button
-                className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none"
-                onClick={() => navigate("/transacoes?type=income")}
-                size="sm"
-              >
-                <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm">Nova Receita</span>
-              </Button>
-              <Button
-                variant="destructive"
-                className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none"
-                onClick={() => navigate("/transacoes?type=expense")}
-                size="sm"
-              >
-                <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm">Nova Despesa</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="flex items-center gap-1 sm:gap-2 flex-1 sm:flex-none"
-                onClick={() => navigate("/contas")}
-                size="sm"
-              >
-                <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm">Gerenciar Contas</span>
-              </Button>
+        {/* Grid Layout Responsivo */}
+        <div className="w-full">
+          {isMobile ? (
+            // Layout vertical para mobile
+            <div className="space-y-4">
+              {visibleCards.map((card) => (
+                <div key={card.id}>
+                  {cardComponents[card.id]}
+                </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Transactions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Transações Recentes</CardTitle>
-            <CardDescription>
-              Suas últimas movimentações financeiras
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-[500px] overflow-y-auto space-y-4 pr-2">
-              {transactions
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .slice(0, 10)
-                .map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between p-3 sm:p-4 border rounded-lg">
-                    <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
-                      <div className={`p-1.5 sm:p-2 rounded-full flex-shrink-0 ${transaction.type === "income"
-                        ? "bg-success/10 text-success"
-                        : "bg-destructive/10 text-destructive"
-                        }`}>
-                        {transaction.type === "income" ? (
-                          <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                        ) : (
-                          <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm sm:text-base truncate">{transaction.description}</p>
-                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                          {transaction.category?.name || 'Sem categoria'} • {transaction.account?.name || 'Conta removida'}
-                        </p>
-                      </div>
-                    </div>
-                     <div className="text-right flex-shrink-0">
-                       <p className={`font-bold text-sm sm:text-base ${transaction.type === "income" ? "text-success" : "text-destructive"
-                         }`}>
-                         {transaction.type === "income" ? "+" : ""}
-                         {formatPrivacyCurrency(transaction.amount)}
-                       </p>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        {new Date(transaction.date).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
+          ) : (
+            // Grid layout para desktop/tablet
+            <ReactGridLayout
+              className="layout"
+              layout={visibleLayout}
+              cols={12}
+              rowHeight={60}
+              width={1200}
+              onLayoutChange={onLayoutChange}
+              isDraggable={isEditMode}
+              isResizable={isEditMode}
+              compactType="vertical"
+              preventCollision={false}
+              margin={[16, 16]}
+              containerPadding={[0, 0]}
+            >
+              {visibleCards.map((card) => (
+                <div key={card.id} className="transition-all">
+                  {cardComponents[card.id]}
+                </div>
+              ))}
+            </ReactGridLayout>
+          )}
+        </div>
       </div>
     </Layout>
   )
