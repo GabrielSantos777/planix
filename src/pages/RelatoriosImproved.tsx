@@ -758,70 +758,125 @@ const RelatoriosImproved = () => {
         {/* Tabela de Transações */}
         <Card>
           <CardHeader>
-            <CardTitle>Transações Detalhadas</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-base sm:text-lg">Transações Detalhadas</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Lista completa das transações filtradas
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0 sm:p-6">
             {filteredTransactions.length > 0 ? (
-              <div className="max-h-[600px] overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead>Conta</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+              <>
+                {/* Mobile View - Cards */}
+                <div className="block sm:hidden">
+                  <div className="max-h-[500px] overflow-y-auto space-y-3 p-3">
                     {filteredTransactions.map((transaction) => {
                       const isPaid = new Date(transaction.date) <= new Date()
                       return (
-                        <TableRow key={transaction.id}>
-                          <TableCell className="font-medium">
-                            {format(new Date(transaction.date), "dd/MM/yyyy")}
-                          </TableCell>
-                          <TableCell>{transaction.description}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {transaction.category?.name || "Sem categoria"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {transaction.account?.name || transaction.credit_card?.name || "N/A"}
-                          </TableCell>
-                          <TableCell>
+                        <div key={transaction.id} className="p-3 border rounded-lg space-y-2">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{transaction.description}</p>
+                              <p className="text-xs text-muted-foreground">{format(new Date(transaction.date), "dd/MM/yyyy")}</p>
+                            </div>
                             <Badge 
                               variant={transaction.type === "income" ? "default" : "destructive"}
+                              className="ml-2 flex-shrink-0 text-xs"
                             >
                               {transaction.type === "income" ? "Receita" : 
-                               transaction.type === "expense" ? "Despesa" : "Transferência"}
+                               transaction.type === "expense" ? "Despesa" : "Transfer"}
                             </Badge>
-                          </TableCell>
-                          <TableCell className={`text-right font-medium ${
-                            transaction.type === "income" ? "text-success" : "text-destructive"
-                          }`}>
-                            {transaction.type === "income" ? "+" : ""}
-                            {formatCurrency(transaction.amount || 0)}
-                          </TableCell>
-                          <TableCell>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">
+                              {transaction.category?.name || "Sem categoria"}
+                            </span>
+                            <span className={`font-bold text-sm ${
+                              transaction.type === "income" ? "text-success" : "text-destructive"
+                            }`}>
+                              {transaction.type === "income" ? "+" : ""}
+                              {formatCurrency(transaction.amount || 0)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <span className="text-xs text-muted-foreground">
+                              {transaction.account?.name || transaction.credit_card?.name || "N/A"}
+                            </span>
                             <Badge 
                               variant={isPaid ? "default" : "secondary"}
+                              className="text-xs"
                             >
                               {isPaid ? "Pago" : "Pendente"}
                             </Badge>
-                          </TableCell>
-                        </TableRow>
+                          </div>
+                        </div>
                       )
                     })}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
+                </div>
+
+                {/* Desktop View - Table */}
+                <div className="hidden sm:block">
+                  <div className="max-h-[600px] overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Data</TableHead>
+                          <TableHead className="text-xs">Descrição</TableHead>
+                          <TableHead className="text-xs">Categoria</TableHead>
+                          <TableHead className="text-xs">Conta</TableHead>
+                          <TableHead className="text-xs">Tipo</TableHead>
+                          <TableHead className="text-right text-xs">Valor</TableHead>
+                          <TableHead className="text-xs">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTransactions.map((transaction) => {
+                          const isPaid = new Date(transaction.date) <= new Date()
+                          return (
+                            <TableRow key={transaction.id}>
+                              <TableCell className="font-medium text-xs">
+                                {format(new Date(transaction.date), "dd/MM/yyyy")}
+                              </TableCell>
+                              <TableCell className="text-xs">{transaction.description}</TableCell>
+                              <TableCell className="text-xs">
+                                <Badge variant="outline" className="text-xs">
+                                  {transaction.category?.name || "Sem categoria"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {transaction.account?.name || transaction.credit_card?.name || "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={transaction.type === "income" ? "default" : "destructive"}
+                                  className="text-xs"
+                                >
+                                  {transaction.type === "income" ? "Receita" : 
+                                   transaction.type === "expense" ? "Despesa" : "Transferência"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className={`text-right font-medium text-xs ${
+                                transaction.type === "income" ? "text-success" : "text-destructive"
+                              }`}>
+                                {transaction.type === "income" ? "+" : ""}
+                                {formatCurrency(transaction.amount || 0)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={isPaid ? "default" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {isPaid ? "Pago" : "Pendente"}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <PieChart className="h-12 w-12 text-muted-foreground mb-4" />

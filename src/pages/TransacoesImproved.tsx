@@ -79,8 +79,11 @@ const TransacoesImproved = () => {
   // Handle quick action from dashboard
   useEffect(() => {
     const type = searchParams.get('type')
-    if (type && ['income', 'expense'].includes(type)) {
-      setNewTransaction(prev => ({ ...prev, type: type as any }))
+    if (type && ['income', 'expense', 'transfer'].includes(type)) {
+      setNewTransaction(prev => ({ 
+        ...prev, 
+        type: type as "income" | "expense" | "transfer"
+      }))
       setIsDialogOpen(true)
     }
   }, [searchParams])
