@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,12 +23,25 @@ import { usePrivacy } from "@/context/PrivacyContext"
 import { useMemo } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { WealthEvolutionChart } from "@/components/WealthEvolutionChart"
+import { useCapacitor } from "@/hooks/useCapacitor"
+import { usePushNotifications } from "@/hooks/usePushNotifications"
 
 const Dashboard = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { user } = useAuth()
   const { accounts, creditCards, transactions, investments, contacts } = useSupabaseData()
+  const { isNative, platform } = useCapacitor()
+  const { isRegistered } = usePushNotifications()
+
+  useEffect(() => {
+    if (isNative) {
+      console.log(`Running on native ${platform} platform`)
+      if (isRegistered) {
+        console.log('Push notifications registered successfully')
+      }
+    }
+  }, [isNative, platform, isRegistered])
   const { formatCurrency } = useCurrency()
   const { isPrivacyEnabled, togglePrivacy, hideValue } = usePrivacy()
   
