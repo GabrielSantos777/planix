@@ -323,7 +323,7 @@ const SettingsImproved = () => {
                   <div>
                     <Label className="text-sm font-medium">Status</Label>
                     <Badge variant="default" className="mt-1">
-                      {profile?.is_admin ? 'Administrador' : 'Usuário'}
+                      Usuário
                     </Badge>
                   </div>
                 </div>
@@ -347,9 +347,6 @@ const SettingsImproved = () => {
                       <Badge variant={profile?.subscription_plan === 'premium' ? 'default' : 'secondary'}>
                         {profile?.subscription_plan === 'premium' ? 'Premium' : 'Básico'}
                       </Badge>
-                      {profile?.is_admin && (
-                        <Badge variant="outline">Admin</Badge>
-                      )}
                     </div>
                   </div>
                   

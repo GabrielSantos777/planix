@@ -30,6 +30,7 @@ const Investimentos = () => {
   const [selectedInvestment, setSelectedInvestment] = useState<any>(null)
   const [redeemAmount, setRedeemAmount] = useState(0)
   const [redeemQuantity, setRedeemQuantity] = useState(0)
+  const [redeemByValue, setRedeemByValue] = useState(true) // Toggle para resgate por valor ou quantidade
   const [reinvestAmount, setReinvestAmount] = useState(0)
   const [newCurrentPrice, setNewCurrentPrice] = useState(0)
   const [selectedAccountId, setSelectedAccountId] = useState<string>("")
@@ -136,7 +137,7 @@ const Investimentos = () => {
   }
 
   const handleRedeemInvestment = async () => {
-    if (!selectedInvestment || !selectedAccountId || redeemQuantity <= 0) {
+    if (!selectedInvestment || !selectedAccountId) {
       toast({
         title: "❌ Erro",
         description: "Preencha todos os campos para realizar o resgate",
@@ -145,17 +146,58 @@ const Investimentos = () => {
       return
     }
 
-    if (redeemQuantity > selectedInvestment.quantity) {
-      toast({
-        title: "❌ Erro",
-        description: "Quantidade de resgate não pode ser maior que a quantidade investida",
-        variant: "destructive"
-      })
-      return
+    // Validar baseado no tipo de resgate
+    let actualRedeemQuantity = 0
+    let totalRedeem = 0
+
+    if (redeemByValue) {
+      // Resgate por valor
+      if (redeemAmount <= 0) {
+        toast({
+          title: "❌ Erro",
+          description: "Digite um valor válido para resgate",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      const maxRedeemValue = selectedInvestment.quantity * selectedInvestment.current_price
+      if (redeemAmount > maxRedeemValue) {
+        toast({
+          title: "❌ Erro",
+          description: `Valor máximo disponível para resgate: ${formatCurrency(maxRedeemValue)}`,
+          variant: "destructive"
+        })
+        return
+      }
+      
+      actualRedeemQuantity = redeemAmount / selectedInvestment.current_price
+      totalRedeem = redeemAmount
+    } else {
+      // Resgate por quantidade
+      if (redeemQuantity <= 0) {
+        toast({
+          title: "❌ Erro",
+          description: "Digite uma quantidade válida para resgate",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      if (redeemQuantity > selectedInvestment.quantity) {
+        toast({
+          title: "❌ Erro",
+          description: "Quantidade de resgate não pode ser maior que a quantidade investida",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      actualRedeemQuantity = redeemQuantity
+      totalRedeem = redeemQuantity * selectedInvestment.current_price
     }
 
     try {
-      const totalRedeem = redeemQuantity * selectedInvestment.current_price
 
       // Registrar transferência de volta para a conta bancária (não classificar como receita)
       const investmentAccount = await getOrCreateInvestmentAccount()
@@ -165,20 +207,20 @@ const Investimentos = () => {
         amount: totalRedeem,
         date: new Date().toISOString().split('T')[0],
         description: `Resgate de ${selectedInvestment.name}`,
-        notes: `Resgate de ${redeemQuantity} cotas de ${selectedInvestment.symbol}`,
+        notes: `Resgate de ${actualRedeemQuantity.toFixed(4)} cotas de ${selectedInvestment.symbol}`,
         investmentMetadata: {
           kind: 'investment_transfer',
           action: 'resgate',
           symbol: selectedInvestment.symbol,
-          quantity: redeemQuantity,
+          quantity: actualRedeemQuantity,
           price: selectedInvestment.current_price,
           group_id: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`
         }
       })
 
       // Atualizar ou remover investimento
-      const newQuantity = selectedInvestment.quantity - redeemQuantity
-      if (newQuantity > 0) {
+      const newQuantity = selectedInvestment.quantity - actualRedeemQuantity
+      if (newQuantity > 0.0001) { // Tolerância para precisão decimal
         await updateInvestment(selectedInvestment.id, {
           quantity: newQuantity
         })
@@ -192,6 +234,8 @@ const Investimentos = () => {
       setIsRedeemDialogOpen(false)
       setSelectedInvestment(null)
       setRedeemQuantity(0)
+      setRedeemAmount(0)
+      setRedeemByValue(true)
       setSelectedAccountId("")
 
       toast({
@@ -498,13 +542,13 @@ const Investimentos = () => {
 
   return (
     <Layout>
-      <div className="p-4 sm:p-6 space-y-6">
-        {/* Header Section - Responsivo */}
-        <div className="flex flex-col space-y-4 lg:space-y-0 lg:flex-row lg:justify-between lg:items-start">
-          {/* Título e Descrição - Sempre à esquerda */}
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-[100vw] overflow-x-hidden">
+        {/* Header Section - Totalmente Responsivo */}
+        <div className="flex flex-col space-y-3 sm:space-y-4 lg:space-y-0 lg:flex-row lg:justify-between lg:items-start">
+          {/* Título e Descrição */}
           <div className="flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-left">Investimentos</h1>
-            <p className="text-sm sm:text-base text-muted-foreground text-left">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-left">Investimentos</h1>
+            <p className="text-xs sm:text-sm md:text-base text-muted-foreground text-left mt-1">
               Gerencie seu portfólio de investimentos
             </p>
           </div>
@@ -654,35 +698,35 @@ const Investimentos = () => {
           </div>
         </div>
 
-        {/* Resumo */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+        {/* Resumo - Cards Responsivos */}
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <Card className="sm:col-span-2 lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 Valor Total
               </CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-success break-words">
                 {formatCurrency(totalValue)}
               </div>
             </CardContent>
           </Card>
           
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 Lucro/Prejuízo
               </CardTitle>
               {totalProfit >= 0 ? (
-                <TrendingUp className="h-4 w-4 text-success" />
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-success flex-shrink-0" />
               ) : (
-                <TrendingDown className="h-4 w-4 text-destructive" />
+                <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-destructive flex-shrink-0" />
               )}
             </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className={`text-xl sm:text-2xl font-bold break-words ${totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {formatCurrency(totalProfit)}
               </div>
               <p className={`text-xs ${totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
@@ -692,13 +736,13 @@ const Investimentos = () => {
           </Card>
           
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">
                 Total de Ativos
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">
                 {investments.length}
               </div>
             </CardContent>
@@ -713,14 +757,121 @@ const Investimentos = () => {
           
           <TabsContent value="table" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Meus Investimentos</CardTitle>
-                <CardDescription>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Meus Investimentos</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
                   Lista completa dos seus ativos
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Table>
+              <CardContent className="p-0 sm:p-6 sm:pt-0">
+                {/* Versão Mobile - Cards */}
+                <div className="block md:hidden space-y-3 p-4">
+                  {investments.map((investment) => {
+                    const totalValue = investment.quantity * investment.current_price
+                    const totalCost = investment.quantity * investment.average_price
+                    const profit = totalValue - totalCost
+                    const profitPercentage = (profit / totalCost) * 100
+
+                    return (
+                      <Card key={investment.id} className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-semibold text-base">{investment.symbol}</div>
+                              <div className="text-xs text-muted-foreground">{investment.name}</div>
+                              <div className="text-xs mt-1">
+                                {investment.type === 'stocks' ? 'Ação' : 
+                                 investment.type === 'crypto' ? 'Crypto' : 
+                                 investment.type === 'bonds' ? 'Renda Fixa' : 'Fundo'}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold text-base">{formatCurrency(totalValue, investment.currency)}</div>
+                              <div className={`text-xs font-medium ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                {formatCurrency(profit, investment.currency)}
+                              </div>
+                              <div className={`text-xs ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                {profitPercentage > 0 ? '+' : ''}{profitPercentage.toFixed(2)}%
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-muted-foreground">Qtd: </span>
+                              <span className="font-medium">{investment.quantity.toFixed(4)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Preço Médio: </span>
+                              <span className="font-medium">{formatCurrency(investment.average_price, investment.currency)}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Preço Atual: </span>
+                              <span className="font-medium">{formatCurrency(investment.current_price, investment.currency)}</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedInvestment(investment)
+                                setNewCurrentPrice(investment.current_price)
+                                setIsUpdatePriceDialogOpen(true)
+                              }}
+                              className="text-xs h-8"
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Preço
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedInvestment(investment)
+                                setReinvestAmount(0)
+                                setIsReinvestDialogOpen(true)
+                              }}
+                              className="text-xs h-8"
+                            >
+                              <ArrowUpFromLine className="h-3 w-3 mr-1" />
+                              Aportar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedInvestment(investment)
+                                setRedeemQuantity(0)
+                                setRedeemAmount(0)
+                                setRedeemByValue(investment.type === 'bonds')
+                                setIsRedeemDialogOpen(true)
+                              }}
+                              className="text-xs h-8"
+                            >
+                              <ArrowDownToLine className="h-3 w-3 mr-1" />
+                              Resgatar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteInvestment(investment.id)}
+                              className="text-xs h-8"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Excluir
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    )
+                  })}
+                </div>
+
+                {/* Versão Desktop - Tabela com Scroll Horizontal */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Ativo</TableHead>
@@ -792,12 +943,13 @@ const Investimentos = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  setSelectedInvestment(investment)
-                                  setRedeemQuantity(0)
-                                  setRedeemAmount(0)
-                                  setIsRedeemDialogOpen(true)
-                                }}
+                                 onClick={() => {
+                                   setSelectedInvestment(investment)
+                                   setRedeemQuantity(0)
+                                   setRedeemAmount(0)
+                                   setRedeemByValue(investment.type === 'bonds') // Padrão para Renda Fixa é por valor
+                                   setIsRedeemDialogOpen(true)
+                                 }}
                                 title="Resgatar"
                               >
                                 <ArrowDownToLine className="h-4 w-4" />
@@ -815,23 +967,24 @@ const Investimentos = () => {
                         </TableRow>
                       )
                     })}
-                  </TableBody>
-                </Table>
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
           
           <TabsContent value="charts" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
               <Card>
-                <CardHeader>
-                  <CardTitle>Distribuição por Valor</CardTitle>
-                  <CardDescription>
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg">Distribuição por Valor</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     Valor atual de cada ativo
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
+                <CardContent className="p-4 sm:p-6 sm:pt-0">
+                  <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
@@ -845,14 +998,14 @@ const Investimentos = () => {
               </Card>
               
               <Card>
-                <CardHeader>
-                  <CardTitle>Distribuição por Tipo</CardTitle>
-                  <CardDescription>
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg">Distribuição por Tipo</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     Porcentagem de cada tipo de investimento
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
+                <CardContent className="p-4 sm:p-6 sm:pt-0">
+                  <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
                     <PieChart>
                       <Pie
                         data={pieData}
@@ -894,32 +1047,84 @@ const Investimentos = () => {
                   <div className="p-3 bg-muted rounded-md">
                     <div className="font-medium">{selectedInvestment.symbol} - {selectedInvestment.name}</div>
                     <div className="text-sm text-muted-foreground">
-                      Quantidade disponível: {selectedInvestment.quantity}
+                      Quantidade disponível: {selectedInvestment.quantity.toFixed(4)}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       Preço atual: {formatCurrency(selectedInvestment.current_price, selectedInvestment.currency)}
+                    </div>
+                    <div className="text-sm font-medium text-primary mt-1">
+                      Valor disponível para resgate: {formatCurrency(selectedInvestment.quantity * selectedInvestment.current_price, selectedInvestment.currency)}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="redeemQuantity">Quantidade a Resgatar *</Label>
-                  <Input
-                    id="redeemQuantity"
-                    type="number"
-                    placeholder="0"
-                    value={redeemQuantity || ''}
-                    onChange={(e) => {
-                      const qty = Number(e.target.value)
-                      setRedeemQuantity(qty)
-                      setRedeemAmount(qty * selectedInvestment.current_price)
-                    }}
-                    max={selectedInvestment.quantity}
-                  />
+                  <Label>Tipo de Resgate</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={redeemByValue ? "default" : "outline"}
+                      onClick={() => {
+                        setRedeemByValue(true)
+                        setRedeemQuantity(0)
+                      }}
+                      className="flex-1"
+                    >
+                      Por Valor (R$)
+                    </Button>
+                    <Button
+                      variant={!redeemByValue ? "default" : "outline"}
+                      onClick={() => {
+                        setRedeemByValue(false)
+                        setRedeemAmount(0)
+                      }}
+                      className="flex-1"
+                    >
+                      Por Quantidade
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Valor a receber: {formatCurrency(redeemAmount, selectedInvestment.currency)}
+                    {redeemByValue 
+                      ? "Recomendado para Renda Fixa (CDB, LCI, etc.)" 
+                      : "Recomendado para Ações e Fundos"}
                   </p>
                 </div>
+
+                {redeemByValue ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="redeemAmount">Valor a Resgatar (R$) *</Label>
+                    <CurrencyInput
+                      value={redeemAmount}
+                      onChange={(value) => {
+                        setRedeemAmount(value)
+                        setRedeemQuantity(value / selectedInvestment.current_price)
+                      }}
+                      currency={selectedInvestment.currency === 'BRL' ? 'R$' : selectedInvestment.currency}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Isso resgatará aproximadamente {(redeemAmount / selectedInvestment.current_price).toFixed(4)} cotas
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="redeemQuantity">Quantidade a Resgatar *</Label>
+                    <Input
+                      id="redeemQuantity"
+                      type="number"
+                      step="0.0001"
+                      placeholder="0"
+                      value={redeemQuantity || ''}
+                      onChange={(e) => {
+                        const qty = Number(e.target.value)
+                        setRedeemQuantity(qty)
+                        setRedeemAmount(qty * selectedInvestment.current_price)
+                      }}
+                      max={selectedInvestment.quantity}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Valor a receber: {formatCurrency(redeemQuantity * selectedInvestment.current_price, selectedInvestment.currency)}
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="accountDestination">Conta de Destino *</Label>

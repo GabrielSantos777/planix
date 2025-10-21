@@ -70,13 +70,14 @@ export const CategoryManagement = () => {
       if (editingCategory) {
         await updateCategory(editingCategory.id, formData)
         toast({
-          title: "Categoria atualizada!",
+          title: "✅ Categoria atualizada!",
           description: `${formData.name} foi atualizada com sucesso.`
         })
       } else {
-        await addCategory(formData)
+        const result = await addCategory(formData)
+        console.log('Categoria criada:', result)
         toast({
-          title: "Categoria criada!",
+          title: "✅ Categoria criada!",
           description: `${formData.name} foi criada com sucesso.`
         })
       }
@@ -85,9 +86,10 @@ export const CategoryManagement = () => {
       setEditingCategory(null)
       setIsDialogOpen(false)
     } catch (error) {
+      console.error('Erro ao salvar categoria:', error)
       toast({
-        title: "Erro",
-        description: "Erro ao salvar categoria. Tente novamente.",
+        title: "❌ Erro",
+        description: error instanceof Error ? error.message : "Erro ao salvar categoria. Tente novamente.",
         variant: "destructive"
       })
     }
