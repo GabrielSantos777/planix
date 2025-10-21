@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/integrations/supabase/client'
 import Layout from '@/components/Layout'
 import { formatPhoneNumber } from '@/utils/phoneFormatter'
+import { ContactsManagement } from '@/components/ContactsManagement'
 
 const SettingsImproved = () => {
   const { user, profile, refreshProfile } = useAuth()
@@ -283,14 +284,7 @@ const SettingsImproved = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">
-                    Acesse a página de contatos para gerenciar suas conexões
-                  </p>
-                  <Button onClick={() => window.location.href = '/contatos'}>
-                    Ir para Contatos
-                  </Button>
-                </div>
+                <ContactsManagement />
               </CardContent>
             </Card>
           </TabsContent>
