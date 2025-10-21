@@ -30,7 +30,7 @@ const Dashboard = () => {
       }
     }
   }, [isNative, platform, isRegistered])
-  
+
   const getTotalInvestmentValue = () => {
     return investments.reduce((total, investment) => {
       return total + (investment.quantity * investment.current_price)
@@ -133,21 +133,7 @@ const Dashboard = () => {
 
         {/* Financial Summary Cards - Grid Responsivo */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {/* Investments */}
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Investimentos</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-success">
-                {formatPrivacyCurrency(getTotalInvestmentValue())}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Valor total investido
-              </p>
-            </CardContent>
-          </Card>
+
 
           {/* Income */}
           <Card className="hover:shadow-md transition-shadow">
@@ -160,7 +146,7 @@ const Dashboard = () => {
                 {formatPrivacyCurrency(monthlyIncome)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Total Entradas do mês atual
+                Total Entradas do mês
               </p>
             </CardContent>
           </Card>
@@ -176,7 +162,23 @@ const Dashboard = () => {
                 {formatPrivacyCurrency(monthlyExpenses)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Total Gastos do mês atual
+                Total Gastos do mês
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Monthly Net */}
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Saldo Mensal</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl sm:text-3xl font-bold ${monthlyNet >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {formatPrivacyCurrency(monthlyNet)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Receitas - Despesas
               </p>
             </CardContent>
           </Card>
@@ -192,7 +194,7 @@ const Dashboard = () => {
                 {formatPrivacyCurrency(monthlyCreditCardExpenses)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Total Gastos no cartão (mês atual)
+                Total Gastos no cartão
               </p>
             </CardContent>
           </Card>
@@ -216,21 +218,23 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Monthly Net */}
+          {/* Investments */}
           <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Saldo Mensal</CardTitle>
+              <CardTitle className="text-sm font-medium">Investimentos</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl sm:text-3xl font-bold ${monthlyNet >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatPrivacyCurrency(monthlyNet)}
+              <div className="text-xl sm:text-2xl font-bold text-success">
+                {formatPrivacyCurrency(getTotalInvestmentValue())}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Receitas - Despesas (mês atual)
+                Valor total investido
               </p>
             </CardContent>
           </Card>
+
+
 
           {/* My Credit Card */}
           <Card className="hover:shadow-md transition-shadow">
@@ -243,7 +247,7 @@ const Dashboard = () => {
                 {formatPrivacyCurrency(myCreditCardExpenses)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Do mês atual feitas por mim como responsável
+                Gastos feitos por mim
               </p>
             </CardContent>
           </Card>
@@ -261,12 +265,12 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={accountBalancesData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="name" 
+                  <XAxis
+                    dataKey="name"
                     className="text-xs"
                     tick={{ fontSize: 11 }}
                   />
-                  <YAxis 
+                  <YAxis
                     className="text-xs"
                     tick={{ fontSize: 11 }}
                   />
@@ -297,8 +301,8 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start gap-2 h-auto py-3"
                 onClick={() => navigate('/transacoes?type=income')}
               >
@@ -308,8 +312,8 @@ const Dashboard = () => {
                   <div className="text-xs text-muted-foreground">Adicionar entrada</div>
                 </div>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start gap-2 h-auto py-3"
                 onClick={() => navigate('/transacoes?type=expense')}
               >
@@ -319,8 +323,8 @@ const Dashboard = () => {
                   <div className="text-xs text-muted-foreground">Adicionar gasto</div>
                 </div>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full justify-start gap-2 h-auto py-3"
                 onClick={() => navigate('/transacoes?type=transfer')}
               >
@@ -348,16 +352,15 @@ const Dashboard = () => {
             ) : (
               <div className="space-y-3">
                 {recentTransactions.map((transaction) => (
-                  <div 
-                    key={transaction.id} 
+                  <div
+                    key={transaction.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className={`mt-0.5 rounded-full p-2 flex-shrink-0 ${
-                        transaction.type === 'income' 
-                          ? 'bg-success/10 text-success' 
-                          : 'bg-destructive/10 text-destructive'
-                      }`}>
+                      <div className={`mt-0.5 rounded-full p-2 flex-shrink-0 ${transaction.type === 'income'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-destructive/10 text-destructive'
+                        }`}>
                         {transaction.type === 'income' ? (
                           <TrendingUp className="h-4 w-4" />
                         ) : (
@@ -372,9 +375,8 @@ const Dashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <div className={`text-right font-semibold text-sm sm:text-base flex-shrink-0 ${
-                      transaction.type === 'income' ? 'text-success' : 'text-destructive'
-                    }`}>
+                    <div className={`text-right font-semibold text-sm sm:text-base flex-shrink-0 ${transaction.type === 'income' ? 'text-success' : 'text-destructive'
+                      }`}>
                       {transaction.type === 'income' ? '+' : '-'} {formatPrivacyCurrency(Math.abs(transaction.amount))}
                     </div>
                   </div>

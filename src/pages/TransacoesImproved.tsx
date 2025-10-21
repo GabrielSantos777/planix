@@ -694,7 +694,7 @@ const TransacoesImproved = () => {
           <CardHeader>
             <CardTitle className="text-base sm:text-lg">Transações</CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              {filteredTransactions.length} transação(ões) encontrada(s)
+              {filteredTransactions.length} transações encontrada(s)
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0 sm:p-6">

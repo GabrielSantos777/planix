@@ -212,7 +212,7 @@ const Transacoes = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
+              {/* <div className="flex-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -222,7 +222,7 @@ const Transacoes = () => {
                     className="pl-9"
                   />
                 </div>
-              </div>
+              </div> */}
               <div className="sm:w-48">
                 <Select value={filterType} onValueChange={setFilterType}>
                   <SelectTrigger>
@@ -245,7 +245,7 @@ const Transacoes = () => {
           <CardHeader>
             <CardTitle>Transações</CardTitle>
             <CardDescription>
-              {filteredTransactions.length} transação(ões) encontrada(s)
+              {filteredTransactions.length} transações encontrada(s)
             </CardDescription>
           </CardHeader>
           <CardContent>

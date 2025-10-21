@@ -466,17 +466,17 @@ const RelatoriosImproved = () => {
 
             {/* Filtro de Descrição - Linha separada */}
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label>Buscar por descrição</Label>
                 <Input
                   placeholder="Digite para filtrar por descrição..."
                   value={descriptionFilter}
                   onChange={(e) => setDescriptionFilter(e.target.value)}
                 />
-              </div>
+              </div> */}
               <div className="flex items-end">
                 <div className="text-sm text-muted-foreground">
-                  {filteredTransactions.length} transação(ões) encontrada(s)
+                  {filteredTransactions.length} transações encontrada(s)
                   {hasActiveFilters && " com os filtros aplicados"}
                 </div>
               </div>
