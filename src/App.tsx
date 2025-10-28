@@ -35,6 +35,7 @@ import AboutUs from "./pages/AboutUs";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Contact from "./pages/Contact";
+import Orcamento from "./pages/Orcamento";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,16 +85,21 @@ const App = () => (
                           <Investimentos />
                         </ProtectedRoute>
                       } />
-                      <Route path="/metas" element={
-                        <ProtectedRoute>
-                          <GoalsImproved />
-                        </ProtectedRoute>
-                      } />
-                       <Route path="/relatorios" element={
-                         <ProtectedRoute requireSubscription>
-                           <RelatoriosImproved />
+                       <Route path="/metas" element={
+                         <ProtectedRoute>
+                           <GoalsImproved />
                          </ProtectedRoute>
                        } />
+                        <Route path="/orcamento" element={
+                          <ProtectedRoute requireSubscription>
+                            <Orcamento />
+                          </ProtectedRoute>
+                        } />
+                        <Route path="/relatorios" element={
+                          <ProtectedRoute requireSubscription>
+                            <RelatoriosImproved />
+                          </ProtectedRoute>
+                        } />
                        <Route path="/settings" element={
                         <ProtectedRoute>
                           <SettingsImproved />

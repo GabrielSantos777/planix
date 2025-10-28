@@ -11,7 +11,8 @@ import {
   MessageSquare,
   X,
   Users,
-  Share2
+  Share2,
+  PieChart
 } from "lucide-react"
 
 import { useSidebar } from "@/components/ui/sidebar"
@@ -43,6 +44,11 @@ const items = [
     title: "Metas", 
     url: "/metas", 
     icon: Target 
+  },
+  { 
+    title: "Orçamento", 
+    url: "/orcamento", 
+    icon: PieChart 
   },
   { 
     title: "Relatórios", 

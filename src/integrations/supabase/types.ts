@@ -57,7 +57,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           new_data: Json | null
           old_data: Json | null
           operation: string
@@ -68,7 +68,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           new_data?: Json | null
           old_data?: Json | null
           operation: string
@@ -79,7 +79,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           new_data?: Json | null
           old_data?: Json | null
           operation?: string
@@ -88,6 +88,80 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      budget_settings: {
+        Row: {
+          created_at: string
+          enable_rollover: boolean | null
+          enable_zero_based: boolean | null
+          id: string
+          savings_goal_percentage: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enable_rollover?: boolean | null
+          enable_zero_based?: boolean | null
+          id?: string
+          savings_goal_percentage?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enable_rollover?: boolean | null
+          enable_zero_based?: boolean | null
+          id?: string
+          savings_goal_percentage?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      budgets: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          month: number
+          notes: string | null
+          planned_amount: number
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          month: number
+          notes?: string | null
+          planned_amount?: number
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          month?: number
+          notes?: string | null
+          planned_amount?: number
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       categories: {
         Row: {
@@ -694,18 +768,9 @@ export type Database = {
         }
         Returns: boolean
       }
-      cleanup_old_audit_logs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      cleanup_rate_limit_logs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      create_security_backup: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      cleanup_old_audit_logs: { Args: never; Returns: number }
+      cleanup_rate_limit_logs: { Args: never; Returns: number }
+      create_security_backup: { Args: never; Returns: string }
       create_whatsapp_integration: {
         Args: {
           p_phone_number: string
@@ -723,7 +788,7 @@ export type Database = {
         Returns: string
       }
       detect_suspicious_activity: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           details: string
           risk_level: string
@@ -731,12 +796,9 @@ export type Database = {
           user_id: string
         }[]
       }
-      encrypt_whatsapp_token: {
-        Args: { token: string }
-        Returns: string
-      }
+      encrypt_whatsapp_token: { Args: { token: string }; Returns: string }
       generate_security_report: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           description: string
           metric: string
@@ -747,10 +809,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"][]
       }
-      get_user_whatsapp_token: {
-        Args: { user_uuid: string }
-        Returns: string
-      }
+      get_user_whatsapp_token: { Args: { user_uuid: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -758,10 +817,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_profile_owner: {
-        Args: { profile_user_id: string }
-        Returns: boolean
-      }
+      is_profile_owner: { Args: { profile_user_id: string }; Returns: boolean }
       mask_sensitive_financial_data: {
         Args: {
           data_owner_id: string
@@ -778,24 +834,15 @@ export type Database = {
         Args: { p_card_id: string }
         Returns: undefined
       }
-      sanitize_text_input: {
-        Args: { input_text: string }
-        Returns: string
-      }
+      sanitize_text_input: { Args: { input_text: string }; Returns: string }
       update_whatsapp_token: {
         Args: { new_token: string; phone: string; user_uuid: string }
         Returns: boolean
       }
-      validate_cpf: {
-        Args: { cpf: string }
-        Returns: boolean
-      }
-      validate_phone_number: {
-        Args: { phone: string }
-        Returns: boolean
-      }
+      validate_cpf: { Args: { cpf: string }; Returns: boolean }
+      validate_phone_number: { Args: { phone: string }; Returns: boolean }
       verify_financial_integrity: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           check_name: string
           details: string
