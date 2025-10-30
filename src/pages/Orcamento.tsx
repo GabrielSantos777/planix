@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, TrendingDown, TrendingUp, AlertCircle, Plus, ChevronLeft, ChevronRight, Settings, Copy, PieChart } from 'lucide-react';
 import { useBudget } from '@/hooks/useBudget';
 import { useBudgetAnalytics } from '@/hooks/useBudgetAnalytics';
-import { useCategories } from '@/context/CategoriesContext';
+import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { formatCurrency } from '@/utils/formatters';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -34,7 +34,7 @@ export default function Orcamento() {
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<any>(null);
 
-  const { categories } = useCategories();
+  const { categories } = useSupabaseData();
   const { budgets, settings, isLoading, upsertBudget, deleteBudget, copyFromPreviousMonth, updateSettings } = useBudget(selectedMonth, selectedYear);
   const { categorySpending, summary } = useBudgetAnalytics(selectedMonth, selectedYear, budgets);
 
