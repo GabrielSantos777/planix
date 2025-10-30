@@ -213,6 +213,7 @@ export default function Orcamento() {
                       value={formData.category_id}
                       onValueChange={(value) => setFormData({ ...formData, category_id: value })}
                       required
+                      disabled={!!editingBudget}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione uma categoria" />
@@ -369,6 +370,7 @@ export default function Orcamento() {
             <TabsTrigger value="expenses">Despesas</TabsTrigger>
             <TabsTrigger value="income">Receitas</TabsTrigger>
             <TabsTrigger value="charts">Gráficos</TabsTrigger>
+            <TabsTrigger value="table">Tabela</TabsTrigger>
           </TabsList>
 
           <TabsContent value="expenses" className="space-y-4">
@@ -569,6 +571,58 @@ export default function Orcamento() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="table" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tabela de Orçamentos</CardTitle>
+                <CardDescription>Edite ou exclua orçamentos diretamente na tabela</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left">
+                        <th className="py-2 px-3">Categoria</th>
+                        <th className="py-2 px-3">Tipo</th>
+                        <th className="py-2 px-3 text-right">Planejado</th>
+                        <th className="py-2 px-3 text-right">Realizado</th>
+                        <th className="py-2 px-3 text-right">Restante</th>
+                        <th className="py-2 px-3 text-right">% Usado</th>
+                        <th className="py-2 px-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {categorySpending.map((row) => {
+                        const budget = budgets.find(b => b.category_id === row.categoryId);
+                        return (
+                          <tr key={row.categoryId} className="border-t">
+                            <td className="py-2 px-3">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: row.categoryColor }} />
+                                {row.categoryName}
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 capitalize">{row.categoryType}</td>
+                            <td className="py-2 px-3 text-right">{formatCurrency(row.planned, selectedCurrency.code)}</td>
+                            <td className="py-2 px-3 text-right">{formatCurrency(row.actual, selectedCurrency.code)}</td>
+                            <td className={`py-2 px-3 text-right ${row.remaining >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(row.remaining, selectedCurrency.code)}</td>
+                            <td className="py-2 px-3 text-right">{row.percentageUsed.toFixed(0)}%</td>
+                            <td className="py-2 px-3">
+                              <div className="flex justify-end gap-2">
+                                <Button size="sm" variant="outline" onClick={() => budget && handleEdit(budget)}>Editar</Button>
+                                <Button size="sm" variant="destructive" onClick={() => budget && deleteBudget.mutate(budget.id)}>Excluir</Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

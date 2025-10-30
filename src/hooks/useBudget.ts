@@ -85,8 +85,17 @@ export const useBudget = (month: number, year: number) => {
     mutationFn: async (budget: Partial<Budget> & { category_id: string; month: number; year: number; planned_amount: number }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
+      // Check if budget already exists
+      const { data: existingBudget } = await supabase
+        .from('budgets')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('category_id', budget.category_id)
+        .eq('month', budget.month)
+        .eq('year', budget.year)
+        .maybeSingle();
+
       const budgetData = {
-        id: budget.id,
         user_id: user.id,
         category_id: budget.category_id,
         month: budget.month,
@@ -95,11 +104,24 @@ export const useBudget = (month: number, year: number) => {
         notes: budget.notes || undefined,
       };
 
-      const { data, error } = await supabase
-        .from('budgets')
-        .upsert(budgetData)
-        .select()
-        .single();
+      let data, error;
+
+      if (existingBudget) {
+        // Update existing budget
+        ({ data, error } = await supabase
+          .from('budgets')
+          .update(budgetData)
+          .eq('id', existingBudget.id)
+          .select()
+          .single());
+      } else {
+        // Insert new budget
+        ({ data, error } = await supabase
+          .from('budgets')
+          .insert(budgetData)
+          .select()
+          .single());
+      }
 
       if (error) throw error;
       return data;
@@ -167,7 +189,7 @@ export const useBudget = (month: number, year: number) => {
 
       const { error: insertError } = await supabase
         .from('budgets')
-        .upsert(newBudgets);
+        .upsert(newBudgets, { onConflict: 'user_id,category_id,month,year' });
 
       if (insertError) throw insertError;
 
