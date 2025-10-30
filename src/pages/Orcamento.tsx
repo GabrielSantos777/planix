@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Cell, Pie, PieChart as RechartsPie, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useCurrency } from '@/context/CurrencyContext';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -39,7 +40,7 @@ export default function Orcamento() {
 
   const [formData, setFormData] = useState({
     category_id: '',
-    planned_amount: '',
+    planned_amount: 0,
     notes: '',
   });
 
@@ -70,16 +71,20 @@ export default function Orcamento() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.category_id || formData.planned_amount <= 0) {
+      return;
+    }
+    
     await upsertBudget.mutateAsync({
       id: editingBudget?.id,
       category_id: formData.category_id,
       month: selectedMonth,
       year: selectedYear,
-      planned_amount: parseFloat(formData.planned_amount),
-      notes: formData.notes,
+      planned_amount: formData.planned_amount,
+      notes: formData.notes || undefined,
     });
 
-    setFormData({ category_id: '', planned_amount: '', notes: '' });
+    setFormData({ category_id: '', planned_amount: 0, notes: '' });
     setEditingBudget(null);
     setIsAddDialogOpen(false);
   };
@@ -88,7 +93,7 @@ export default function Orcamento() {
     setEditingBudget(budget);
     setFormData({
       category_id: budget.category_id,
-      planned_amount: budget.planned_amount.toString(),
+      planned_amount: Number(budget.planned_amount),
       notes: budget.notes || '',
     });
     setIsAddDialogOpen(true);
@@ -130,18 +135,19 @@ export default function Orcamento() {
     <Layout>
       <div className="container mx-auto py-6 space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Orçamento Mensal</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Orçamento Mensal</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               Planeje e acompanhe seus gastos e receitas
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="sm" className="sm:size-icon">
                   <Settings className="h-4 w-4" />
+                  <span className="sm:hidden ml-2">Configurações</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -182,18 +188,18 @@ export default function Orcamento() {
                 </div>
               </DialogContent>
             </Dialog>
-            <Button onClick={() => copyFromPreviousMonth.mutate()} variant="outline">
-              <Copy className="h-4 w-4 mr-2" />
-              Copiar Mês Anterior
+            <Button onClick={() => copyFromPreviousMonth.mutate()} variant="outline" size="sm" className="flex-shrink-0">
+              <Copy className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Copiar Mês Anterior</span>
             </Button>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Orçamento
+                <Button size="sm" className="flex-shrink-0">
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Adicionar Orçamento</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>{editingBudget ? 'Editar' : 'Adicionar'} Orçamento</DialogTitle>
                   <DialogDescription>
@@ -229,13 +235,11 @@ export default function Orcamento() {
                   </div>
                   <div className="space-y-2">
                     <Label>Valor Planejado</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
+                    <CurrencyInput
                       value={formData.planned_amount}
-                      onChange={(e) => setFormData({ ...formData, planned_amount: e.target.value })}
-                      required
+                      onChange={(value) => setFormData({ ...formData, planned_amount: value })}
+                      currency={selectedCurrency.symbol}
+                      placeholder="0,00"
                     />
                   </div>
                   <div className="space-y-2">
