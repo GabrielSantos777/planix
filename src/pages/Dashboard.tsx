@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Eye, EyeOff, TrendingUp, TrendingDown, CreditCard, Wallet, PlusCircle, MinusCircle, ArrowRightLeft } from "lucide-react"
+import { Eye, EyeOff, TrendingUp, TrendingDown, CreditCard, Wallet, PlusCircle, MinusCircle, ArrowRightLeft, ChevronLeft, ChevronRight } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useCurrency } from "@/context/CurrencyContext"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import Layout from "@/components/Layout"
@@ -21,6 +22,10 @@ const Dashboard = () => {
   const { formatCurrency } = useCurrency()
   const { isPrivacyEnabled, togglePrivacy, hideValue } = usePrivacy()
   const navigate = useNavigate()
+
+  // State for selected month/year
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
 
   useEffect(() => {
     if (isNative) {
@@ -42,14 +47,41 @@ const Dashboard = () => {
     return isPrivacyEnabled ? hideValue(formatted) : formatted
   }
 
-  // Get current month transactions
-  const currentMonth = new Date().getMonth()
-  const currentYear = new Date().getFullYear()
+  // Month navigation functions
+  const goToPreviousMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11)
+      setSelectedYear(selectedYear - 1)
+    } else {
+      setSelectedMonth(selectedMonth - 1)
+    }
+  }
+
+  const goToNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0)
+      setSelectedYear(selectedYear + 1)
+    } else {
+      setSelectedMonth(selectedMonth + 1)
+    }
+  }
+
+  const goToCurrentMonth = () => {
+    setSelectedMonth(new Date().getMonth())
+    setSelectedYear(new Date().getFullYear())
+  }
+
+  const isCurrentMonth = selectedMonth === new Date().getMonth() && selectedYear === new Date().getFullYear()
+
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ]
 
   const currentMonthTransactions = transactions.filter(t => {
     const transactionDate = new Date(t.date)
-    return transactionDate.getMonth() === currentMonth &&
-      transactionDate.getFullYear() === currentYear
+    return transactionDate.getMonth() === selectedMonth &&
+      transactionDate.getFullYear() === selectedYear
   })
 
   const monthlyIncome = currentMonthTransactions
@@ -114,21 +146,60 @@ const Dashboard = () => {
     <Layout>
       <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="w-full sm:w-auto">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold truncate">Dashboard</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">Visão geral das suas finanças</p>
+        <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="w-full sm:w-auto">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold truncate">Dashboard</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Visão geral das suas finanças</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={togglePrivacy}
+              title={isPrivacyEnabled ? "Mostrar valores" : "Ocultar valores"}
+              className="w-full sm:w-auto"
+            >
+              {isPrivacyEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              <span className="ml-2">{isPrivacyEnabled ? "Mostrar" : "Ocultar"} valores</span>
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={togglePrivacy}
-            title={isPrivacyEnabled ? "Mostrar valores" : "Ocultar valores"}
-            className="w-full sm:w-auto"
-          >
-            {isPrivacyEnabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            <span className="ml-2">{isPrivacyEnabled ? "Mostrar" : "Ocultar"} valores</span>
-          </Button>
+
+          {/* Month Selector */}
+          <div className="flex items-center justify-between gap-2 p-3 sm:p-4 bg-muted/50 rounded-lg border">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToPreviousMonth}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <div className="flex items-center gap-2 flex-1 justify-center">
+              <span className="text-sm sm:text-base font-semibold">
+                {monthNames[selectedMonth]} {selectedYear}
+              </span>
+              {!isCurrentMonth && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goToCurrentMonth}
+                  className="text-xs h-7"
+                >
+                  Voltar para hoje
+                </Button>
+              )}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToNextMonth}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Financial Summary Cards - Grid Responsivo */}
