@@ -128,6 +128,7 @@ export const useBudget = (month: number, year: number) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-analytics'] });
       toast.success('Orçamento salvo com sucesso');
     },
     onError: (error) => {
@@ -148,6 +149,7 @@ export const useBudget = (month: number, year: number) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-analytics'] });
       toast.success('Orçamento removido');
     },
     onError: (error) => {

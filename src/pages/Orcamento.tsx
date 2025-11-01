@@ -218,17 +218,33 @@ export default function Orcamento() {
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione uma categoria" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Despesas</div>
+                      <SelectContent className="max-h-[300px]">
+                        <div className="px-2 py-2 text-xs font-semibold text-muted-foreground bg-muted/50 sticky top-0">
+                          Despesas
+                        </div>
                         {expenseCategories.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full" 
+                                style={{ backgroundColor: cat.color }}
+                              />
+                              <span>{cat.name}</span>
+                            </div>
                           </SelectItem>
                         ))}
-                        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground mt-2">Receitas</div>
+                        <div className="px-2 py-2 text-xs font-semibold text-muted-foreground bg-muted/50 sticky top-0 mt-1">
+                          Receitas
+                        </div>
                         {incomeCategories.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full" 
+                                style={{ backgroundColor: cat.color }}
+                              />
+                              <span>{cat.name}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -403,17 +419,23 @@ export default function Orcamento() {
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Planejado</span>
-                          <span className="font-semibold">{formatCurrency(spending.planned, selectedCurrency.code)}</span>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-sm text-muted-foreground">Planejado</span>
+                            <div className="text-xl font-bold">
+                              {formatCurrency(spending.planned, selectedCurrency.code)}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-sm text-muted-foreground">Realizado</span>
+                            <div className="text-xl font-bold text-destructive">
+                              {formatCurrency(spending.actual, selectedCurrency.code)}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Realizado</span>
-                          <span className="font-semibold">{formatCurrency(spending.actual, selectedCurrency.code)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center pt-2 border-t">
                           <span className="text-sm text-muted-foreground">Restante</span>
-                          <span className={`font-semibold ${spending.remaining >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          <span className={`text-lg font-bold ${spending.remaining >= 0 ? 'text-success' : 'text-destructive'}`}>
                             {formatCurrency(spending.remaining, selectedCurrency.code)}
                           </span>
                         </div>
@@ -457,22 +479,28 @@ export default function Orcamento() {
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Previsto</span>
-                          <span className="font-semibold">{formatCurrency(spending.planned, selectedCurrency.code)}</span>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-sm text-muted-foreground">Previsto</span>
+                            <div className="text-xl font-bold text-success">
+                              {formatCurrency(spending.planned, selectedCurrency.code)}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-sm text-muted-foreground">Recebido</span>
+                            <div className="text-xl font-bold text-success">
+                              {formatCurrency(spending.actual, selectedCurrency.code)}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Recebido</span>
-                          <span className="font-semibold">{formatCurrency(spending.actual, selectedCurrency.code)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center pt-2 border-t">
                           <span className="text-sm text-muted-foreground">Diferença</span>
-                          <span className={`font-semibold ${spending.actual >= spending.planned ? 'text-success' : 'text-destructive'}`}>
+                          <span className={`text-lg font-bold ${spending.actual >= spending.planned ? 'text-success' : 'text-destructive'}`}>
                             {formatCurrency(spending.actual - spending.planned, selectedCurrency.code)}
                           </span>
                         </div>
                         <Progress 
-                          value={Math.min((spending.actual / spending.planned) * 100, 100)} 
+                          value={spending.planned > 0 ? Math.min((spending.actual / spending.planned) * 100, 100) : 0} 
                         />
                       </CardContent>
                     </Card>

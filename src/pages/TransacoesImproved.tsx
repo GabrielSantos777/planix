@@ -234,6 +234,36 @@ const TransacoesImproved = () => {
       return
     }
 
+    // Validação de saldo disponível
+    if (newTransaction.type === "expense") {
+      if (newTransaction.payment_method === "account" && newTransaction.account_id) {
+        const account = accounts.find(a => a.id === newTransaction.account_id)
+        if (account && account.current_balance < newTransaction.amount) {
+          toast({
+            title: "Saldo Insuficiente",
+            description: `Saldo disponível: ${formatCurrency(account.current_balance)}. Esta transação excede o saldo da conta.`,
+            variant: "destructive"
+          })
+          return
+        }
+      }
+
+      if (newTransaction.payment_method === "credit_card" && newTransaction.credit_card_id) {
+        const card = creditCards.find(c => c.id === newTransaction.credit_card_id)
+        if (card) {
+          const availableLimit = card.limit_amount - (card.current_balance || 0)
+          if (availableLimit < newTransaction.amount) {
+            toast({
+              title: "Limite Insuficiente",
+              description: `Limite disponível: ${formatCurrency(availableLimit)}. Esta transação excede o limite do cartão.`,
+              variant: "destructive"
+            })
+            return
+          }
+        }
+      }
+    }
+
     try {
       const baseTransactionData = {
         description: newTransaction.description,

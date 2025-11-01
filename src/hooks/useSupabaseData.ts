@@ -352,8 +352,6 @@ export const useSupabaseData = () => {
         if (account) {
           const newBalance = (account.current_balance || 0) + (transaction.amount || 0)
           await updateAccount(transaction.account_id, { current_balance: newBalance })
-          // Refetch accounts to update UI
-          await fetchAccounts()
         }
       }
       
@@ -363,12 +361,10 @@ export const useSupabaseData = () => {
         if (creditCard) {
           const newBalance = (creditCard.current_balance || 0) + Math.abs(transaction.amount || 0)
           await updateCreditCard(transaction.credit_card_id, { current_balance: newBalance })
-          // Refetch credit cards to update UI
-          await fetchCreditCards()
         }
       }
       
-      setTransactions(prev => [data as any, ...prev])
+      await fetchAllData()
       return data
     } catch (error) {
       console.error('Error adding transaction:', error)
@@ -409,8 +405,6 @@ export const useSupabaseData = () => {
           // Apply the new transaction effect
           newBalance += (data.amount || 0)
           await updateAccount(originalTransaction.account_id, { current_balance: newBalance })
-          // Refetch accounts to update UI
-          await fetchAccounts()
         }
       }
       
@@ -423,14 +417,10 @@ export const useSupabaseData = () => {
           // Apply the new transaction effect (add to balance)
           newBalance += Math.abs(data.amount || 0)
           await updateCreditCard(originalTransaction.credit_card_id, { current_balance: newBalance })
-          // Refetch credit cards to update UI
-          await fetchCreditCards()
         }
       }
       
-      setTransactions(prev => prev.map(transaction => 
-        transaction.id === id ? data as any : transaction
-      ))
+      await fetchAllData()
       return data
     } catch (error) {
       console.error('Error updating transaction:', error)
@@ -456,8 +446,6 @@ export const useSupabaseData = () => {
         if (account) {
           const newBalance = (account.current_balance || 0) - (transaction.amount || 0)
           await updateAccount(transaction.account_id, { current_balance: newBalance })
-          // Refetch accounts to update UI
-          await fetchAccounts()
         }
       }
       
@@ -467,12 +455,10 @@ export const useSupabaseData = () => {
         if (creditCard) {
           const newBalance = (creditCard.current_balance || 0) - Math.abs(transaction.amount || 0)
           await updateCreditCard(transaction.credit_card_id, { current_balance: newBalance })
-          // Refetch credit cards to update UI
-          await fetchCreditCards()
         }
       }
       
-      setTransactions(prev => prev.filter(transaction => transaction.id !== id))
+      await fetchAllData()
     } catch (error) {
       console.error('Error deleting transaction:', error)
       throw error
