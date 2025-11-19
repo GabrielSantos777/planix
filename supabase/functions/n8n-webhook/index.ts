@@ -109,11 +109,15 @@ serve(async (req) => {
       );
     }
 
-    // Handle category creation
+    // Handle category creation (DISABLED: categories must be managed in app)
     if (body.action === 'create_category') {
-      // SECURITY: Validate input
-      let validatedCategory;
-      try {
+      return new Response(
+        JSON.stringify({
+          error: 'Criação de categorias via webhook desabilitada. Use o app para gerenciar categorias.',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
         validatedCategory = categorySchema.parse({
           user_id: body.user_id,
           name: body.name,

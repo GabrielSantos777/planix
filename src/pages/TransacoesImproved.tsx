@@ -51,13 +51,13 @@ const TransacoesImproved = () => {
   } = useSupabaseData()
   const [searchParams] = useSearchParams()
   
-  const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
   const [filterCategory, setFilterCategory] = useState<string>("all")
   const [filterMonth, setFilterMonth] = useState<string>("all") // "all" or YYYY-MM format
   const [filterContact, setFilterContact] = useState<string>("all")
   const [filterAccount, setFilterAccount] = useState<string>("all")
   const [filterCreditCard, setFilterCreditCard] = useState<string>("all")
+  const [filterResponsible, setFilterResponsible] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
   
@@ -106,20 +106,20 @@ const TransacoesImproved = () => {
       return false
     }
 
-    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesAccount = filterAccount === "all" || transaction.account_id === filterAccount
     const matchesCreditCard = filterCreditCard === "all" || transaction.credit_card_id === filterCreditCard
     const matchesType = filterType === "all" || transaction.type === filterType
     const matchesCategory = filterCategory === "all" || transaction.category_id === filterCategory
-    const matchesContact = filterContact === "all" || 
-                          (filterContact === "me" && !transaction.contact_id) ||
-                          transaction.contact_id === filterContact
+    const matchesContact = filterContact === "all" || transaction.contact_id === filterContact
+    const matchesResponsible = filterResponsible === "all" ||
+                              (filterResponsible === "me" && !transaction.contact_id) ||
+                              (filterResponsible === "contact" && !!transaction.contact_id)
     
     // Filter by month (YYYY-MM) - only if not "all"
     const transactionMonth = transaction.date.slice(0, 7) // Get YYYY-MM from date
     const matchesMonth = filterMonth === "all" || transactionMonth === filterMonth
-
-    return matchesSearch && matchesType && matchesCategory && matchesMonth && matchesContact && matchesAccount && matchesCreditCard
+ 
+    return matchesType && matchesCategory && matchesMonth && matchesContact && matchesAccount && matchesCreditCard && matchesResponsible
   })
 
   const handleAddTransaction = async () => {
@@ -642,18 +642,7 @@ const TransacoesImproved = () => {
             <CardTitle className="text-lg">Filtros</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-              <div className="sm:col-span-2 lg:col-span-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar transações..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
                 <Select value={filterType} onValueChange={setFilterType}>
                   <SelectTrigger>
@@ -677,21 +666,6 @@ const TransacoesImproved = () => {
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id}>
                         {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Select value={filterAccount} onValueChange={setFilterAccount}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Conta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as contas</SelectItem>
-                    {accounts.filter(a => a.type !== 'investment').map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -730,6 +704,18 @@ const TransacoesImproved = () => {
                         </SelectItem>
                       )
                     })}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select value={filterResponsible} onValueChange={setFilterResponsible}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os responsáveis</SelectItem>
+                    <SelectItem value="me">Você</SelectItem>
+                    <SelectItem value="contact">Contato</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

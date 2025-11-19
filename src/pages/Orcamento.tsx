@@ -87,7 +87,6 @@ export default function Orcamento() {
     setFormData({ category_id: '', planned_amount: 0, notes: '' });
     setEditingBudget(null);
     setIsAddDialogOpen(false);
-  };
 
   const handleEdit = (budget: any) => {
     setEditingBudget(budget);
