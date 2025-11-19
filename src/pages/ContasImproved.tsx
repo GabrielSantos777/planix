@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import Layout from "@/components/Layout"
 import { CreditCardInvoices } from "@/components/CreditCardInvoices"
+import { AccountTransactions } from "@/components/AccountTransactions"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from "@/components/ui/carousel"
 
 const accountTypeLabels = {
@@ -441,43 +442,55 @@ export default function ContasImproved() {
       .slice(0, 5)
   }
 
-  // Get transactions grouped by month for credit cards with correct current month logic
+  // Get transactions grouped by month for credit cards with correct invoice logic
   const getCreditCardMonthlyInvoices = (cardId): MonthlyInvoice[] => {
     const cardTransactions = transactions.filter(t => t.credit_card_id === cardId)
+    const card = creditCards.find(c => c.id === cardId)
+    
+    if (!card) return []
     
     const invoicesByMonth: { [key: string]: MonthlyInvoice } = {}
+    const today = new Date()
     
     cardTransactions.forEach(transaction => {
       const transactionDate = new Date(transaction.date)
-      const card = creditCards.find(c => c.id === cardId)
       
-      if (!card) return
-      
-      // Calculate invoice month based on closing day
+      // Determinar a qual fatura a transação pertence
       let invoiceMonth, invoiceYear
-      const currentDate = new Date()
       
-      if (transactionDate.getDate() <= card.closing_day) {
-        // Transaction is for current month's invoice
-        invoiceMonth = transactionDate.getMonth()
-        invoiceYear = transactionDate.getFullYear()
-      } else {
-        // Transaction is for next month's invoice
+      // Se a transação foi feita após o dia de fechamento, vai para a próxima fatura
+      if (transactionDate.getDate() > card.closing_day) {
         const nextMonth = new Date(transactionDate.getFullYear(), transactionDate.getMonth() + 1, 1)
         invoiceMonth = nextMonth.getMonth()
         invoiceYear = nextMonth.getFullYear()
+      } else {
+        // Transação antes ou no dia de fechamento = fatura do mês atual da transação
+        invoiceMonth = transactionDate.getMonth()
+        invoiceYear = transactionDate.getFullYear()
       }
       
       const invoiceKey = `${invoiceYear}-${invoiceMonth.toString().padStart(2, '0')}`
       
       if (!invoicesByMonth[invoiceKey]) {
+        const dueDate = new Date(invoiceYear, invoiceMonth, card.due_day)
+        
+        // Determinar status da fatura
+        let status: 'open' | 'closed' | 'paid' = 'open'
+        const closingDate = new Date(invoiceYear, invoiceMonth, card.closing_day)
+        
+        if (today > dueDate) {
+          status = 'paid' // Vencida (assumir paga por agora)
+        } else if (today > closingDate) {
+          status = 'closed' // Fechada mas ainda não vencida
+        }
+        
         invoicesByMonth[invoiceKey] = {
           month: invoiceMonth,
           year: invoiceYear,
           transactions: [],
           total: 0,
-          dueDate: new Date(invoiceYear, invoiceMonth, card.due_day),
-          status: 'open' as 'open' | 'closed' | 'paid'
+          dueDate,
+          status
         }
       }
       
@@ -699,6 +712,13 @@ export default function ContasImproved() {
                           </div>
                         </CardContent>
                       </Card>
+                      
+                      {/* Account Transactions */}
+                      <AccountTransactions 
+                        accountId={account.id} 
+                        accountName={account.name}
+                        className="mt-4"
+                      />
                     </CarouselItem>
                   ))}
                 </CarouselContent>

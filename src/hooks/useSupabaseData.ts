@@ -636,11 +636,11 @@ export const useSupabaseData = () => {
     }
   }
 
-  // Helper: find or create the general investments account
+  // Helper: find or create the investment account
   const getOrCreateInvestmentAccount = async (): Promise<Account> => {
-    // Try to find in current state first
+    // Try to find an investment account (prefer one named "Investimentos")
     let investmentAccount = accounts.find(
-      (a) => a.type === 'investment' && a.name === 'Investimentos - Conta Geral'
+      (a) => a.type === 'investment' && a.name === 'Investimentos'
     )
 
     if (investmentAccount) return investmentAccount
@@ -652,7 +652,7 @@ export const useSupabaseData = () => {
         .select('*')
         .eq('user_id', user.id)
         .eq('type', 'investment')
-        .eq('name', 'Investimentos - Conta Geral')
+        .eq('name', 'Investimentos')
         .maybeSingle()
 
       if (data) {
@@ -663,7 +663,7 @@ export const useSupabaseData = () => {
 
     // Create if it doesn't exist
     const created = await addAccount({
-      name: 'Investimentos - Conta Geral',
+      name: 'Investimentos',
       type: 'investment' as any,
       initial_balance: 0,
       currency: 'BRL',
