@@ -15,7 +15,7 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
   const { formatCurrency } = useCurrency()
   const { isPrivacyEnabled } = usePrivacy()
 
-  // Cálculo do saldo total mensal nos últimos 12 meses
+  // Cálculo do patrimônio líquido mensal nos últimos 12 meses
   const evolutionData = useMemo(() => {
     const last12Months = Array.from({ length: 12 }, (_, i) => {
       const date = new Date()
@@ -28,23 +28,30 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
     })
 
     return last12Months.map(({ month, year, monthIndex }) => {
-      // Calcular todas as transações até o final deste mês
+      // Calcular patrimônio líquido no final deste mês
       const endOfMonth = new Date(year, monthIndex + 1, 0)
+      
+      // Filtrar transações até o final deste mês
       const transactionsUpToMonth = transactions.filter(t => new Date(t.date) <= endOfMonth)
       
-      // Somar saldos iniciais das contas
-      const accountsBalance = accounts.reduce((sum, account) => sum + (account.initial_balance || 0), 0)
+      // Somar saldos iniciais de todas as contas (exceto investimentos que já estão nas transações)
+      const accountsBalance = accounts
+        .filter(acc => acc.type !== 'investment')
+        .reduce((sum, account) => sum + (account.initial_balance || 0), 0)
       
-      // Somar movimentações das transações
-      const movementsBalance = transactionsUpToMonth.reduce((sum, t) => {
+      // Somar todas as movimentações (receitas - despesas) até este mês
+      const transactionsBalance = transactionsUpToMonth.reduce((sum, t) => {
+        // Ignorar transferências para não duplicar valores
+        if (t.is_transfer) return sum
         return sum + (t.amount || 0)
       }, 0)
       
-      const totalBalance = accountsBalance + movementsBalance
+      // Patrimônio líquido = saldo inicial das contas + movimentações
+      const netWorth = accountsBalance + transactionsBalance
 
       return {
         month,
-        balance: totalBalance
+        balance: netWorth
       }
     })
   }, [transactions, accounts])

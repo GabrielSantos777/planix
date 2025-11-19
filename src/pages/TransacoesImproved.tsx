@@ -56,6 +56,8 @@ const TransacoesImproved = () => {
   const [filterCategory, setFilterCategory] = useState<string>("all")
   const [filterMonth, setFilterMonth] = useState<string>("all") // "all" or YYYY-MM format
   const [filterContact, setFilterContact] = useState<string>("all")
+  const [filterAccount, setFilterAccount] = useState<string>("all")
+  const [filterCreditCard, setFilterCreditCard] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
   
@@ -99,12 +101,14 @@ const TransacoesImproved = () => {
     if (
       transaction.type === 'transfer' &&
       transaction.account &&
-      (transaction.account.name === 'Investimentos - Conta Geral' || transaction.account.type === 'investment')
+      (transaction.account.name === 'Investimentos' || transaction.account.type === 'investment')
     ) {
       return false
     }
 
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesAccount = filterAccount === "all" || transaction.account_id === filterAccount
+    const matchesCreditCard = filterCreditCard === "all" || transaction.credit_card_id === filterCreditCard
     const matchesType = filterType === "all" || transaction.type === filterType
     const matchesCategory = filterCategory === "all" || transaction.category_id === filterCategory
     const matchesContact = filterContact === "all" || 
@@ -115,7 +119,7 @@ const TransacoesImproved = () => {
     const transactionMonth = transaction.date.slice(0, 7) // Get YYYY-MM from date
     const matchesMonth = filterMonth === "all" || transactionMonth === filterMonth
 
-    return matchesSearch && matchesType && matchesCategory && matchesMonth && matchesContact
+    return matchesSearch && matchesType && matchesCategory && matchesMonth && matchesContact && matchesAccount && matchesCreditCard
   })
 
   const handleAddTransaction = async () => {
@@ -638,7 +642,7 @@ const TransacoesImproved = () => {
             <CardTitle className="text-lg">Filtros</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
               <div className="sm:col-span-2 lg:col-span-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -679,6 +683,36 @@ const TransacoesImproved = () => {
                 </Select>
               </div>
               <div>
+                <Select value={filterAccount} onValueChange={setFilterAccount}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Conta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as contas</SelectItem>
+                    {accounts.filter(a => a.type !== 'investment').map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select value={filterCreditCard} onValueChange={setFilterCreditCard}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Cartão" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os cartões</SelectItem>
+                    {creditCards.map((card) => (
+                      <SelectItem key={card.id} value={card.id}>
+                        {card.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Select value={filterMonth} onValueChange={setFilterMonth}>
                   <SelectTrigger>
                     <SelectValue placeholder="Mês" />
@@ -699,21 +733,13 @@ const TransacoesImproved = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Select value={filterContact} onValueChange={setFilterContact}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="me">Você</SelectItem>
-                    {contacts.map(contact => (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        {contact.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            </div>
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {filteredTransactions.length} transação(ões) encontrada(s)
+              </p>
+              <div className="text-sm font-medium">
+                Total: {formatCurrency(filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0))}
               </div>
             </div>
           </CardContent>
