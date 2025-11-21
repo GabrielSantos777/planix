@@ -37,13 +37,14 @@ const COLORS = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'
 const RelatoriosImproved = () => {
   const { toast } = useToast()
   const { formatCurrency } = useCurrency()
-  const { transactions, categories, accounts, creditCards } = useSupabaseData()
+  const { transactions, categories, accounts, creditCards, contacts } = useSupabaseData()
   
   // Estados para filtros
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM format
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
   const [accountFilter, setAccountFilter] = useState("all")
+  const [contactFilter, setContactFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [descriptionFilter, setDescriptionFilter] = useState("")
 
@@ -53,13 +54,14 @@ const RelatoriosImproved = () => {
     setCategoryFilter("all")
     setTypeFilter("all")
     setAccountFilter("all")
+    setContactFilter("all")
     setStatusFilter("all")
     setDescriptionFilter("")
   }
 
   // Verificar se há filtros ativos
   const hasActiveFilters = categoryFilter !== "all" || 
-    typeFilter !== "all" || accountFilter !== "all" || statusFilter !== "all" || descriptionFilter
+    typeFilter !== "all" || accountFilter !== "all" || contactFilter !== "all" || statusFilter !== "all" || descriptionFilter
 
   // Filter transactions based on all filters
   const filteredTransactions = useMemo(() => {
@@ -84,6 +86,9 @@ const RelatoriosImproved = () => {
         accountMatch = transaction.account_id === accountFilter || transaction.credit_card_id === accountFilter
       }
       
+      // Filtro de contato (responsável)
+      const contactMatch = contactFilter === "all" || transaction.contact_id === contactFilter
+      
       // Filtro de status (simulado baseado na data - se futuro = pendente)
       let statusMatch = true
       if (statusFilter !== "all") {
@@ -94,18 +99,31 @@ const RelatoriosImproved = () => {
         if (statusFilter === "pending" && isPaid) statusMatch = false
       }
 
-      return dateMatch && descriptionMatch && categoryMatch && typeMatch && accountMatch && statusMatch
+      return dateMatch && descriptionMatch && categoryMatch && typeMatch && accountMatch && contactMatch && statusMatch
     })
 
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [transactions, filterMonth, categoryFilter, typeFilter, accountFilter, statusFilter, descriptionFilter])
 
+  // Calcular totais evitando dupla contagem de pagamento de fatura de cartão
   const totalIncome = filteredTransactions
     .filter(t => t.type === "income")
     .reduce((sum, t) => sum + (t.amount || 0), 0)
 
+  // Para despesas, excluir pagamentos de fatura de cartão (que já foram contabilizados na compra)
   const totalExpenses = filteredTransactions
-    .filter(t => t.type === "expense")
+    .filter(t => {
+      if (t.type !== "expense") return false
+      
+      // Verificar se é um pagamento de fatura de cartão
+      // Um pagamento de fatura geralmente tem descrição contendo "pagamento" ou "fatura"
+      // e tem tanto account_id quanto referência a cartão
+      const isInvoicePayment = t.description?.toLowerCase().includes('pagamento') && 
+                               t.description?.toLowerCase().includes('fatura')
+      
+      // Não contar pagamentos de fatura
+      return !isInvoicePayment
+    })
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
   const netBalance = totalIncome - totalExpenses
@@ -368,6 +386,7 @@ const RelatoriosImproved = () => {
                       categoryFilter !== "all" && "Categoria",
                       typeFilter !== "all" && "Tipo",
                       accountFilter !== "all" && "Conta",
+                      contactFilter !== "all" && "Responsável",
                       statusFilter !== "all" && "Status",
                       descriptionFilter && "Descrição"
                     ].filter(Boolean).length} filtro(s) ativo(s)
@@ -383,22 +402,26 @@ const RelatoriosImproved = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-              {/* Filtro de Mês */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+              {/* Filtro de Tipo */}
               <div className="space-y-2">
-                <Label htmlFor="filterMonth">Mês</Label>
-                <Input
-                  id="filterMonth"
-                  type="month"
-                  value={filterMonth}
-                  onChange={(e) => setFilterMonth(e.target.value)}
-                  className="w-full"
-                />
+                <Label>Filtro por Tipo</Label>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    <SelectItem value="income">Receita</SelectItem>
+                    <SelectItem value="expense">Despesa</SelectItem>
+                    <SelectItem value="transfer">Transferência</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Categoria */}
+              {/* Filtro de Categoria */}
               <div className="space-y-2">
-                <Label>Categoria</Label>
+                <Label>Filtro por Categoria</Label>
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todas" />
@@ -414,25 +437,9 @@ const RelatoriosImproved = () => {
                 </Select>
               </div>
 
-              {/* Tipo */}
+              {/* Filtro de Conta */}
               <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os tipos</SelectItem>
-                    <SelectItem value="income">Receita</SelectItem>
-                    <SelectItem value="expense">Despesa</SelectItem>
-                    <SelectItem value="transfer">Transferência</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Conta */}
-              <div className="space-y-2">
-                <Label>Conta</Label>
+                <Label>Filtro por Conta</Label>
                 <Select value={accountFilter} onValueChange={setAccountFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todas" />
@@ -448,9 +455,39 @@ const RelatoriosImproved = () => {
                 </Select>
               </div>
 
-              {/* Status */}
+              {/* Filtro de Responsável/Contato */}
               <div className="space-y-2">
-                <Label>Status</Label>
+                <Label>Filtro por Responsável</Label>
+                <Select value={contactFilter} onValueChange={setContactFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {contacts.map(contact => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro de Mês */}
+              <div className="space-y-2">
+                <Label htmlFor="filterMonth">Filtro por Mês</Label>
+                <Input
+                  id="filterMonth"
+                  type="month"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Filtro de Status */}
+              <div className="space-y-2">
+                <Label>Filtro por Status</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos" />
