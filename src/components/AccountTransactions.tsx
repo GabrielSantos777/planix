@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { useCurrency } from '@/context/CurrencyContext'
 import { TrendingUp, TrendingDown, ArrowUpDown } from 'lucide-react'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 interface AccountTransactionsProps {
   accountId: string
@@ -15,6 +16,7 @@ interface AccountTransactionsProps {
 export const AccountTransactions = ({ accountId, accountName, className }: AccountTransactionsProps) => {
   const { transactions, categories } = useSupabaseData()
   const { formatCurrency } = useCurrency()
+  const isMobile = useIsMobile()
 
   const accountTransactions = useMemo(() => {
     return transactions
@@ -52,6 +54,56 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
       default:
         return null
     }
+  }
+
+  if (isMobile) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle>Transações de {accountName}</CardTitle>
+          <CardDescription>
+            {accountTransactions.length} transação(ões) encontrada(s)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {accountTransactions.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              Nenhuma transação encontrada
+            </div>
+          ) : (
+            accountTransactions.map((transaction) => (
+              <Card key={transaction.id} className="p-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium">{transaction.description}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className={
+                        transaction.type === 'income' 
+                          ? 'text-success font-semibold' 
+                          : transaction.type === 'expense'
+                          ? 'text-destructive font-semibold'
+                          : 'font-semibold'
+                      }>
+                        {formatCurrency(transaction.amount)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">{getCategoryName(transaction.category_id)}</span>
+                    {getTypeBadge(transaction.type)}
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    )
   }
 
   return (

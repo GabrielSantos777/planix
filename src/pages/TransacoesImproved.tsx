@@ -57,7 +57,6 @@ const TransacoesImproved = () => {
   const [filterContact, setFilterContact] = useState<string>("all")
   const [filterAccount, setFilterAccount] = useState<string>("all")
   const [filterCreditCard, setFilterCreditCard] = useState<string>("all")
-  const [filterResponsible, setFilterResponsible] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
   
@@ -110,16 +109,15 @@ const TransacoesImproved = () => {
     const matchesCreditCard = filterCreditCard === "all" || transaction.credit_card_id === filterCreditCard
     const matchesType = filterType === "all" || transaction.type === filterType
     const matchesCategory = filterCategory === "all" || transaction.category_id === filterCategory
-    const matchesContact = filterContact === "all" || transaction.contact_id === filterContact
-    const matchesResponsible = filterResponsible === "all" ||
-                              (filterResponsible === "me" && !transaction.contact_id) ||
-                              (filterResponsible === "contact" && !!transaction.contact_id)
+    const matchesContact = filterContact === "all" || 
+                          (filterContact === "me" && !transaction.contact_id) || 
+                          transaction.contact_id === filterContact
     
     // Filter by month (YYYY-MM) - only if not "all"
     const transactionMonth = transaction.date.slice(0, 7) // Get YYYY-MM from date
     const matchesMonth = filterMonth === "all" || transactionMonth === filterMonth
  
-    return matchesType && matchesCategory && matchesMonth && matchesContact && matchesAccount && matchesCreditCard && matchesResponsible
+    return matchesType && matchesCategory && matchesMonth && matchesContact && matchesAccount && matchesCreditCard
   })
 
   const handleAddTransaction = async () => {
@@ -708,14 +706,18 @@ const TransacoesImproved = () => {
                 </Select>
               </div>
               <div>
-                <Select value={filterResponsible} onValueChange={setFilterResponsible}>
+                <Select value={filterContact} onValueChange={setFilterContact}>
                   <SelectTrigger>
                     <SelectValue placeholder="Responsável" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os responsáveis</SelectItem>
                     <SelectItem value="me">Você</SelectItem>
-                    <SelectItem value="contact">Contato</SelectItem>
+                    {contacts.map((contact) => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
