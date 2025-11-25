@@ -37,3 +37,12 @@ verify_jwt = true
 
 [functions.transaction-manager]
 verify_jwt = true
+
+[functions.boletos-consent]
+verify_jwt = true
+
+[functions.boletos-cpf]
+verify_jwt = true
+
+[functions.boletos-search]
+verify_jwt = true

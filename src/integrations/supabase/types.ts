@@ -89,6 +89,63 @@ export type Database = {
         }
         Relationships: []
       }
+      boletos: {
+        Row: {
+          additional_info: Json | null
+          amount: number
+          barcode: string | null
+          beneficiary: string
+          created_at: string
+          digitable_line: string | null
+          due_date: string
+          external_id: string
+          id: string
+          payer_document: string | null
+          payer_name: string | null
+          payment_date: string | null
+          status: string
+          synced_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          additional_info?: Json | null
+          amount: number
+          barcode?: string | null
+          beneficiary: string
+          created_at?: string
+          digitable_line?: string | null
+          due_date: string
+          external_id: string
+          id?: string
+          payer_document?: string | null
+          payer_name?: string | null
+          payment_date?: string | null
+          status: string
+          synced_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          additional_info?: Json | null
+          amount?: number
+          barcode?: string | null
+          beneficiary?: string
+          created_at?: string
+          digitable_line?: string | null
+          due_date?: string
+          external_id?: string
+          id?: string
+          payer_document?: string | null
+          payer_name?: string | null
+          payment_date?: string | null
+          status?: string
+          synced_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       budget_settings: {
         Row: {
           created_at: string
@@ -702,6 +759,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_consents: {
+        Row: {
+          consent_text: string
+          consent_type: string
+          consent_version: string
+          created_at: string
+          granted_at: string
+          id: string
+          ip_address: unknown
+          is_active: boolean
+          revoked_at: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          consent_text: string
+          consent_type?: string
+          consent_version?: string
+          created_at?: string
+          granted_at?: string
+          id?: string
+          ip_address?: unknown
+          is_active?: boolean
+          revoked_at?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          consent_text?: string
+          consent_type?: string
+          consent_version?: string
+          created_at?: string
+          granted_at?: string
+          id?: string
+          ip_address?: unknown
+          is_active?: boolean
+          revoked_at?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_cpf_tokens: {
+        Row: {
+          cpf_token: string
+          created_at: string
+          encrypted_cpf: string
+          id: string
+          last_used_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cpf_token: string
+          created_at?: string
+          encrypted_cpf: string
+          id?: string
+          last_used_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cpf_token?: string
+          created_at?: string
+          encrypted_cpf?: string
+          id?: string
+          last_used_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

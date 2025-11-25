@@ -31,6 +31,7 @@ import WhatsAppConnection from "./pages/WhatsAppConnection";
 import Categorias from "./pages/Categorias";
 import Contacts from "./pages/Contacts";
 import Social from "./pages/Social";
+import Boletos from "./pages/Boletos";
 import AboutUs from "./pages/AboutUs";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -123,6 +124,11 @@ const App = () => (
                        <Route path="/social" element={
                          <ProtectedRoute>
                            <Social />
+                         </ProtectedRoute>
+                       } />
+                       <Route path="/boletos" element={
+                         <ProtectedRoute requireSubscription>
+                           <Boletos />
                          </ProtectedRoute>
                        } />
                        <Route path="/sobre" element={<AboutUs />} />
