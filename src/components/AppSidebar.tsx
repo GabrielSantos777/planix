@@ -12,7 +12,8 @@ import {
   X,
   Users,
   Share2,
-  PieChart
+  PieChart,
+  FileText
 } from "lucide-react"
 
 import { useSidebar } from "@/components/ui/sidebar"
@@ -64,6 +65,11 @@ const items = [
     title: "Social", 
     url: "/social", 
     icon: Share2 
+  },
+  { 
+    title: "Boletos", 
+    url: "/boletos", 
+    icon: FileText 
   },
   { 
     title: "Configurações", 
