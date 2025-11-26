@@ -1,498 +1,500 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2, FileText, RefreshCw, Download, Trash2, Calendar, DollarSign } from "lucide-react";
-import { toast } from "sonner";
-import { formatCurrency, formatDate } from "@/utils/formatters";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Search, Download, RefreshCw, FileText, AlertCircle, CheckCircle, Clock } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/integrations/supabase/client"
+import { formatCurrency, formatDate } from "@/utils/formatters"
+import { formatCPF, unformatCPF, validateCPF } from "@/utils/cpfFormatter"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import Layout from "@/components/Layout"
+
+const CONSENT_TEXT = `
+Ao autorizar, você está consentindo que:
+
+1. Suas informações de boletos sejam consultadas via Open Finance
+2. Os dados sejam armazenados de forma segura e criptografada
+3. Seu CPF seja usado exclusivamente para consulta de boletos
+4. Você pode revogar este consentimento a qualquer momento
+
+Esta autorização é necessária para cumprir com a LGPD e as regulamentações do Open Finance Brasil.
+`
 
 interface Boleto {
-  id: string;
-  external_id: string;
-  barcode: string;
-  digitable_line: string;
-  beneficiary: string;
-  amount: number;
-  due_date: string;
-  payment_date?: string;
-  status: 'open' | 'paid' | 'overdue' | 'cancelled';
-  payer_name: string;
-  payer_document: string;
-  synced_at: string;
+  id: string
+  external_id: string
+  barcode: string | null
+  digitable_line: string | null
+  beneficiary: string
+  amount: number
+  due_date: string
+  payment_date: string | null
+  status: string
+  payer_name: string | null
+  payer_document: string | null
+  synced_at: string
 }
 
-const CONSENT_TEXT = `Para exibir seus boletos, precisamos consultar dados junto aos provedores bancários via Open Finance usando seu CPF. Estes dados serão utilizados apenas para listar seus boletos (consulta e exibição), por até 12 meses, e serão armazenados de forma segura e pseudonimizada. Você pode revogar este consentimento a qualquer momento e solicitar a exclusão dos seus dados. Tratamos esses dados em conformidade com a Lei Geral de Proteção de Dados (LGPD). Para saber mais, consulte nossa Política de Privacidade ou entre em contato com o encarregado: contato@financeapp.com`;
-
-export default function Boletos() {
-  const { user } = useAuth();
-  const isMobile = useIsMobile();
-  
-  const [boletos, setBoletos] = useState<Boleto[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  
-  const [hasConsent, setHasConsent] = useState(false);
-  const [hasCPF, setHasCPF] = useState(false);
-  const [showConsentModal, setShowConsentModal] = useState(false);
-  const [showCPFModal, setShowCPFModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  
-  const [cpf, setCpf] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+const Boletos = () => {
+  const [boletos, setBoletos] = useState<Boleto[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [showConsentModal, setShowConsentModal] = useState(false)
+  const [showCPFModal, setShowCPFModal] = useState(false)
+  const [hasConsent, setHasConsent] = useState(false)
+  const [hasCPF, setHasCPF] = useState(false)
+  const [cpfInput, setCpfInput] = useState("")
+  const { toast } = useToast()
 
   useEffect(() => {
-    checkConsentAndCPF();
-  }, [user]);
-
-  useEffect(() => {
-    if (hasConsent && hasCPF) {
-      loadBoletos();
-    }
-  }, [hasConsent, hasCPF]);
+    checkConsentAndCPF()
+  }, [])
 
   const checkConsentAndCPF = async () => {
-    if (!user) return;
-
     try {
-      // Check consent
-      const { data: consentData } = await supabase.functions.invoke('boletos-consent', {
-        body: { action: 'check' },
-      });
+      setLoading(true)
 
-      setHasConsent(consentData?.has_consent || false);
-
-      // Check CPF
-      const { data: cpfData } = await supabase.functions.invoke('boletos-cpf', {
-        body: { action: 'get' },
-      });
-
-      setHasCPF(cpfData?.has_cpf || false);
-
-      // Show consent modal if needed
-      if (!consentData?.has_consent) {
-        setShowConsentModal(true);
-      } else if (!cpfData?.has_cpf) {
-        setShowCPFModal(true);
+      // Verificar se o usuário tem CPF no perfil
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({
+          title: "Erro de autenticação",
+          description: "Você precisa estar logado",
+          variant: "destructive",
+        })
+        return
       }
-    } catch (error) {
-      console.error('Error checking consent/CPF:', error);
-    }
-  };
 
-  const handleConsent = async (accepted: boolean) => {
-    if (!accepted) {
-      setShowConsentModal(false);
-      toast.error("É necessário aceitar o consentimento para usar este recurso");
-      return;
-    }
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('cpf')
+        .eq('user_id', user.id)
+        .single()
 
-    try {
-      const { data, error } = await supabase.functions.invoke('boletos-consent', {
-        body: {
-          action: 'create',
-          consent_text: CONSENT_TEXT,
-          consent_version: 'v1.0',
-        },
-      });
+      if (profileError) throw profileError
 
-      if (error) throw error;
+      const hasCPFValue = !!profile?.cpf
+      setHasCPF(hasCPFValue)
 
-      setHasConsent(true);
-      setShowConsentModal(false);
-      setShowCPFModal(true);
-      toast.success("Consentimento registrado com sucesso!");
+      // Verificar consentimento
+      const { data: consentData, error: consentError } = await supabase.functions.invoke(
+        'boletos-consent',
+        {
+          body: { action: 'check' },
+        }
+      )
+
+      if (consentError) throw consentError
+
+      const hasConsentValue = consentData?.has_consent || false
+      setHasConsent(hasConsentValue)
+
+      // Se não tem CPF, solicitar
+      if (!hasCPFValue) {
+        setShowCPFModal(true)
+        return
+      }
+
+      // Se não tem consentimento, solicitar
+      if (!hasConsentValue) {
+        setShowConsentModal(true)
+        return
+      }
+
+      // Se tem tudo, carregar boletos
+      await loadBoletos()
     } catch (error: any) {
-      console.error('Error creating consent:', error);
-      toast.error("Erro ao registrar consentimento");
+      console.error('Error checking consent and CPF:', error)
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao verificar dados",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
   const handleSaveCPF = async () => {
-    if (!cpf || cpf.replace(/\D/g, '').length !== 11) {
-      toast.error("Por favor, insira um CPF válido");
-      return;
+    const cleanCPF = unformatCPF(cpfInput)
+    
+    if (!validateCPF(cleanCPF)) {
+      toast({
+        title: "CPF inválido",
+        description: "Por favor, digite um CPF válido",
+        variant: "destructive",
+      })
+      return
     }
 
     try {
-      const { error } = await supabase.functions.invoke('boletos-cpf', {
-        body: {
-          action: 'save',
-          cpf: cpf,
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Usuário não autenticado")
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ cpf: cleanCPF })
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      setHasCPF(true)
+      setShowCPFModal(false)
+      setCpfInput("")
+      
+      toast({
+        title: "CPF salvo com sucesso",
+        description: "Agora você pode consultar seus boletos",
+      })
+
+      // Verificar consentimento
+      if (!hasConsent) {
+        setShowConsentModal(true)
+      } else {
+        await loadBoletos()
+      }
+    } catch (error: any) {
+      console.error('Error saving CPF:', error)
+      toast({
+        title: "Erro ao salvar CPF",
+        description: error.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleConsent = async (granted: boolean) => {
+    if (!granted) {
+      setShowConsentModal(false)
+      toast({
+        title: "Consentimento negado",
+        description: "Você precisa autorizar para consultar boletos",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase.functions.invoke('boletos-consent', {
+        body: { 
+          action: 'create',
+          consent_text: CONSENT_TEXT,
         },
-      });
+      })
 
-      if (error) throw error;
+      if (error) throw error
 
-      setHasCPF(true);
-      setShowCPFModal(false);
-      toast.success("CPF salvo com sucesso!");
-      loadBoletos();
+      setHasConsent(true)
+      setShowConsentModal(false)
+      
+      toast({
+        title: "Consentimento registrado",
+        description: "Consultando seus boletos...",
+      })
+
+      await loadBoletos()
     } catch (error: any) {
-      console.error('Error saving CPF:', error);
-      toast.error("Erro ao salvar CPF");
+      console.error('Error creating consent:', error)
+      toast({
+        title: "Erro ao registrar consentimento",
+        description: error.message,
+        variant: "destructive",
+      })
     }
-  };
-
-  const handleDeleteCPF = async () => {
-    try {
-      const { error } = await supabase.functions.invoke('boletos-cpf', {
-        body: { action: 'delete' },
-      });
-
-      if (error) throw error;
-
-      setHasCPF(false);
-      setBoletos([]);
-      setShowDeleteConfirm(false);
-      toast.success("CPF e dados removidos com sucesso!");
-    } catch (error: any) {
-      console.error('Error deleting CPF:', error);
-      toast.error("Erro ao remover CPF");
-    }
-  };
+  }
 
   const loadBoletos = async () => {
-    if (!user || !hasConsent || !hasCPF) return;
-
-    setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('boletos-search', {
-        body: {},
-      });
+      setLoading(true)
 
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('boletos-search')
 
-      setBoletos(data?.boletos || []);
+      if (error) throw error
+
+      setBoletos(data?.boletos || [])
+      
+      toast({
+        title: "Boletos carregados",
+        description: `${data?.boletos?.length || 0} boletos encontrados`,
+      })
     } catch (error: any) {
-      console.error('Error loading boletos:', error);
-      toast.error(error.message || "Erro ao carregar boletos");
+      console.error('Error loading boletos:', error)
+      toast({
+        title: "Erro ao carregar boletos",
+        description: error.message,
+        variant: "destructive",
+      })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadBoletos();
-    setRefreshing(false);
-    toast.success("Boletos atualizados!");
-  };
+    setRefreshing(true)
+    await loadBoletos()
+    setRefreshing(false)
+  }
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      open: { variant: "secondary" as const, label: "Em Aberto" },
-      paid: { variant: "default" as const, label: "Pago" },
-      overdue: { variant: "destructive" as const, label: "Vencido" },
-      cancelled: { variant: "outline" as const, label: "Cancelado" },
-    };
-    const config = variants[status] || variants.open;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+    switch (status) {
+      case 'paid':
+        return (
+          <Badge className="bg-green-500/10 text-green-700 dark:text-green-400">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Pago
+          </Badge>
+        )
+      case 'open':
+        return (
+          <Badge className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400">
+            <Clock className="w-3 h-3 mr-1" />
+            Em aberto
+          </Badge>
+        )
+      case 'overdue':
+        return (
+          <Badge className="bg-red-500/10 text-red-700 dark:text-red-400">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Vencido
+          </Badge>
+        )
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
 
   const filteredBoletos = boletos.filter(boleto => {
-    const matchesStatus = statusFilter === "all" || boleto.status === statusFilter;
     const matchesSearch = 
       boleto.beneficiary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      boleto.external_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      boleto.digitable_line.includes(searchQuery);
-    return matchesStatus && matchesSearch;
-  });
+      boleto.external_id.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    const matchesStatus = statusFilter === 'all' || boleto.status === statusFilter
+
+    return matchesSearch && matchesStatus
+  })
 
   const exportToCSV = () => {
-    const headers = ["ID", "Beneficiário", "Valor", "Vencimento", "Status"];
-    const rows = filteredBoletos.map(b => [
-      b.external_id,
-      b.beneficiary,
-      b.amount.toString(),
-      b.due_date,
-      b.status
-    ]);
-    
-    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'boletos.csv';
-    a.click();
-    toast.success("CSV exportado com sucesso!");
-  };
+    const headers = ['Data Vencimento', 'Beneficiário', 'Valor', 'Status', 'Código de Barras']
+    const rows = filteredBoletos.map(boleto => [
+      formatDate(boleto.due_date),
+      boleto.beneficiary,
+      formatCurrency(boleto.amount),
+      boleto.status,
+      boleto.barcode || boleto.digitable_line || ''
+    ])
 
-  if (!hasConsent || !hasCPF) {
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `boletos_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+
+    toast({
+      title: "Exportado com sucesso",
+      description: `${filteredBoletos.length} boletos exportados`,
+    })
+  }
+
+  if (loading && !hasConsent && !hasCPF) {
     return (
-      <>
-        <div className="container mx-auto p-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Boletos</CardTitle>
-              <CardDescription>
-                Configure sua conta para visualizar seus boletos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-muted-foreground">
-                Para visualizar seus boletos, você precisa:
-              </p>
-              <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                <li>Aceitar o consentimento de uso de dados (LGPD)</li>
-                <li>Cadastrar seu CPF de forma segura</li>
-              </ul>
-              {!hasConsent && (
-                <Button onClick={() => setShowConsentModal(true)} className="w-full">
-                  Iniciar Configuração
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+            <p className="text-muted-foreground">Carregando...</p>
+          </div>
         </div>
-
-        <ConsentModal
-          open={showConsentModal}
-          onOpenChange={setShowConsentModal}
-          onConsent={handleConsent}
-        />
-
-        <CPFModal
-          open={showCPFModal}
-          onOpenChange={setShowCPFModal}
-          cpf={cpf}
-          onCPFChange={setCpf}
-          onSave={handleSaveCPF}
-        />
-      </>
-    );
+      </Layout>
+    )
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Boletos</h1>
-          <p className="text-muted-foreground">Gerencie seus boletos via Open Finance</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            {!isMobile && <span className="ml-2">Atualizar</span>}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={exportToCSV}
-            disabled={filteredBoletos.length === 0}
-          >
-            <Download className="h-4 w-4" />
-            {!isMobile && <span className="ml-2">Exportar CSV</span>}
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => setShowDeleteConfirm(true)}
-          >
-            <Trash2 className="h-4 w-4" />
-            {!isMobile && <span className="ml-2">Remover CPF</span>}
-          </Button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Buscar por número ou beneficiário</Label>
-              <Input
-                placeholder="Digite para buscar..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Filtrar por Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="open">Em Aberto</SelectItem>
-                  <SelectItem value="overdue">Vencidos</SelectItem>
-                  <SelectItem value="paid">Pagos</SelectItem>
-                  <SelectItem value="cancelled">Cancelados</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Boletos List */}
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : filteredBoletos.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+    <Layout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Meus Boletos</h1>
             <p className="text-muted-foreground">
-              {searchQuery || statusFilter !== "all"
-                ? "Nenhum boleto encontrado com os filtros aplicados"
-                : "Nenhum boleto encontrado"}
+              Consulte e gerencie seus boletos via Open Finance
             </p>
+          </div>
+          <Button onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Filtros</CardTitle>
+            <CardDescription>Busque e filtre seus boletos</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por beneficiário ou código..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full sm:w-auto">
+                <TabsList>
+                  <TabsTrigger value="all">Todos</TabsTrigger>
+                  <TabsTrigger value="open">Em aberto</TabsTrigger>
+                  <TabsTrigger value="paid">Pagos</TabsTrigger>
+                  <TabsTrigger value="overdue">Vencidos</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Button variant="outline" onClick={exportToCSV}>
+                <Download className="w-4 h-4 mr-2" />
+                Exportar CSV
+              </Button>
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid gap-4">
-          {filteredBoletos.map((boleto) => (
-            <Card key={boleto.id}>
-              <CardContent className="pt-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-lg">{boleto.beneficiary}</h3>
-                        <p className="text-sm text-muted-foreground">{boleto.external_id}</p>
-                      </div>
-                      {getStatusBadge(boleto.status)}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{formatCurrency(boleto.amount)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>Venc: {formatDate(boleto.due_date)}</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {boleto.digitable_line}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
 
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover CPF e Dados?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação irá remover seu CPF e todos os boletos salvos. Você precisará
-              cadastrar novamente seu CPF para visualizar boletos no futuro.
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteCPF} className="bg-destructive text-destructive-foreground">
-              Remover
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
-
-function ConsentModal({ open, onOpenChange, onConsent }: any) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Consentimento para consulta de boletos</DialogTitle>
-          <DialogDescription className="text-left space-y-4 pt-4">
-            <p>{CONSENT_TEXT}</p>
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => onConsent(false)}>
-            Recusar
-          </Button>
-          <Button onClick={() => onConsent(true)}>
-            Aceitar e Continuar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CPFModal({ open, onOpenChange, cpf, onCPFChange, onSave }: any) {
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    return numbers
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-      .substring(0, 14);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Cadastrar CPF</DialogTitle>
-          <DialogDescription>
-            Seu CPF será armazenado de forma segura e criptografada para consulta aos boletos.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div>
-            <Label htmlFor="cpf">CPF</Label>
-            <Input
-              id="cpf"
-              placeholder="000.000.000-00"
-              value={cpf}
-              onChange={(e) => onCPFChange(formatCPF(e.target.value))}
-              maxLength={14}
-            />
+        {loading ? (
+          <div className="flex items-center justify-center min-h-[200px]">
+            <RefreshCw className="w-6 h-6 animate-spin text-primary" />
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={onSave}>Salvar CPF</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+        ) : filteredBoletos.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <FileText className="w-12 h-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Nenhum boleto encontrado</h3>
+              <p className="text-muted-foreground text-center max-w-md">
+                {searchQuery || statusFilter !== 'all'
+                  ? 'Tente ajustar os filtros de busca'
+                  : 'Não foram encontrados boletos para o seu CPF'}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {filteredBoletos.map((boleto) => (
+              <Card key={boleto.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex flex-col sm:flex-row justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-lg">{boleto.beneficiary}</h3>
+                        {getStatusBadge(boleto.status)}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                        <div>
+                          <span className="font-medium">Vencimento:</span> {formatDate(boleto.due_date)}
+                        </div>
+                        {boleto.payment_date && (
+                          <div>
+                            <span className="font-medium">Pagamento:</span> {formatDate(boleto.payment_date)}
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-medium">Código:</span> {boleto.external_id}
+                        </div>
+                      </div>
+                      {boleto.digitable_line && (
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {boleto.digitable_line}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col justify-between items-end">
+                      <div className="text-2xl font-bold">{formatCurrency(boleto.amount)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Sincronizado: {new Date(boleto.synced_at).toLocaleString('pt-BR')}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Modal de CPF */}
+        <Dialog open={showCPFModal} onOpenChange={setShowCPFModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>CPF necessário</DialogTitle>
+              <DialogDescription>
+                Para consultar boletos via Open Finance, precisamos do seu CPF. 
+                Este CPF ficará salvo no seu cadastro e não poderá ser alterado.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="cpf">CPF</Label>
+                <Input
+                  id="cpf"
+                  placeholder="000.000.000-00"
+                  value={cpfInput}
+                  onChange={(e) => setCpfInput(formatCPF(e.target.value))}
+                  maxLength={14}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCPFModal(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveCPF}>
+                Salvar CPF
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Consentimento */}
+        <Dialog open={showConsentModal} onOpenChange={setShowConsentModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Consentimento - Open Finance</DialogTitle>
+              <DialogDescription>
+                Leia atentamente os termos de consentimento
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[400px] overflow-y-auto">
+              <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg">
+                {CONSENT_TEXT}
+              </pre>
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" onClick={() => handleConsent(false)}>
+                Não Autorizo
+              </Button>
+              <Button onClick={() => handleConsent(true)}>
+                Autorizo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </Layout>
+  )
 }
+
+export default Boletos
