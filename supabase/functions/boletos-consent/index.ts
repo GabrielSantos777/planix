@@ -33,9 +33,14 @@ serve(async (req) => {
     const { action, consent_text, consent_version } = await req.json();
 
     if (action === 'create') {
-      // Get client info
+      // Get client info - extract first IP from x-forwarded-for (can contain multiple IPs)
+      const forwardedFor = req.headers.get('x-forwarded-for');
+      const clientIp = forwardedFor 
+        ? forwardedFor.split(',')[0].trim() 
+        : req.headers.get('cf-connecting-ip');
+      
       const clientInfo = {
-        ip_address: req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip'),
+        ip_address: clientIp,
         user_agent: req.headers.get('user-agent'),
       };
 
