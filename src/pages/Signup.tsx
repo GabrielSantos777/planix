@@ -6,13 +6,16 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { formatCPF, unformatCPF, validateCPF } from "@/utils/cpfFormatter"
+import { supabase } from "@/integrations/supabase/client"
 
 const Signup = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    cpf: ""
   })
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
@@ -22,6 +25,7 @@ const Signup = () => {
     e.preventDefault()
     setIsLoading(true)
 
+    // Validar senha
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Erro no cadastro",
@@ -32,29 +36,66 @@ const Signup = () => {
       return
     }
 
-    // Simulate signup
-    setTimeout(() => {
-      if (formData.name && formData.email && formData.password) {
-        localStorage.setItem("isAuthenticated", "true")
-        localStorage.setItem("userName", formData.name)
-        toast({
-          title: "Conta criada com sucesso!",
-          description: "Bem-vindo ao FinanceTracker",
-        })
-        navigate("/dashboard")
-      } else {
-        toast({
-          title: "Erro no cadastro",
-          description: "Por favor, preencha todos os campos",
-          variant: "destructive",
-        })
-      }
+    // Validar CPF
+    const cleanCPF = unformatCPF(formData.cpf)
+    if (!validateCPF(cleanCPF)) {
+      toast({
+        title: "CPF inválido",
+        description: "Por favor, digite um CPF válido",
+        variant: "destructive",
+      })
       setIsLoading(false)
-    }, 1000)
+      return
+    }
+
+    try {
+      // Criar conta no Supabase
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.name,
+          },
+        },
+      })
+
+      if (signUpError) throw signUpError
+
+      // Atualizar perfil com CPF
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ cpf: cleanCPF })
+          .eq('user_id', authData.user.id)
+
+        if (profileError) throw profileError
+      }
+
+      toast({
+        title: "Conta criada com sucesso!",
+        description: "Verifique seu email para confirmar o cadastro",
+      })
+      navigate("/login")
+    } catch (error: any) {
+      console.error('Error signing up:', error)
+      toast({
+        title: "Erro no cadastro",
+        description: error.message || "Ocorreu um erro ao criar sua conta",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    if (field === 'cpf') {
+      // Formata CPF enquanto digita
+      setFormData(prev => ({ ...prev, cpf: formatCPF(value) }))
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }))
+    }
   }
 
   return (
@@ -93,6 +134,21 @@ const Signup = () => {
                 onChange={(e) => handleInputChange("email", e.target.value)}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cpf">CPF</Label>
+              <Input
+                id="cpf"
+                type="text"
+                placeholder="000.000.000-00"
+                value={formData.cpf}
+                onChange={(e) => handleInputChange("cpf", e.target.value)}
+                maxLength={14}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Seu CPF será usado para consultar boletos e não poderá ser alterado
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
