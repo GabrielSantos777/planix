@@ -14,12 +14,18 @@ const corsHeaders = {
 };
 
 // Crypto functions for CPF encryption
+const encryptionSecret = Deno.env.get('CPF_ENCRYPTION_KEY') || 'default-key-change-me-in-production!!';
+// Derive a 256-bit key from the secret (valid length for AES-256)
+const rawEncryptionKey = await crypto.subtle.digest(
+  'SHA-256',
+  new TextEncoder().encode(encryptionSecret),
+);
 const ENCRYPTION_KEY = await crypto.subtle.importKey(
-  "raw",
-  new TextEncoder().encode(Deno.env.get('CPF_ENCRYPTION_KEY') || 'default-key-change-me-in-production!!'),
-  { name: "AES-GCM" },
+  'raw',
+  rawEncryptionKey,
+  { name: 'AES-GCM' },
   false,
-  ["encrypt", "decrypt"]
+  ['encrypt', 'decrypt'],
 );
 
 async function encryptCPF(cpf: string): Promise<{ encrypted: string; token: string }> {
