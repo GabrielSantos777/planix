@@ -179,7 +179,49 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        throw new Error('CPF not found');
+        console.log('CPF token not found, attempting migration from profiles for user:', user.id);
+
+        // Backward compatibility: try to migrate CPF from profiles table
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('cpf')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error('Error fetching profile for CPF migration:', profileError);
+          throw new Error('CPF not found. Please save your CPF first.');
+        }
+
+        if (!profile?.cpf) {
+          throw new Error('CPF not found. Please save your CPF first.');
+        }
+
+        const cleanCPF = profile.cpf.replace(/\D/g, '');
+        if (cleanCPF.length !== 11) {
+          console.error('Invalid CPF format in profile for user:', user.id);
+          throw new Error('CPF not found. Please save your CPF first.');
+        }
+
+        const { encrypted, token } = await encryptCPF(cleanCPF);
+
+        const { error: saveError } = await supabase
+          .from('user_cpf_tokens')
+          .insert({
+            user_id: user.id,
+            cpf_token: token,
+            encrypted_cpf: encrypted,
+            last_used_at: new Date().toISOString(),
+          });
+
+        if (saveError) {
+          console.error('Error migrating CPF to tokens table:', saveError);
+          throw new Error('CPF not found. Please save your CPF first.');
+        }
+
+        return new Response(JSON.stringify({ cpf: cleanCPF, token }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       const decryptedCPF = await decryptCPF(data.encrypted_cpf);
