@@ -8,6 +8,19 @@ import { useToast } from "@/hooks/use-toast"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { formatCPF, unformatCPF, validateCPF } from "@/utils/cpfFormatter"
 import { supabase } from "@/integrations/supabase/client"
+import { z } from "zod"
+
+// Schema de validação
+const signupSchema = z.object({
+  name: z.string().trim().min(1, "Nome é obrigatório").max(100, "Nome muito longo"),
+  email: z.string().trim().email("Email inválido").max(255, "Email muito longo"),
+  cpf: z.string().length(11, "CPF deve ter 11 dígitos").refine(validateCPF, "CPF inválido"),
+  password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres").max(100, "Senha muito longa"),
+  confirmPassword: z.string()
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "As senhas não coincidem",
+  path: ["confirmPassword"],
+})
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -25,23 +38,22 @@ const Signup = () => {
     e.preventDefault()
     setIsLoading(true)
 
-    // Validar senha
-    if (formData.password !== formData.confirmPassword) {
+    const cleanCPF = unformatCPF(formData.cpf)
+    
+    // Validar todos os campos com zod
+    const validation = signupSchema.safeParse({
+      name: formData.name,
+      email: formData.email,
+      cpf: cleanCPF,
+      password: formData.password,
+      confirmPassword: formData.confirmPassword
+    })
+
+    if (!validation.success) {
+      const firstError = validation.error.errors[0]
       toast({
         title: "Erro no cadastro",
-        description: "As senhas não coincidem",
-        variant: "destructive",
-      })
-      setIsLoading(false)
-      return
-    }
-
-    // Validar CPF
-    const cleanCPF = unformatCPF(formData.cpf)
-    if (!validateCPF(cleanCPF)) {
-      toast({
-        title: "CPF inválido",
-        description: "Por favor, digite um CPF válido",
+        description: firstError.message,
         variant: "destructive",
       })
       setIsLoading(false)
@@ -49,6 +61,23 @@ const Signup = () => {
     }
 
     try {
+      // Verificar se CPF já está em uso
+      const { data: existingCPF } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('cpf', cleanCPF)
+        .maybeSingle()
+
+      if (existingCPF) {
+        toast({
+          title: "CPF já cadastrado",
+          description: "Este CPF já está sendo usado por outra conta",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
+
       // Criar conta no Supabase
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -78,7 +107,7 @@ const Signup = () => {
       })
       navigate("/login")
     } catch (error: any) {
-      console.error('Error signing up:', error)
+      // Não fazer log de erros de autenticação com dados sensíveis
       toast({
         title: "Erro no cadastro",
         description: error.message || "Ocorreu um erro ao criar sua conta",

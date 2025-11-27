@@ -19,6 +19,12 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import Layout from "@/components/Layout"
+import { z } from "zod"
+
+// Schema de validação
+const cpfSchema = z.object({
+  cpf: z.string().length(11, "CPF deve ter 11 dígitos").refine(validateCPF, "CPF inválido")
+})
 
 const CONSENT_TEXT = `
 Ao autorizar, você está consentindo que:
@@ -117,7 +123,7 @@ const Boletos = () => {
       // Se tem tudo, carregar boletos
       await loadBoletos()
     } catch (error: any) {
-      console.error('Error checking consent and CPF:', error)
+      // Não fazer log de dados sensíveis
       toast({
         title: "Erro",
         description: error.message || "Erro ao verificar dados",
@@ -131,10 +137,13 @@ const Boletos = () => {
   const handleSaveCPF = async () => {
     const cleanCPF = unformatCPF(cpfInput)
     
-    if (!validateCPF(cleanCPF)) {
+    // Validar CPF com zod
+    const validation = cpfSchema.safeParse({ cpf: cleanCPF })
+    
+    if (!validation.success) {
       toast({
         title: "CPF inválido",
-        description: "Por favor, digite um CPF válido",
+        description: validation.error.errors[0].message,
         variant: "destructive",
       })
       return
@@ -143,6 +152,23 @@ const Boletos = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Usuário não autenticado")
+
+      // Verificar se CPF já está em uso
+      const { data: existingCPF } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('cpf', cleanCPF)
+        .neq('user_id', user.id)
+        .maybeSingle()
+
+      if (existingCPF) {
+        toast({
+          title: "CPF já cadastrado",
+          description: "Este CPF já está sendo usado por outra conta",
+          variant: "destructive",
+        })
+        return
+      }
 
       const { error } = await supabase
         .from('profiles')
@@ -167,7 +193,7 @@ const Boletos = () => {
         await loadBoletos()
       }
     } catch (error: any) {
-      console.error('Error saving CPF:', error)
+      // Não fazer log de dados sensíveis
       toast({
         title: "Erro ao salvar CPF",
         description: error.message,
@@ -207,7 +233,7 @@ const Boletos = () => {
 
       await loadBoletos()
     } catch (error: any) {
-      console.error('Error creating consent:', error)
+      // Não fazer log de dados sensíveis
       toast({
         title: "Erro ao registrar consentimento",
         description: error.message,
@@ -231,7 +257,7 @@ const Boletos = () => {
         description: `${data?.boletos?.length || 0} boletos encontrados`,
       })
     } catch (error: any) {
-      console.error('Error loading boletos:', error)
+      // Não fazer log de dados sensíveis
       toast({
         title: "Erro ao carregar boletos",
         description: error.message,
