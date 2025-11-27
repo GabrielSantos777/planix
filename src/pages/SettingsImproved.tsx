@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client'
 import Layout from '@/components/Layout'
 import { formatPhoneNumber } from '@/utils/phoneFormatter'
 import { ContactsManagement } from '@/components/ContactsManagement'
+import { formatCPF } from '@/utils/cpfFormatter'
 
 const SettingsImproved = () => {
   const { user, profile, refreshProfile } = useAuth()
@@ -32,14 +33,16 @@ const SettingsImproved = () => {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || '',
-    phone: profile?.phone || ''
+    phone: profile?.phone || '',
+    cpf: profile?.cpf || ''
   })
 
   useEffect(() => {
     if (profile) {
       setFormData({
         full_name: profile.full_name || '',
-        phone: profile.phone || ''
+        phone: profile.phone || '',
+        cpf: profile.cpf || ''
       })
       setAvatarUrl(profile.avatar_url)
     }
@@ -265,6 +268,19 @@ const SettingsImproved = () => {
                       }}
                       placeholder="(11) 99999-9999"
                     />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="cpf">CPF</Label>
+                    <Input
+                      id="cpf"
+                      value={formData.cpf ? formatCPF(formData.cpf) : ''}
+                      disabled
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      O CPF não pode ser alterado após o cadastro
+                    </p>
                   </div>
                 </div>
 
