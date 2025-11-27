@@ -91,7 +91,7 @@ const Signup = () => {
 
       if (signUpError) throw signUpError
 
-      // Atualizar perfil com CPF
+      // Atualizar perfil com CPF (para exibição)
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -99,6 +99,19 @@ const Signup = () => {
           .eq('user_id', authData.user.id)
 
         if (profileError) throw profileError
+
+        // Salvar CPF criptografado via edge function (para uso em boletos)
+        const { error: cpfError } = await supabase.functions.invoke('boletos-cpf', {
+          body: { 
+            action: 'save',
+            cpf: cleanCPF 
+          }
+        })
+
+        if (cpfError) {
+          console.error('Erro ao criptografar CPF:', cpfError)
+          // Continua mesmo se falhar a criptografia, pois o CPF está salvo no perfil
+        }
       }
 
       toast({
