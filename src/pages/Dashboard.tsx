@@ -129,10 +129,10 @@ const Dashboard = () => {
       .filter(acc => acc.is_active)
       .map(acc => ({
         name: acc.name,
-        balance: acc.current_balance || 0
+        balance: computeAccountBalance(acc.id)
       }))
       .sort((a, b) => b.balance - a.balance)
-  }, [accounts])
+  }, [accounts, transactions])
 
   // Recent transactions (last 5)
   const recentTransactions = useMemo(() => {

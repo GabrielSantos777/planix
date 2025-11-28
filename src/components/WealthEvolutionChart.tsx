@@ -31,23 +31,30 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
       // Calcular patrimônio líquido no final deste mês
       const endOfMonth = new Date(year, monthIndex + 1, 0)
       
-      // Filtrar transações até o final deste mês
-      const transactionsUpToMonth = transactions.filter(t => new Date(t.date) <= endOfMonth)
+      // Filtrar transações até o final deste mês (excluindo transferências)
+      const transactionsUpToMonth = transactions.filter(t => {
+        const transactionDate = new Date(t.date)
+        return transactionDate <= endOfMonth && !t.is_transfer
+      })
       
-      // Somar saldos iniciais de todas as contas (exceto investimentos que já estão nas transações)
-      const accountsBalance = accounts
-        .filter(acc => acc.type !== 'investment')
+      // Somar saldos iniciais de todas as contas ativas
+      const accountsInitialBalance = accounts
+        .filter(acc => acc.is_active)
         .reduce((sum, account) => sum + (account.initial_balance || 0), 0)
       
-      // Somar todas as movimentações (receitas - despesas) até este mês
-      const transactionsBalance = transactionsUpToMonth.reduce((sum, t) => {
-        // Ignorar transferências para não duplicar valores
-        if (t.is_transfer) return sum
-        return sum + (t.amount || 0)
-      }, 0)
+      // Calcular o saldo baseado nas transações de contas (account_id)
+      const accountTransactionsBalance = transactionsUpToMonth
+        .filter(t => t.account_id)
+        .reduce((sum, t) => sum + (t.amount || 0), 0)
       
-      // Patrimônio líquido = saldo inicial das contas + movimentações
-      const netWorth = accountsBalance + transactionsBalance
+      // Calcular as despesas do cartão de crédito (credit_card_id)
+      // Cartão de crédito não soma no patrimônio, é apenas uma dívida futura
+      const creditCardExpenses = transactionsUpToMonth
+        .filter(t => t.credit_card_id && t.type === 'expense')
+        .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+      
+      // Patrimônio líquido = saldo inicial + movimentações de contas - dívidas de cartão
+      const netWorth = accountsInitialBalance + accountTransactionsBalance - creditCardExpenses
 
       return {
         month,
