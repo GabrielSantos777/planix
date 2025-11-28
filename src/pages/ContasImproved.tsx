@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 import { banks } from "@/data/banks"
@@ -31,7 +30,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import Layout from "@/components/Layout"
 import { CreditCardInvoices } from "@/components/CreditCardInvoices"
-import { AccountTransactions } from "@/components/AccountTransactions"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from "@/components/ui/carousel"
 
 const accountTypeLabels = {
@@ -691,19 +689,44 @@ export default function ContasImproved() {
                             {/* Recent Transactions */}
                             <div className="space-y-3">
                               <Label className="text-sm font-medium">Transações Recentes</Label>
-                              <div className="space-y-2 max-h-64 overflow-y-auto rounded-lg border bg-muted/30 p-3">
+                              <div className="space-y-2 max-h-80 overflow-y-auto rounded-lg border bg-muted/30 p-3">
                                 {getAccountTransactions(account.id).length > 0 ? (
-                                  getAccountTransactions(account.id).slice(0, 5).map((transaction) => (
-                                    <div key={transaction.id} className="flex justify-between items-center p-3 rounded-md bg-background border hover:bg-accent/50 transition-colors">
-                                      <div>
-                                        <p className="font-medium text-sm">{transaction.description}</p>
-                                        <p className="text-xs text-muted-foreground">{new Date(transaction.date).toLocaleDateString('pt-BR')}</p>
+                                  getAccountTransactions(account.id).slice(0, 8).map((transaction) => {
+                                    const category = transaction.category_id ? 
+                                      (transactions.find(t => t.id === transaction.id) as any)?.categories?.name : 
+                                      '-'
+                                    const typeLabel = transaction.is_transfer ? 'Transferência' : 
+                                      transaction.type === 'income' ? 'Receita' : 'Despesa'
+                                    
+                                    return (
+                                      <div key={transaction.id} className="p-3 rounded-md bg-background border hover:bg-accent/50 transition-colors">
+                                        <div className="flex justify-between items-start gap-3">
+                                          <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-sm truncate">{transaction.description}</p>
+                                            <div className="flex flex-wrap gap-2 mt-1">
+                                              <p className="text-xs text-muted-foreground">
+                                                {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                                              </p>
+                                              <Badge variant="outline" className="text-xs">
+                                                {typeLabel}
+                                              </Badge>
+                                              {category && category !== '-' && (
+                                                <Badge variant="secondary" className="text-xs">
+                                                  {category}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <p className={`font-bold text-sm whitespace-nowrap ${
+                                            transaction.type === 'income' ? 'text-green-600' : 
+                                            transaction.is_transfer ? 'text-blue-600' : 'text-red-600'
+                                          }`}>
+                                            {transaction.type === 'income' || transaction.is_transfer ? '+' : ''}{formatCurrency(Math.abs(transaction.amount))}
+                                          </p>
+                                        </div>
                                       </div>
-                                      <p className={`font-bold text-sm ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                                        {transaction.type === 'income' ? '+' : ''}{formatCurrency(transaction.amount)}
-                                      </p>
-                                    </div>
-                                  ))
+                                    )
+                                  })
                                 ) : (
                                   <p className="text-sm text-muted-foreground text-center py-4">Nenhuma transação encontrada</p>
                                 )}
@@ -712,13 +735,6 @@ export default function ContasImproved() {
                           </div>
                         </CardContent>
                       </Card>
-                      
-                      {/* Account Transactions */}
-                      <AccountTransactions 
-                        accountId={account.id} 
-                        accountName={account.name}
-                        className="mt-4"
-                      />
                     </CarouselItem>
                   ))}
                 </CarouselContent>
