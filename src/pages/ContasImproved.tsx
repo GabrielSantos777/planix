@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast"
 import Layout from "@/components/Layout"
 import { CreditCardInvoices } from "@/components/CreditCardInvoices"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from "@/components/ui/carousel"
+import { getBestPurchaseDay } from "@/hooks/useCreditCardInvoice"
 
 const accountTypeLabels = {
   bank: "Conta Corrente",
@@ -111,34 +112,88 @@ export default function ContasImproved() {
     })
   }, [creditCardCarouselApi])
   
-  // Get current month invoice for a credit card
+  // Get current month invoice for a credit card (usando lógica correta de faturas)
   const getCurrentMonthInvoice = (cardId: string) => {
-    const now = new Date()
-    const currentMonth = now.getMonth()
-    const currentYear = now.getFullYear()
+    const card = creditCards.find(c => c.id === cardId)
+    if (!card) return 0
     
-    const cardTransactions = transactions.filter(t => 
-      t.credit_card_id === cardId &&
-      new Date(t.date).getMonth() === currentMonth &&
-      new Date(t.date).getFullYear() === currentYear
-    )
+    const now = new Date()
+    const currentDay = now.getDate()
+    
+    // Determinar qual é a fatura "atual" baseada no dia de fechamento
+    let targetMonth, targetYear
+    if (currentDay <= card.closing_day) {
+      targetMonth = now.getMonth()
+      targetYear = now.getFullYear()
+    } else {
+      // Após fechamento, a fatura atual é a do próximo mês
+      if (now.getMonth() === 11) {
+        targetMonth = 0
+        targetYear = now.getFullYear() + 1
+      } else {
+        targetMonth = now.getMonth() + 1
+        targetYear = now.getFullYear()
+      }
+    }
+    
+    // Filtrar transações que pertencem a esta fatura
+    const cardTransactions = transactions.filter(t => {
+      if (t.credit_card_id !== cardId) return false
+      const tDate = new Date(t.date)
+      
+      // Calcular em qual fatura esta transação cai
+      let invoiceMonth, invoiceYear
+      if (tDate.getDate() >= card.closing_day) {
+        if (tDate.getMonth() === 11) {
+          invoiceMonth = 0
+          invoiceYear = tDate.getFullYear() + 1
+        } else {
+          invoiceMonth = tDate.getMonth() + 1
+          invoiceYear = tDate.getFullYear()
+        }
+      } else {
+        invoiceMonth = tDate.getMonth()
+        invoiceYear = tDate.getFullYear()
+      }
+      
+      return invoiceMonth === targetMonth && invoiceYear === targetYear
+    })
     
     return cardTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0)
   }
 
   // Calculate used limit including all open invoices and future installments
   const getUsedLimit = (cardId: string) => {
+    const card = creditCards.find(c => c.id === cardId)
+    if (!card) return 0
+    
     const cardTransactions = transactions.filter(t => t.credit_card_id === cardId)
     
-    // Group transactions by invoice month
+    // Group transactions by invoice month using correct logic
     const invoicesByMonth: { [key: string]: { transactions: any[], total: number, isPaid: boolean } } = {}
     
     cardTransactions.forEach(transaction => {
       const transactionDate = new Date(transaction.date)
-      const month = transactionDate.getMonth()
-      const year = transactionDate.getFullYear()
       
-      const invoiceKey = `${year}-${month.toString().padStart(2, '0')}`
+      // Aplicar a mesma lógica de faturas
+      let invoiceMonth, invoiceYear
+      
+      if (transactionDate.getDate() >= card.closing_day) {
+        // Compra no dia do fechamento ou depois → próxima fatura
+        if (transactionDate.getMonth() === 11) {
+          invoiceMonth = 0
+          invoiceYear = transactionDate.getFullYear() + 1
+        } else {
+          invoiceMonth = transactionDate.getMonth() + 1
+          invoiceYear = transactionDate.getFullYear()
+        }
+      } else {
+        // Compra antes do fechamento → fatura do mês atual
+        invoiceMonth = transactionDate.getMonth()
+        invoiceYear = transactionDate.getFullYear()
+      }
+      
+      const invoiceKey = `${invoiceYear}-${invoiceMonth.toString().padStart(2, '0')}`
       
       if (!invoicesByMonth[invoiceKey]) {
         invoicesByMonth[invoiceKey] = {
@@ -156,7 +211,7 @@ export default function ContasImproved() {
     const paymentTransactions = transactions.filter(t => 
       t.account_id && 
       t.description.toLowerCase().includes('pagamento fatura') &&
-      t.description.toLowerCase().includes(creditCards.find(c => c.id === cardId)?.name.toLowerCase() || '')
+      t.description.toLowerCase().includes(card.name.toLowerCase())
     )
     
     paymentTransactions.forEach(payment => {
@@ -291,6 +346,9 @@ export default function ContasImproved() {
       return
     }
 
+    // Calcular automaticamente o melhor dia de compra (dia seguinte ao fechamento)
+    const calculatedBestPurchaseDay = getBestPurchaseDay(newCreditCard.closing_day)
+
     try {
       if (editingCreditCard) {
         // Update existing credit card
@@ -300,7 +358,7 @@ export default function ContasImproved() {
           limit_amount: newCreditCard.limit_amount,
           due_day: newCreditCard.due_day,
           closing_day: newCreditCard.closing_day,
-          best_purchase_day: newCreditCard.best_purchase_day
+          best_purchase_day: calculatedBestPurchaseDay
         })
 
         toast({
@@ -316,7 +374,7 @@ export default function ContasImproved() {
           current_balance: 0,
           due_day: newCreditCard.due_day,
           closing_day: newCreditCard.closing_day,
-          best_purchase_day: newCreditCard.best_purchase_day,
+          best_purchase_day: calculatedBestPurchaseDay,
           currency: 'BRL',
           is_active: true
         })
@@ -454,15 +512,21 @@ export default function ContasImproved() {
       const transactionDate = new Date(transaction.date)
       
       // Determinar a qual fatura a transação pertence
+      // REGRA: Compras NO DIA do fechamento ou DEPOIS → próxima fatura
+      // Compras ANTES do dia de fechamento → fatura atual
       let invoiceMonth, invoiceYear
       
-      // Se a transação foi feita após o dia de fechamento, vai para a próxima fatura
-      if (transactionDate.getDate() > card.closing_day) {
-        const nextMonth = new Date(transactionDate.getFullYear(), transactionDate.getMonth() + 1, 1)
-        invoiceMonth = nextMonth.getMonth()
-        invoiceYear = nextMonth.getFullYear()
+      if (transactionDate.getDate() >= card.closing_day) {
+        // Compra no dia do fechamento ou depois → próxima fatura
+        if (transactionDate.getMonth() === 11) {
+          invoiceMonth = 0
+          invoiceYear = transactionDate.getFullYear() + 1
+        } else {
+          invoiceMonth = transactionDate.getMonth() + 1
+          invoiceYear = transactionDate.getFullYear()
+        }
       } else {
-        // Transação antes ou no dia de fechamento = fatura do mês atual da transação
+        // Compra antes do fechamento → fatura do mês atual
         invoiceMonth = transactionDate.getMonth()
         invoiceYear = transactionDate.getFullYear()
       }
@@ -470,11 +534,11 @@ export default function ContasImproved() {
       const invoiceKey = `${invoiceYear}-${invoiceMonth.toString().padStart(2, '0')}`
       
       if (!invoicesByMonth[invoiceKey]) {
+        const closingDate = new Date(invoiceYear, invoiceMonth, card.closing_day)
         const dueDate = new Date(invoiceYear, invoiceMonth, card.due_day)
         
         // Determinar status da fatura
         let status: 'open' | 'closed' | 'paid' = 'open'
-        const closingDate = new Date(invoiceYear, invoiceMonth, card.closing_day)
         
         if (today > dueDate) {
           status = 'paid' // Vencida (assumir paga por agora)
@@ -857,7 +921,12 @@ export default function ContasImproved() {
                             </div>
 
                             {/* Credit Card Invoices Component */}
-                            <CreditCardInvoices cardId={card.id} cardName={card.name} />
+                            <CreditCardInvoices 
+                              cardId={card.id} 
+                              cardName={card.name} 
+                              closingDay={card.closing_day}
+                              dueDay={card.due_day}
+                            />
                           </div>
                         </CardContent>
                       </Card>

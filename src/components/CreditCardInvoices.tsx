@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ChevronDown, ChevronUp, Calendar, CreditCard, Edit } from 'lucide-react'
+import { ChevronDown, ChevronUp, Calendar, CreditCard, Edit, Info, Sparkles } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useCurrency } from '@/context/CurrencyContext'
@@ -12,6 +12,8 @@ import { CreditCardInvoiceModal } from './CreditCardInvoiceModal'
 import { CreditCardInvoiceEditModal } from './CreditCardInvoiceEditModal'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/AuthContext'
+import { useCreditCardInvoice, getBestPurchaseDay } from '@/hooks/useCreditCardInvoice'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface MonthlyInvoice {
   month: number
@@ -19,16 +21,20 @@ interface MonthlyInvoice {
   transactions: any[]
   total: number
   dueDate: Date
-  status: 'open' | 'closed' | 'paid' | 'partial'
+  closingDate?: Date
+  status: 'open' | 'closed' | 'paid' | 'partial' | 'overdue'
+  isCurrent?: boolean
 }
 
 interface CreditCardInvoicesProps {
   cardId: string
   cardName: string
+  closingDay: number
+  dueDay: number
 }
 
-export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps) => {
-  const { transactions, addTransaction, creditCardInvoices, upsertCreditCardInvoice } = useSupabaseData()
+export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: CreditCardInvoicesProps) => {
+  const { transactions, creditCards, addTransaction, creditCardInvoices, upsertCreditCardInvoice } = useSupabaseData()
   const { formatCurrency } = useCurrency()
   const { toast } = useToast()
   const { user } = useAuth()
@@ -40,59 +46,45 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
   const [invoiceToPayAmount, setInvoiceToPayAmount] = useState(0)
   const [currentEditingInvoice, setCurrentEditingInvoice] = useState<any>(null)
 
-  // Get all invoices for this card with database status
-  const getCardInvoices = (): MonthlyInvoice[] => {
-    const cardTransactions = transactions.filter(t => t.credit_card_id === cardId)
-    const invoicesByMonth: { [key: string]: MonthlyInvoice } = {}
-    
-    // First, create invoices from transactions
-    cardTransactions.forEach(transaction => {
-      const transactionDate = new Date(transaction.date)
-      const month = transactionDate.getMonth()
-      const year = transactionDate.getFullYear()
-      
-      const invoiceKey = `${year}-${month.toString().padStart(2, '0')}`
-      
-      if (!invoicesByMonth[invoiceKey]) {
-        invoicesByMonth[invoiceKey] = {
-          month,
-          year,
-          transactions: [],
-          total: 0,
-          dueDate: new Date(year, month + 1, 10),
-          status: 'open'
-        }
-      }
-      
-      invoicesByMonth[invoiceKey].transactions.push(transaction)
-      invoicesByMonth[invoiceKey].total += Math.abs(transaction.amount)
-    })
-    
-    // Update status from database
-    creditCardInvoices
-      .filter(invoice => invoice.credit_card_id === cardId)
-      .forEach(dbInvoice => {
-        const invoiceKey = `${dbInvoice.year}-${dbInvoice.month.toString().padStart(2, '0')}`
-        if (invoicesByMonth[invoiceKey]) {
-          invoicesByMonth[invoiceKey].status = dbInvoice.status as 'open' | 'closed' | 'paid' | 'partial'
-        }
-      })
-    
-    return Object.values(invoicesByMonth).sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year
-      return b.month - a.month
-    })
-  }
+  // Usar o hook de faturas com a lógica correta
+  const card = creditCards.find(c => c.id === cardId)
+  const { 
+    bestPurchaseDay, 
+    currentInvoiceData, 
+    allInvoices,
+    getInvoiceForPurchase 
+  } = useCreditCardInvoice(
+    card ? { ...card, closing_day: closingDay, due_day: dueDay } : null, 
+    transactions
+  )
 
-  const invoices = getCardInvoices()
-  const currentMonthInvoice = invoices.find(inv => {
-    const now = new Date()
-    return inv.month === now.getMonth() && inv.year === now.getFullYear()
+  // Converter para o formato esperado pelo componente
+  const invoices = allInvoices.map(inv => {
+    // Verificar status no banco de dados
+    const dbInvoice = creditCardInvoices.find(
+      dbInv => dbInv.credit_card_id === cardId && 
+               dbInv.month === inv.month && 
+               dbInv.year === inv.year
+    )
+    
+    return {
+      month: inv.month,
+      year: inv.year,
+      transactions: inv.transactions,
+      total: inv.total,
+      dueDate: inv.dueDate,
+      closingDate: inv.closingDate,
+      status: (dbInvoice?.status || inv.status) as 'open' | 'closed' | 'paid' | 'partial' | 'overdue',
+      isCurrent: inv.isCurrent
+    }
   })
+
+  // Encontrar a fatura atual baseada na lógica correta
+  const currentInvoice = invoices.find(inv => inv.isCurrent) || currentInvoiceData
 
   const displayInvoice = selectedMonth && selectedMonth !== 'current'
     ? invoices.find(inv => `${inv.year}-${inv.month.toString().padStart(2, '0')}` === selectedMonth)
-    : currentMonthInvoice
+    : currentInvoice
 
   const handlePayInvoice = async (paymentData: {
     account_id: string
@@ -189,73 +181,155 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
     }
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <CreditCard className="h-5 w-5" />
-          Faturas - {cardName}
-        </h3>
-        
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Selecionar mês" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="current">Mês Atual</SelectItem>
-            {invoices.map((invoice) => (
-              <SelectItem 
-                key={`${invoice.year}-${invoice.month}`}
-                value={`${invoice.year}-${invoice.month.toString().padStart(2, '0')}`}
-              >
-                {format(new Date(invoice.year, invoice.month, 1), 'MMMM yyyy', { locale: ptBR })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+  const today = new Date()
+  const currentDay = today.getDate()
+  const isBeforeClosing = currentDay < closingDay
+  const isClosingDay = currentDay === closingDay
 
-      {displayInvoice ? (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                Fatura {format(new Date(displayInvoice.year, displayInvoice.month, 1), 'MMMM yyyy', { locale: ptBR })}
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge variant={displayInvoice.status === 'paid' ? 'default' : displayInvoice.status === 'partial' ? 'secondary' : 'destructive'}>
-                  {displayInvoice.status === 'paid' ? 'Paga' : displayInvoice.status === 'partial' ? 'Parcial' : 'Em Aberto'}
-                </Badge>
-                <Button 
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleEditInvoice(displayInvoice)}
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return <Badge variant="default" className="bg-green-500">Paga</Badge>
+      case 'partial':
+        return <Badge variant="secondary">Parcial</Badge>
+      case 'closed':
+        return <Badge variant="outline">Fechada</Badge>
+      case 'overdue':
+        return <Badge variant="destructive">Vencida</Badge>
+      default:
+        return <Badge variant="outline" className="border-yellow-500 text-yellow-600">Aberta</Badge>
+    }
+  }
+
+  return (
+    <TooltipProvider>
+      <div className="space-y-4">
+        {/* Informações da lógica de faturas */}
+        <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Info className="h-4 w-4 text-primary" />
+            Informações do Cartão
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div className="space-y-1">
+              <span className="text-muted-foreground">Fechamento</span>
+              <p className="font-medium">Dia {closingDay}</p>
+            </div>
+            <div className="space-y-1">
+              <span className="text-muted-foreground">Vencimento</span>
+              <p className="font-medium">Dia {dueDay}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-yellow-500" />
+                <span className="text-muted-foreground">Melhor dia de compra</span>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <p className="font-medium text-green-600 cursor-help">Dia {bestPurchaseDay}</p>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Compras a partir do dia {bestPurchaseDay} terão o maior prazo para pagamento</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="space-y-1">
+              <span className="text-muted-foreground">Status hoje</span>
+              <p className="font-medium">
+                {isClosingDay ? (
+                  <span className="text-orange-500">Dia do fechamento</span>
+                ) : isBeforeClosing ? (
+                  <span className="text-blue-500">Fatura aberta</span>
+                ) : (
+                  <span className="text-green-500">Próxima fatura</span>
+                )}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            {isBeforeClosing 
+              ? `Compras até dia ${closingDay - 1} entram na fatura atual. A partir do dia ${closingDay}, entram na próxima.`
+              : `Compras de hoje em diante entram na fatura de ${format(new Date(today.getFullYear(), today.getMonth() + 1, 1), 'MMMM', { locale: ptBR })}.`
+            }
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Faturas - {cardName}
+          </h3>
+          
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Fatura Atual" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current">Fatura Atual</SelectItem>
+              {invoices.map((invoice) => (
+                <SelectItem 
+                  key={`${invoice.year}-${invoice.month}`}
+                  value={`${invoice.year}-${invoice.month.toString().padStart(2, '0')}`}
                 >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Editar
-                </Button>
-                {displayInvoice.status !== 'paid' && (
+                  {format(new Date(invoice.year, invoice.month, 1), 'MMMM yyyy', { locale: ptBR })}
+                  {invoice.isCurrent && ' (Atual)'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {displayInvoice ? (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-lg">
+                    Fatura {format(new Date(displayInvoice.year, displayInvoice.month, 1), 'MMMM yyyy', { locale: ptBR })}
+                  </CardTitle>
+                  {displayInvoice.isCurrent && (
+                    <Badge variant="outline" className="text-xs">Atual</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {getStatusBadge(displayInvoice.status)}
                   <Button 
                     size="sm"
-                    onClick={() => {
-                      setInvoiceToPayAmount(displayInvoice.total)
-                      setPaymentModalOpen(true)
-                    }}
+                    variant="outline"
+                    onClick={() => handleEditInvoice(displayInvoice)}
                   >
-                    Pagar Fatura
+                    <Edit className="h-4 w-4 mr-1" />
+                    Editar
                   </Button>
-                )}
+                  {displayInvoice.status !== 'paid' && (
+                    <Button 
+                      size="sm"
+                      onClick={() => {
+                        setInvoiceToPayAmount(displayInvoice.total)
+                        setPaymentModalOpen(true)
+                      }}
+                    >
+                      Pagar Fatura
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold text-destructive">
-                {formatCurrency(displayInvoice.total)}
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-2xl font-bold text-destructive">
+                  {formatCurrency(displayInvoice.total)}
+                </div>
+                <div className="text-right">
+                  {displayInvoice.closingDate && (
+                    <p className="text-xs text-muted-foreground">
+                      Fecha em: {format(displayInvoice.closingDate, 'dd/MM/yyyy')}
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    Vencimento: {format(displayInvoice.dueDate, 'dd/MM/yyyy')}
+                  </p>
+                </div>
               </div>
-              <div className="text-sm text-muted-foreground">
-                Vencimento: {format(displayInvoice.dueDate, 'dd/MM/yyyy')}
-              </div>
-            </div>
-          </CardHeader>
+            </CardHeader>
           
           <CardContent>
             <div className="space-y-2">
@@ -335,6 +409,7 @@ export const CreditCardInvoices = ({ cardId, cardName }: CreditCardInvoicesProps
         cardName={cardName}
         onSave={handleSaveInvoice}
       />
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
