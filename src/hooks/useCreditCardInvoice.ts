@@ -29,9 +29,14 @@ interface InvoiceInfo {
 /**
  * Calcula em qual fatura uma compra cairá com base na data da compra e no dia de fechamento
  * 
+ * LÓGICA CORRETA - O período da fatura ATRAVESSA meses:
+ * Exemplo: Fechamento dia 8
+ * - Fatura de Janeiro/2024: compras de 09/Dez/2023 até 08/Jan/2024
+ * - Fatura de Fevereiro/2024: compras de 09/Jan/2024 até 08/Fev/2024
+ * 
  * Regras:
- * - Compras feitas ANTES do dia de fechamento → fatura atual (mesmo mês)
- * - Compras feitas NO DIA ou APÓS o fechamento → próxima fatura
+ * - Compras do dia 1 até o dia do fechamento (inclusive) → fatura do mês atual
+ * - Compras do dia APÓS fechamento até o final do mês → fatura do PRÓXIMO mês
  */
 export function getInvoiceForPurchase(
   purchaseDate: Date,
@@ -45,9 +50,14 @@ export function getInvoiceForPurchase(
   let invoiceMonth: number
   let invoiceYear: number
   
-  // Se a compra foi feita no dia do fechamento ou depois, vai para a PRÓXIMA fatura
-  if (purchaseDay >= closingDay) {
-    // Próximo mês
+  // Se a compra foi feita ATÉ o dia do fechamento (inclusive), vai para a fatura do MÊS ATUAL
+  // Se a compra foi feita APÓS o dia do fechamento, vai para a fatura do PRÓXIMO mês
+  if (purchaseDay <= closingDay) {
+    // Compra até o dia do fechamento → fatura do mês atual da compra
+    invoiceMonth = purchaseMonth
+    invoiceYear = purchaseYear
+  } else {
+    // Compra após o fechamento → fatura do próximo mês
     if (purchaseMonth === 11) {
       invoiceMonth = 0
       invoiceYear = purchaseYear + 1
@@ -55,13 +65,9 @@ export function getInvoiceForPurchase(
       invoiceMonth = purchaseMonth + 1
       invoiceYear = purchaseYear
     }
-  } else {
-    // Compra antes do fechamento → fatura atual (mesmo mês da compra)
-    invoiceMonth = purchaseMonth
-    invoiceYear = purchaseYear
   }
   
-  // Calcular data de fechamento da fatura
+  // Calcular data de fechamento da fatura (dia do fechamento no mês da fatura)
   const closingDate = new Date(invoiceYear, invoiceMonth, closingDay)
   
   // Calcular data de vencimento da fatura
@@ -70,9 +76,6 @@ export function getInvoiceForPurchase(
   // Verificar se a fatura está aberta (ainda não fechou)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  
-  // Determinar data de fechamento atual para comparação
-  const currentClosingDate = new Date(today.getFullYear(), today.getMonth(), closingDay)
   
   const isOpen = today < closingDate
   
@@ -93,9 +96,18 @@ export function getInvoiceForPurchase(
 /**
  * Retorna a fatura atual que deve ser exibida com base na data de hoje e no dia de fechamento
  * 
+ * LÓGICA CORRETA - O período da fatura ATRAVESSA meses:
+ * Exemplo: Fechamento dia 8, hoje é dia 5 de Janeiro
+ * - Estamos dentro do período da fatura de Janeiro (que recebe compras de 09/Dez até 08/Jan)
+ * - Fatura atual = Janeiro
+ * 
+ * Exemplo: Fechamento dia 8, hoje é dia 15 de Janeiro
+ * - Já passou o fechamento de Janeiro, agora estamos no período da fatura de Fevereiro
+ * - Fatura atual = Fevereiro (recebe compras de 09/Jan até 08/Fev)
+ * 
  * Regras:
  * - Até o dia de fechamento (inclusive): exibir fatura do mês atual
- * - A partir do dia seguinte ao fechamento: exibir fatura do próximo mês como "atual"
+ * - Após o dia de fechamento: exibir fatura do próximo mês como "atual"
  */
 export function getCurrentInvoice(
   closingDay: number,
@@ -109,8 +121,8 @@ export function getCurrentInvoice(
   let invoiceMonth: number
   let invoiceYear: number
   
-  // Se estamos NO DIA de fechamento ou ANTES, a fatura atual é do mês corrente
-  // Se estamos DEPOIS do dia de fechamento, a fatura "atual" passa a ser a do próximo mês
+  // Se estamos ATÉ o dia de fechamento (inclusive), a fatura atual é do mês corrente
+  // Se estamos APÓS o dia de fechamento, a fatura "atual" passa a ser a do próximo mês
   if (currentDay <= closingDay) {
     invoiceMonth = currentMonth
     invoiceYear = currentYear
@@ -176,10 +188,10 @@ export function getPurchaseInvoiceInfo(
   const purchaseDay = purchaseDate.getDate()
   let explanation: string
   
-  if (purchaseDay >= closingDay) {
-    explanation = `Compra no dia ${purchaseDay} (no dia do fechamento ou após): cairá na fatura de ${monthNames[invoice.month]}/${invoice.year}`
+  if (purchaseDay <= closingDay) {
+    explanation = `Compra no dia ${purchaseDay} (até o fechamento dia ${closingDay}): cairá na fatura de ${monthNames[invoice.month]}/${invoice.year}`
   } else {
-    explanation = `Compra no dia ${purchaseDay} (antes do fechamento dia ${closingDay}): cairá na fatura de ${monthNames[invoice.month]}/${invoice.year}`
+    explanation = `Compra no dia ${purchaseDay} (após o fechamento dia ${closingDay}): cairá na fatura de ${monthNames[invoice.month]}/${invoice.year}`
   }
   
   return {
