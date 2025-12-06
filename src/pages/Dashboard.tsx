@@ -13,10 +13,11 @@ import { useCapacitor } from "@/hooks/useCapacitor"
 import { usePushNotifications } from "@/hooks/usePushNotifications"
 import { useNavigate } from "react-router-dom"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { getInvoiceForPurchase } from "@/hooks/useCreditCardInvoice"
 
 const Dashboard = () => {
   const { user } = useAuth()
-  const { accounts, transactions, investments } = useSupabaseData()
+  const { accounts, transactions, investments, creditCards } = useSupabaseData()
   const { isNative, platform } = useCapacitor()
   const { isRegistered } = usePushNotifications()
   const { formatCurrency } = useCurrency()
@@ -93,9 +94,22 @@ const Dashboard = () => {
     .filter(t => t.type === "expense" && t.account_id)
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
-  // Monthly credit card expenses
-  const monthlyCreditCardExpenses = currentMonthTransactions
-    .filter(t => t.type === "expense" && t.credit_card_id)
+  // Helper function to check if a credit card transaction belongs to a specific invoice month/year
+  const isCreditCardTransactionInInvoice = (transaction: typeof transactions[0], targetMonth: number, targetYear: number) => {
+    if (!transaction.credit_card_id) return false
+    
+    const card = creditCards.find(c => c.id === transaction.credit_card_id)
+    if (!card) return false
+    
+    const purchaseDate = new Date(transaction.date)
+    const invoiceInfo = getInvoiceForPurchase(purchaseDate, card.closing_day, card.due_day)
+    
+    return invoiceInfo.month === targetMonth && invoiceInfo.year === targetYear
+  }
+
+  // Monthly credit card expenses - using invoice logic
+  const monthlyCreditCardExpenses = transactions
+    .filter(t => t.type === "expense" && t.credit_card_id && isCreditCardTransactionInInvoice(t, selectedMonth, selectedYear))
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
   // Total expenses + credit card
@@ -106,8 +120,9 @@ const Dashboard = () => {
     .filter(t => t.type === "expense" && !t.contact_id && t.account_id)
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
-  const myCreditCardExpenses = currentMonthTransactions
-    .filter(t => t.type === "expense" && !t.contact_id && t.credit_card_id)
+  // My credit card expenses - using invoice logic
+  const myCreditCardExpenses = transactions
+    .filter(t => t.type === "expense" && !t.contact_id && t.credit_card_id && isCreditCardTransactionInInvoice(t, selectedMonth, selectedYear))
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
   const myTotalExpenses = myExpenses + myCreditCardExpenses
