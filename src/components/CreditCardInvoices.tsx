@@ -248,7 +248,7 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
           </div>
           <p className="text-xs text-muted-foreground mt-2">
             {isBeforeClosing 
-              ? `Compras até dia ${closingDay - 1} entram na fatura atual. A partir do dia ${closingDay}, entram na próxima.`
+              ? `Compras até dia ${closingDay} entram na fatura atual. A partir do dia ${closingDay + 1}, entram na próxima.`
               : `Compras de hoje em diante entram na fatura de ${format(new Date(today.getFullYear(), today.getMonth() + 1, 1), 'MMMM', { locale: ptBR })}.`
             }
           </p>
