@@ -70,7 +70,16 @@ serve(async (req) => {
     const apiKey = req.headers.get('x-api-key');
     const expectedApiKey = Deno.env.get('N8N_API_KEY');
     
-    if (!apiKey || !expectedApiKey || apiKey !== expectedApiKey) {
+    // Explicitly fail if secret is not configured
+    if (!expectedApiKey) {
+      console.error('N8N_API_KEY secret is not configured');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!apiKey || apiKey !== expectedApiKey) {
       console.error('Invalid or missing API key');
       return new Response(
         JSON.stringify({ error: 'Unauthorized: Invalid or missing API key' }),

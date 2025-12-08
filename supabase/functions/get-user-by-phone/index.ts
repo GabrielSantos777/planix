@@ -25,13 +25,23 @@ serve(async (req) => {
   }
 
   try {
-    // SECURITY FIX: Require API key authentication
+    // SECURITY: Require API key authentication
     const apiKey = req.headers.get('x-api-key');
     const expectedApiKey = Deno.env.get('N8N_API_KEY');
     
-    if (!apiKey || apiKey !== expectedApiKey) {
+    // Explicitly fail if secret is not configured
+    if (!expectedApiKey) {
+      console.error('N8N_API_KEY secret is not configured');
       return new Response(
-        JSON.stringify({ error: 'Invalid or missing API key' }),
+        JSON.stringify({ error: 'Server configuration error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!apiKey || apiKey !== expectedApiKey) {
+      console.error('Invalid or missing API key');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Invalid or missing API key' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
