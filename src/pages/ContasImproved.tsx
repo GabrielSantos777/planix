@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
+import { Checkbox } from "@/components/ui/checkbox"
 import { banks } from "@/data/banks"
 import { 
   Plus, 
@@ -248,6 +250,15 @@ export default function ContasImproved() {
   const [viewAccount, setViewAccount] = useState(null)
   const [viewCreditCard, setViewCreditCard] = useState(null)
   
+  // Estados para confirmação de exclusão
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteType, setDeleteType] = useState<'account' | 'creditCard' | null>(null)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [deleteTargetName, setDeleteTargetName] = useState<string>('')
+  
+  // Estado para transações selecionadas
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
+  
   // Estados para novos itens
   const [newAccount, setNewAccount] = useState<{
     name: string
@@ -407,38 +418,81 @@ export default function ContasImproved() {
     }
   }
 
-  const handleDeleteAccount = async (accountId) => {
+  // Funções para abrir diálogo de confirmação de exclusão
+  const confirmDeleteAccount = (account: any) => {
+    setDeleteType('account')
+    setDeleteTargetId(account.id)
+    setDeleteTargetName(account.name)
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDeleteCreditCard = (card: any) => {
+    setDeleteType('creditCard')
+    setDeleteTargetId(card.id)
+    setDeleteTargetName(card.name)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId || !deleteType) return
+    
     try {
-      await deleteAccount(accountId)
-      toast({
-        title: "Sucesso",
-        description: "Conta removida com sucesso!"
-      })
+      if (deleteType === 'account') {
+        await deleteAccount(deleteTargetId)
+        toast({
+          title: "Sucesso",
+          description: "Conta removida com sucesso!"
+        })
+      } else if (deleteType === 'creditCard') {
+        await deleteCreditCard(deleteTargetId)
+        toast({
+          title: "Sucesso",
+          description: "Cartão removido com sucesso!"
+        })
+      }
     } catch (error) {
-      console.error('Error deleting account:', error)
+      console.error('Error deleting:', error)
       toast({
         title: "Erro",
-        description: "Erro ao remover conta. Tente novamente.",
+        description: `Erro ao remover ${deleteType === 'account' ? 'conta' : 'cartão'}. Tente novamente.`,
         variant: "destructive"
       })
+    } finally {
+      setDeleteConfirmOpen(false)
+      setDeleteTargetId(null)
+      setDeleteTargetName('')
+      setDeleteType(null)
     }
   }
 
-  const handleDeleteCreditCard = async (cardId) => {
-    try {
-      await deleteCreditCard(cardId)
-      toast({
-        title: "Sucesso",
-        description: "Cartão removido com sucesso!"
-      })
-    } catch (error) {
-      console.error('Error deleting credit card:', error)
-      toast({
-        title: "Erro",
-        description: "Erro ao remover cartão. Tente novamente.",
-        variant: "destructive"
-      })
-    }
+  // Funções para seleção de transações
+  const toggleTransactionSelection = (transactionId: string) => {
+    setSelectedTransactions(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(transactionId)) {
+        newSet.delete(transactionId)
+      } else {
+        newSet.add(transactionId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleAllTransactions = (transactionIds: string[]) => {
+    setSelectedTransactions(prev => {
+      const allSelected = transactionIds.every(id => prev.has(id))
+      if (allSelected) {
+        // Deselect all
+        const newSet = new Set(prev)
+        transactionIds.forEach(id => newSet.delete(id))
+        return newSet
+      } else {
+        // Select all
+        const newSet = new Set(prev)
+        transactionIds.forEach(id => newSet.add(id))
+        return newSet
+      }
+    })
   }
 
   const openEditAccountDialog = (account) => {
@@ -731,7 +785,7 @@ export default function ContasImproved() {
                               <Button variant="ghost" size="sm" onClick={() => openEditAccountDialog(account)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(account.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => confirmDeleteAccount(account)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -752,7 +806,21 @@ export default function ContasImproved() {
                             
                             {/* Recent Transactions */}
                             <div className="space-y-3">
-                              <Label className="text-sm font-medium">Transações Recentes</Label>
+                              <div className="flex items-center justify-between">
+                                <Label className="text-sm font-medium">Transações Recentes</Label>
+                                {getAccountTransactions(account.id).length > 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <Checkbox
+                                      id={`select-all-${account.id}`}
+                                      checked={getAccountTransactions(account.id).slice(0, 8).every(t => selectedTransactions.has(t.id))}
+                                      onCheckedChange={() => toggleAllTransactions(getAccountTransactions(account.id).slice(0, 8).map(t => t.id))}
+                                    />
+                                    <label htmlFor={`select-all-${account.id}`} className="text-xs text-muted-foreground cursor-pointer">
+                                      Selecionar todas
+                                    </label>
+                                  </div>
+                                )}
+                              </div>
                               <div className="space-y-2 max-h-80 overflow-y-auto rounded-lg border bg-muted/30 p-3">
                                 {getAccountTransactions(account.id).length > 0 ? (
                                   getAccountTransactions(account.id).slice(0, 8).map((transaction) => {
@@ -763,30 +831,38 @@ export default function ContasImproved() {
                                       transaction.type === 'income' ? 'Receita' : 'Despesa'
                                     
                                     return (
-                                      <div key={transaction.id} className="p-3 rounded-md bg-background border hover:bg-accent/50 transition-colors">
-                                        <div className="flex justify-between items-start gap-3">
-                                          <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-sm truncate">{transaction.description}</p>
-                                            <div className="flex flex-wrap gap-2 mt-1">
-                                              <p className="text-xs text-muted-foreground">
-                                                {new Date(transaction.date).toLocaleDateString('pt-BR')}
-                                              </p>
-                                              <Badge variant="outline" className="text-xs">
-                                                {typeLabel}
-                                              </Badge>
-                                              {category && category !== '-' && (
-                                                <Badge variant="secondary" className="text-xs">
-                                                  {category}
+                                      <div key={transaction.id} className={`p-3 rounded-md bg-background border hover:bg-accent/50 transition-colors ${selectedTransactions.has(transaction.id) ? 'ring-2 ring-primary' : ''}`}>
+                                        <div className="flex items-start gap-3">
+                                          <Checkbox
+                                            id={`transaction-${transaction.id}`}
+                                            checked={selectedTransactions.has(transaction.id)}
+                                            onCheckedChange={() => toggleTransactionSelection(transaction.id)}
+                                            className="mt-1"
+                                          />
+                                          <div className="flex-1 min-w-0 flex justify-between items-start gap-3">
+                                            <div className="flex-1 min-w-0">
+                                              <p className="font-medium text-sm truncate">{transaction.description}</p>
+                                              <div className="flex flex-wrap gap-2 mt-1">
+                                                <p className="text-xs text-muted-foreground">
+                                                  {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                                                </p>
+                                                <Badge variant="outline" className="text-xs">
+                                                  {typeLabel}
                                                 </Badge>
-                                              )}
+                                                {category && category !== '-' && (
+                                                  <Badge variant="secondary" className="text-xs">
+                                                    {category}
+                                                  </Badge>
+                                                )}
+                                              </div>
                                             </div>
+                                            <p className={`font-bold text-sm whitespace-nowrap ${
+                                              transaction.type === 'income' ? 'text-green-600' : 
+                                              transaction.is_transfer ? 'text-blue-600' : 'text-red-600'
+                                            }`}>
+                                              {transaction.type === 'income' || transaction.is_transfer ? '+' : ''}{formatCurrency(Math.abs(transaction.amount))}
+                                            </p>
                                           </div>
-                                          <p className={`font-bold text-sm whitespace-nowrap ${
-                                            transaction.type === 'income' ? 'text-green-600' : 
-                                            transaction.is_transfer ? 'text-blue-600' : 'text-red-600'
-                                          }`}>
-                                            {transaction.type === 'income' || transaction.is_transfer ? '+' : ''}{formatCurrency(Math.abs(transaction.amount))}
-                                          </p>
                                         </div>
                                       </div>
                                     )
@@ -878,7 +954,7 @@ export default function ContasImproved() {
                               <Button variant="ghost" size="sm" onClick={() => openEditCreditCardDialog(card)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteCreditCard(card.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => confirmDeleteCreditCard(card)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -1103,6 +1179,31 @@ export default function ContasImproved() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir {deleteType === 'account' ? 'a conta' : 'o cartão'} <strong>"{deleteTargetName}"</strong>?
+              <br /><br />
+              <span className="text-destructive font-medium">
+                Esta ação não pode ser desfeita. Todas as transações vinculadas também serão removidas.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
     </Layout>
   )
