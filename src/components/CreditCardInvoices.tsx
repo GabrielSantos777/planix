@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ChevronDown, ChevronUp, Calendar, CreditCard, Edit, Info, Sparkles } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -45,6 +46,35 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [invoiceToPayAmount, setInvoiceToPayAmount] = useState(0)
   const [currentEditingInvoice, setCurrentEditingInvoice] = useState<any>(null)
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
+
+  // Toggle transaction selection
+  const toggleTransactionSelection = (transactionId: string) => {
+    setSelectedTransactions(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(transactionId)) {
+        newSet.delete(transactionId)
+      } else {
+        newSet.add(transactionId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleAllInvoiceTransactions = (transactionIds: string[]) => {
+    setSelectedTransactions(prev => {
+      const allSelected = transactionIds.every(id => prev.has(id))
+      if (allSelected) {
+        const newSet = new Set(prev)
+        transactionIds.forEach(id => newSet.delete(id))
+        return newSet
+      } else {
+        const newSet = new Set(prev)
+        transactionIds.forEach(id => newSet.add(id))
+        return newSet
+      }
+    })
+  }
 
   // Usar o hook de faturas com a lógica correta
   const card = creditCards.find(c => c.id === cardId)
@@ -334,9 +364,26 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
           <CardContent>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-medium">
-                  {displayInvoice.transactions.length} transação(ões)
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">
+                    {displayInvoice.transactions.length} transação(ões)
+                  </span>
+                  {displayInvoice.transactions.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`select-all-invoice-${displayInvoice.year}-${displayInvoice.month}`}
+                        checked={displayInvoice.transactions.every(t => selectedTransactions.has(t.id))}
+                        onCheckedChange={() => toggleAllInvoiceTransactions(displayInvoice.transactions.map(t => t.id))}
+                      />
+                      <label 
+                        htmlFor={`select-all-invoice-${displayInvoice.year}-${displayInvoice.month}`} 
+                        className="text-xs text-muted-foreground cursor-pointer"
+                      >
+                        Selecionar todas
+                      </label>
+                    </div>
+                  )}
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -359,17 +406,27 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
                   ? displayInvoice.transactions 
                   : displayInvoice.transactions.slice(0, 5)
                 ).map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between p-2 border rounded">
-                    <div>
-                      <p className="font-medium">{transaction.description}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(transaction.date), 'dd/MM/yyyy')}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-destructive">
-                        {formatCurrency(transaction.amount)}
-                      </p>
+                  <div 
+                    key={transaction.id} 
+                    className={`flex items-center gap-3 p-2 border rounded transition-colors ${selectedTransactions.has(transaction.id) ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+                  >
+                    <Checkbox
+                      id={`invoice-transaction-${transaction.id}`}
+                      checked={selectedTransactions.has(transaction.id)}
+                      onCheckedChange={() => toggleTransactionSelection(transaction.id)}
+                    />
+                    <div className="flex-1 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{transaction.description}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(transaction.date), 'dd/MM/yyyy')}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-destructive">
+                          {formatCurrency(transaction.amount)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Checkbox } from "@/components/ui/checkbox"
 import { 
   Plus, 
   Eye, 
@@ -32,6 +34,9 @@ const Contas = () => {
   const [editingAccount, setEditingAccount] = useState<any | null>(null)
   const [isStatementOpen, setIsStatementOpen] = useState(false)
   const [selectedAccount, setSelectedAccount] = useState<any | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTargetAccount, setDeleteTargetAccount] = useState<any | null>(null)
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
   
   const [newAccount, setNewAccount] = useState({
     name: "",
@@ -84,12 +89,27 @@ const Contas = () => {
     setIsDialogOpen(false)
   }
 
-  const handleDeleteAccount = (accountId: string) => {
-    const account = accounts.find(a => a.id === accountId)
-    deleteAccount(accountId)
+  const confirmDeleteAccount = (account: any) => {
+    setDeleteTargetAccount(account)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetAccount) return
+    deleteAccount(deleteTargetAccount.id)
     toast({
       title: "🗑️ Conta Excluída",
-      description: account ? `${account.name} foi removida` : "Conta excluída com sucesso",
+      description: `${deleteTargetAccount.name} foi removida`,
+    })
+    setDeleteConfirmOpen(false)
+    setDeleteTargetAccount(null)
+  }
+
+  const toggleTransactionSelection = (id: string) => {
+    setSelectedTransactions(prev => {
+      const newSet = new Set(prev)
+      newSet.has(id) ? newSet.delete(id) : newSet.add(id)
+      return newSet
     })
   }
 
@@ -260,7 +280,7 @@ const Contas = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDeleteAccount(account.id)}
+                        onClick={() => confirmDeleteAccount(account)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -406,6 +426,31 @@ const Contas = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir a conta <strong>"{deleteTargetAccount?.name}"</strong>?
+                <br /><br />
+                <span className="text-destructive font-medium">
+                  Esta ação não pode ser desfeita.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   )
