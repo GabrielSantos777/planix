@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { MessageCircle, TrendingDown, Copy } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
-import { format, startOfMonth, endOfMonth } from "date-fns"
+import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useState, useMemo } from "react"
 
@@ -101,18 +101,53 @@ export default function Social() {
     enabled: !!user?.id,
   })
 
-  // Filtrar transações por mês selecionado
+  // Filtrar transações considerando dia de pagamento do contato
+  // Se data da transação < dia de pagamento, aloca no mês anterior para receber no mês atual
   const filteredContactsWithTransactions = useMemo(() => {
     if (!contactsWithTransactions || !selectedMonth) return contactsWithTransactions
 
     const [year, month] = selectedMonth.split('-').map(Number)
-    const monthStart = startOfMonth(new Date(year, month - 1))
-    const monthEnd = endOfMonth(new Date(year, month - 1))
 
     return contactsWithTransactions.map(({ contact, transactions, total }) => {
       const filteredTransactions = transactions.filter(t => {
-        const transDate = new Date(t.date)
-        return transDate >= monthStart && transDate <= monthEnd
+        const transDate = new Date(t.date + 'T12:00:00') // Evitar problema de fuso
+        const transYear = transDate.getFullYear()
+        const transMonth = transDate.getMonth() + 1 // 1-12
+        const transDay = transDate.getDate()
+        
+        const paymentDay = (contact as any).payment_day || null
+        
+        if (paymentDay) {
+          // Se a transação foi feita antes do dia de pagamento, ela cai no mês anterior
+          // e o recebimento é no mês atual
+          if (transDay < paymentDay) {
+            // Transação feita antes do dia de pagamento -> pertence ao ciclo do mês anterior
+            // Será cobrada/recebida no mês da transação
+            // Então para o mês selecionado, queremos transações do mês atual com dia < paymentDay
+            // OU transações do mês anterior com dia >= paymentDay
+            if (transYear === year && transMonth === month && transDay < paymentDay) {
+              return true
+            }
+            // Transações do mês anterior que passaram do dia de pagamento
+            const prevMonth = month === 1 ? 12 : month - 1
+            const prevYear = month === 1 ? year - 1 : year
+            if (transYear === prevYear && transMonth === prevMonth && transDay >= paymentDay) {
+              return true
+            }
+            return false
+          } else {
+            // Transação >= dia de pagamento -> pertence ao ciclo do mês seguinte
+            const nextMonth = month === 12 ? 1 : month + 1
+            const nextYear = month === 12 ? year + 1 : year
+            if (transYear === year && transMonth === month && transDay >= paymentDay) {
+              return true
+            }
+            return false
+          }
+        } else {
+          // Sem dia de pagamento, usa lógica padrão do mês
+          return transYear === year && transMonth === month
+        }
       })
 
       const filteredTotal = filteredTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0)

@@ -546,8 +546,13 @@ const TransacoesImproved = () => {
     }
   }
 
+  // Mostrar todas as categorias disponíveis para cada tipo de transação
+  // mas priorizar as do tipo correto
   const incomeCategories = categories.filter(cat => cat.type === 'income')
   const expenseCategories = categories.filter(cat => cat.type === 'expense')
+  
+  // Para permitir flexibilidade, mostrar todas as categorias na seleção
+  const allCategoriesForSelection = categories
 
   return (
     <Layout>
@@ -988,18 +993,55 @@ const TransacoesImproved = () => {
                           <SelectValue placeholder="Selecione uma categoria" />
                         </SelectTrigger>
                         <SelectContent>
-                          {newTransaction.type === "income" 
-                            ? incomeCategories.map((category) => (
+                          {/* Mostrar todas as categorias, agrupadas por tipo */}
+                          {newTransaction.type === "income" && incomeCategories.length > 0 && (
+                            <>
+                              <SelectItem value="__income_header__" disabled className="font-semibold text-xs text-muted-foreground">
+                                — Categorias de Receita —
+                              </SelectItem>
+                              {incomeCategories.map((category) => (
                                 <SelectItem key={category.id} value={category.id}>
                                   {category.name}
                                 </SelectItem>
-                              ))
-                            : expenseCategories.map((category) => (
+                              ))}
+                            </>
+                          )}
+                          {newTransaction.type === "income" && expenseCategories.length > 0 && (
+                            <>
+                              <SelectItem value="__expense_header__" disabled className="font-semibold text-xs text-muted-foreground">
+                                — Outras Categorias —
+                              </SelectItem>
+                              {expenseCategories.map((category) => (
                                 <SelectItem key={category.id} value={category.id}>
                                   {category.name}
                                 </SelectItem>
-                              ))
-                          }
+                              ))}
+                            </>
+                          )}
+                          {newTransaction.type === "expense" && expenseCategories.length > 0 && (
+                            <>
+                              <SelectItem value="__expense_header__" disabled className="font-semibold text-xs text-muted-foreground">
+                                — Categorias de Despesa —
+                              </SelectItem>
+                              {expenseCategories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
+                          {newTransaction.type === "expense" && incomeCategories.length > 0 && (
+                            <>
+                              <SelectItem value="__income_header__" disabled className="font-semibold text-xs text-muted-foreground">
+                                — Outras Categorias —
+                              </SelectItem>
+                              {incomeCategories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
