@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { supabase } from '@/integrations/supabase/client'
+import { useAuth } from '@/context/AuthContext'
+import * as LucideIcons from 'lucide-react'
 import { 
   Home, 
   Car, 
@@ -13,7 +16,64 @@ import {
   Briefcase,
   Coins,
   PiggyBank,
-  TrendingUp
+  TrendingUp,
+  Folder,
+  Coffee,
+  Pizza,
+  Fuel,
+  Zap,
+  Wifi,
+  Smartphone,
+  Laptop,
+  Camera,
+  Music,
+  Video,
+  Book,
+  Pen,
+  Clock,
+  Calendar,
+  MapPin,
+  Globe,
+  Shield,
+  Key,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  Bell,
+  Mail,
+  Phone,
+  MessageCircle,
+  Users,
+  User,
+  Settings,
+  Wrench,
+  Hammer,
+  Scissors,
+  Paperclip,
+  Flag,
+  Tag,
+  Bookmark,
+  Archive,
+  Download,
+  Upload,
+  Share,
+  Copy,
+  AtSign,
+  Hash,
+  Percent,
+  DollarSign,
+  Euro,
+  Plus,
+  Minus,
+  X,
+  Equal,
+  Star,
+  Circle,
+  Square,
+  Triangle,
+  Diamond,
+  Hexagon
 } from 'lucide-react'
 
 export interface Category {
@@ -22,14 +82,18 @@ export interface Category {
   type: 'income' | 'expense'
   icon: string
   color: string
+  is_default?: boolean
+  user_id?: string
 }
 
 interface CategoriesContextType {
   categories: Category[]
-  addCategory: (category: Omit<Category, 'id'>) => void
-  updateCategory: (id: string, category: Partial<Category>) => void
-  deleteCategory: (id: string) => void
+  addCategory: (category: Omit<Category, 'id'>) => Promise<Category | null>
+  updateCategory: (id: string, category: Partial<Category>) => Promise<void>
+  deleteCategory: (id: string) => Promise<void>
   getCategoryIcon: (iconName: string) => React.ComponentType<any>
+  loading: boolean
+  refetch: () => Promise<void>
 }
 
 const CategoriesContext = createContext<CategoriesContextType | undefined>(undefined)
@@ -42,7 +106,7 @@ export const useCategories = () => {
   return context
 }
 
-const iconMap = {
+const iconMap: Record<string, React.ComponentType<any>> = {
   Home,
   Car,
   ShoppingCart,
@@ -56,67 +120,217 @@ const iconMap = {
   Briefcase,
   Coins,
   PiggyBank,
-  TrendingUp
+  TrendingUp,
+  folder: Folder,
+  Folder,
+  Coffee,
+  Pizza,
+  Fuel,
+  Zap,
+  Wifi,
+  Smartphone,
+  Laptop,
+  Camera,
+  Music,
+  Video,
+  Book,
+  Pen,
+  Clock,
+  Calendar,
+  MapPin,
+  Globe,
+  Shield,
+  Key,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  Bell,
+  Mail,
+  Phone,
+  MessageCircle,
+  Users,
+  User,
+  Settings,
+  Wrench,
+  Hammer,
+  Scissors,
+  Paperclip,
+  Flag,
+  Tag,
+  Bookmark,
+  Archive,
+  Download,
+  Upload,
+  Share,
+  Copy,
+  AtSign,
+  Hash,
+  Percent,
+  DollarSign,
+  Euro,
+  Plus,
+  Minus,
+  X,
+  Equal,
+  Star,
+  Circle,
+  Square,
+  Triangle,
+  Diamond,
+  Hexagon,
+  // Lowercase mappings for database icons
+  home: Home,
+  car: Car,
+  utensils: Utensils,
+  heart: Heart,
+  book: Book,
+  'gamepad-2': GamepadIcon,
+  briefcase: Briefcase,
+  laptop: Laptop,
+  'trending-up': TrendingUp
 }
 
-const defaultCategories: Category[] = [
-  // Despesas
-  { id: '1', name: 'Alimentação', type: 'expense', icon: 'Utensils', color: '#FF6B6B' },
-  { id: '2', name: 'Transporte', type: 'expense', icon: 'Car', color: '#4ECDC4' },
-  { id: '3', name: 'Compras', type: 'expense', icon: 'ShoppingCart', color: '#45B7D1' },
-  { id: '4', name: 'Casa', type: 'expense', icon: 'Home', color: '#96CEB4' },
-  { id: '5', name: 'Entretenimento', type: 'expense', icon: 'GamepadIcon', color: '#FFEAA7' },
-  { id: '6', name: 'Roupas', type: 'expense', icon: 'Shirt', color: '#DDA0DD' },
-  { id: '7', name: 'Saúde', type: 'expense', icon: 'Heart', color: '#FF7675' },
-  { id: '8', name: 'Educação', type: 'expense', icon: 'GraduationCap', color: '#74B9FF' },
-  { id: '9', name: 'Viagem', type: 'expense', icon: 'Plane', color: '#00B894' },
-  
-  // Receitas
-  { id: '10', name: 'Salário', type: 'income', icon: 'Briefcase', color: '#00B894' },
-  { id: '11', name: 'Freelance', type: 'income', icon: 'Coins', color: '#FDCB6E' },
-  { id: '12', name: 'Investimentos', type: 'income', icon: 'TrendingUp', color: '#6C5CE7' },
-  { id: '13', name: 'Presente', type: 'income', icon: 'Gift', color: '#FD79A8' },
-  { id: '14', name: 'Poupança', type: 'income', icon: 'PiggyBank', color: '#00CEC9' }
-]
-
 export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [categories, setCategories] = useState<Category[]>(defaultCategories)
+  const { user } = useAuth()
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const savedCategories = localStorage.getItem('categories')
-    if (savedCategories) {
-      setCategories(JSON.parse(savedCategories))
+  const fetchCategories = async () => {
+    if (!user) {
+      setCategories([])
+      setLoading(false)
+      return
     }
-  }, [])
 
-  useEffect(() => {
-    localStorage.setItem('categories', JSON.stringify(categories))
-  }, [categories])
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .order('name')
 
-  const addCategory = (category: Omit<Category, 'id'>) => {
-    const newCategory: Category = {
-      ...category,
-      id: Date.now().toString()
+      if (error) throw error
+      
+      // Filter and map to ensure only income/expense types are included
+      const filteredData: Category[] = (data || [])
+        .filter(cat => cat.type === 'income' || cat.type === 'expense')
+        .map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          type: cat.type as 'income' | 'expense',
+          icon: cat.icon || 'Folder',
+          color: cat.color || '#6B7280',
+          is_default: cat.is_default || false,
+          user_id: cat.user_id
+        }))
+      
+      setCategories(filteredData)
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    } finally {
+      setLoading(false)
     }
-    setCategories(prev => [...prev, newCategory])
   }
 
-  const updateCategory = (id: string, updatedCategory: Partial<Category>) => {
-    setCategories(prev => 
-      prev.map(category => 
-        category.id === id 
-          ? { ...category, ...updatedCategory }
-          : category
+  useEffect(() => {
+    fetchCategories()
+  }, [user])
+
+  const addCategory = async (category: Omit<Category, 'id'>): Promise<Category | null> => {
+    if (!user) return null
+
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([{ 
+          ...category, 
+          user_id: user.id,
+          is_default: false
+        }])
+        .select()
+        .single()
+
+      if (error) throw error
+      
+      const newCategory: Category = {
+        id: data.id,
+        name: data.name,
+        type: data.type as 'income' | 'expense',
+        icon: data.icon || 'Folder',
+        color: data.color || '#6B7280',
+        is_default: data.is_default || false,
+        user_id: data.user_id
+      }
+      
+      setCategories(prev => [...prev, newCategory])
+      return newCategory
+    } catch (error) {
+      console.error('Error adding category:', error)
+      throw error
+    }
+  }
+
+  const updateCategory = async (id: string, updatedCategory: Partial<Category>) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update(updatedCategory)
+        .eq('id', id)
+
+      if (error) throw error
+
+      setCategories(prev => 
+        prev.map(category => 
+          category.id === id 
+            ? { ...category, ...updatedCategory }
+            : category
+        )
       )
-    )
+    } catch (error) {
+      console.error('Error updating category:', error)
+      throw error
+    }
   }
 
-  const deleteCategory = (id: string) => {
-    setCategories(prev => prev.filter(category => category.id !== id))
+  const deleteCategory = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      
+      setCategories(prev => prev.filter(category => category.id !== id))
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      throw error
+    }
   }
 
-  const getCategoryIcon = (iconName: string) => {
-    return iconMap[iconName as keyof typeof iconMap] || Home
+  const getCategoryIcon = (iconName: string): React.ComponentType<any> => {
+    if (!iconName) return Folder
+    
+    // Try direct match first
+    if (iconMap[iconName]) {
+      return iconMap[iconName]
+    }
+    
+    // Try with first letter capitalized
+    const capitalized = iconName.charAt(0).toUpperCase() + iconName.slice(1)
+    if (iconMap[capitalized]) {
+      return iconMap[capitalized]
+    }
+    
+    // Try to get from lucide-react dynamically
+    const lucideIcon = (LucideIcons as any)[iconName] || (LucideIcons as any)[capitalized]
+    if (lucideIcon) {
+      return lucideIcon
+    }
+    
+    return Folder
   }
 
   const value: CategoriesContextType = {
@@ -124,7 +338,9 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     addCategory,
     updateCategory,
     deleteCategory,
-    getCategoryIcon
+    getCategoryIcon,
+    loading,
+    refetch: fetchCategories
   }
 
   return (

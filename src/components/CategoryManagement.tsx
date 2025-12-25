@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { useCategories } from '@/context/CategoriesContext'
-import { Plus, Edit, Trash2 } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2 } from 'lucide-react'
 
 const iconOptions = [
   // Categorias básicas
@@ -45,16 +45,22 @@ interface CategoryFormData {
 
 export const CategoryManagement = () => {
   const { toast } = useToast()
-  const { categories, addCategory, updateCategory, deleteCategory, getCategoryIcon } = useCategories()
+  const { categories, addCategory, updateCategory, deleteCategory, getCategoryIcon, loading, refetch } = useCategories()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<any | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
     type: 'expense',
-    icon: 'folder',
+    icon: 'Folder',
     color: '#6B7280'
   })
+  
+  // Refetch categories on mount
+  useEffect(() => {
+    refetch()
+  }, [])
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
@@ -66,6 +72,7 @@ export const CategoryManagement = () => {
       return
     }
 
+    setIsSubmitting(true)
     try {
       if (editingCategory) {
         await updateCategory(editingCategory.id, formData)
@@ -74,15 +81,14 @@ export const CategoryManagement = () => {
           description: `${formData.name} foi atualizada com sucesso.`
         })
       } else {
-        const result = await addCategory(formData)
-        console.log('Categoria criada:', result)
+        await addCategory(formData)
         toast({
           title: "✅ Categoria criada!",
           description: `${formData.name} foi criada com sucesso.`
         })
       }
 
-      setFormData({ name: '', type: 'expense', icon: 'folder', color: '#6B7280' })
+      setFormData({ name: '', type: 'expense', icon: 'Folder', color: '#6B7280' })
       setEditingCategory(null)
       setIsDialogOpen(false)
     } catch (error) {
@@ -92,6 +98,8 @@ export const CategoryManagement = () => {
         description: error instanceof Error ? error.message : "Erro ao salvar categoria. Tente novamente.",
         variant: "destructive"
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -137,7 +145,7 @@ export const CategoryManagement = () => {
           <DialogTrigger asChild>
             <Button onClick={() => {
               setEditingCategory(null)
-              setFormData({ name: '', type: 'expense', icon: 'folder', color: '#6B7280' })
+              setFormData({ name: '', type: 'expense', icon: 'Folder', color: '#6B7280' })
             }}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Categoria
@@ -224,13 +232,20 @@ export const CategoryManagement = () => {
                 </div>
               </div>
               
-              <Button onClick={handleSubmit} className="w-full">
+              <Button onClick={handleSubmit} className="w-full" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingCategory ? 'Atualizar' : 'Criar'} Categoria
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
+      
+      {loading && (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Income Categories */}

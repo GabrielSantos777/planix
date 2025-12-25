@@ -1,7 +1,5 @@
 import { useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp } from 'lucide-react'
 import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { useCurrency } from '@/context/CurrencyContext'
 import { usePrivacy } from '@/context/PrivacyContext'
@@ -16,6 +14,7 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
   const { isPrivacyEnabled } = usePrivacy()
 
   // Cálculo do patrimônio líquido mensal nos últimos 12 meses
+  // Mostra o saldo total consolidado ao final de cada mês
   const evolutionData = useMemo(() => {
     const last12Months = Array.from({ length: 12 }, (_, i) => {
       const date = new Date()
@@ -28,33 +27,28 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
     })
 
     return last12Months.map(({ month, year, monthIndex }) => {
-      // Calcular patrimônio líquido no final deste mês
+      // Calcular o saldo total no final deste mês
       const endOfMonth = new Date(year, monthIndex + 1, 0)
-      
-      // Filtrar transações até o final deste mês (excluindo transferências)
-      const transactionsUpToMonth = transactions.filter(t => {
-        const transactionDate = new Date(t.date)
-        return transactionDate <= endOfMonth && !t.is_transfer
-      })
       
       // Somar saldos iniciais de todas as contas ativas
       const accountsInitialBalance = accounts
         .filter(acc => acc.is_active)
         .reduce((sum, account) => sum + (account.initial_balance || 0), 0)
       
-      // Calcular o saldo baseado nas transações de contas (account_id)
-      const accountTransactionsBalance = transactionsUpToMonth
-        .filter(t => t.account_id)
+      // Filtrar TODAS as transações de contas até o final deste mês
+      // Incluindo transferências, pois elas afetam o saldo das contas
+      const accountTransactionsUpToMonth = transactions.filter(t => {
+        const transactionDate = new Date(t.date)
+        return transactionDate <= endOfMonth && t.account_id
+      })
+      
+      // Calcular o saldo baseado nas transações de contas
+      const accountTransactionsBalance = accountTransactionsUpToMonth
         .reduce((sum, t) => sum + (t.amount || 0), 0)
       
-      // Calcular as despesas do cartão de crédito (credit_card_id)
-      // Cartão de crédito não soma no patrimônio, é apenas uma dívida futura
-      const creditCardExpenses = transactionsUpToMonth
-        .filter(t => t.credit_card_id && t.type === 'expense')
-        .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
-      
-      // Patrimônio líquido = saldo inicial + movimentações de contas - dívidas de cartão
-      const netWorth = accountsInitialBalance + accountTransactionsBalance - creditCardExpenses
+      // Patrimônio líquido = saldo inicial de todas as contas + movimentações
+      // Não subtraímos cartão de crédito pois queremos o saldo real das contas
+      const netWorth = accountsInitialBalance + accountTransactionsBalance
 
       return {
         month,
@@ -62,10 +56,6 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
       }
     })
   }, [transactions, accounts])
-
-  const currentBalance = evolutionData[evolutionData.length - 1]?.balance || 0
-  const previousBalance = evolutionData[evolutionData.length - 2]?.balance || 0
-  const growthPercentage = previousBalance !== 0 ? ((currentBalance - previousBalance) / Math.abs(previousBalance)) * 100 : 0
 
   return (
     <div className="h-full w-full">
@@ -87,6 +77,7 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
             axisLine={false}
             tickFormatter={(value) => {
               if (value >= 1000) return `${(value / 1000).toFixed(0)}k`
+              if (value <= -1000) return `${(value / 1000).toFixed(0)}k`
               return `${value}`
             }}
           />
