@@ -200,12 +200,14 @@ async function getOrCreateCategory(supabase: any, userId: string, categoryName: 
 async function sendWhatsAppMessage(phoneNumber: string, message: string): Promise<boolean> {
   try {
     const whatsappToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+    const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID') || '517099498154043';
+    
     if (!whatsappToken) {
       console.error('WhatsApp access token not found');
       return false;
     }
 
-    const response = await fetch(`https://graph.facebook.com/v17.0/YOUR_PHONE_NUMBER_ID/messages`, {
+    const response = await fetch(`https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${whatsappToken}`,
@@ -479,16 +481,8 @@ async function createTransaction(extractedData: any, userId: string, supabase: a
       return '❌ Erro ao registrar transação. Tente novamente.';
     }
 
-    // Atualizar saldo apenas se for conta bancária
-    if (accountId) {
-      const balanceChange = extractedData.type === 'expense' ? -Math.abs(extractedData.amount) : Math.abs(extractedData.amount);
-      await supabase
-        .from('accounts')
-        .update({
-          current_balance: supabase.raw(`current_balance + ${balanceChange}`)
-        })
-        .eq('id', accountId);
-    }
+    // NOTE: Balance is automatically updated by database trigger trg_transactions_recompute_balances
+    // No manual balance update needed - this prevents SQL injection risks
 
     const typeEmoji = extractedData.type === 'expense' ? '💸' : '💰';
     const typeText = extractedData.type === 'expense' ? 'Despesa' : 'Receita';
