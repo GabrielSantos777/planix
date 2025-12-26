@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useApp } from "@/context/AppContext"
 import { useSearchParams } from "react-router-dom"
 import Layout from "@/components/Layout"
+import { getLocalDateString } from "@/utils/dateUtils"
 
 const Transacoes = () => {
   const { toast } = useToast()
@@ -40,7 +41,7 @@ const Transacoes = () => {
     amount: 0,
     type: "expense" as "income" | "expense" | "transfer",
     category: "",
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     account: ""
   })
 
@@ -97,7 +98,7 @@ const Transacoes = () => {
       amount: 0,
       type: "expense",
       category: "",
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateString(),
       account: ""
     })
     setEditingTransaction(null)
@@ -194,7 +195,7 @@ const Transacoes = () => {
                 amount: 0,
                 type: "expense",
                 category: "",
-                date: new Date().toISOString().split('T')[0],
+                date: getLocalDateString(),
                 account: ""
               })
               setIsDialogOpen(true)

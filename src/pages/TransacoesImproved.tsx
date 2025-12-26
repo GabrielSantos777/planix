@@ -28,6 +28,7 @@ import { useSearchParams, useNavigate } from "react-router-dom"
 import Layout from "@/components/Layout"
 import { CurrencyInput } from "@/components/ui/currency-input"
 import { useCurrency } from "@/context/CurrencyContext"
+import { getLocalDateString, getLocalDateForMonth, parseLocalDate } from "@/utils/dateUtils"
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
 
@@ -65,7 +66,7 @@ const TransacoesImproved = () => {
     amount: 0,
     type: "expense" as "income" | "expense" | "transfer",
     category_id: "",
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     account_id: "",
     credit_card_id: "",
     contact_id: "",
@@ -173,7 +174,7 @@ const TransacoesImproved = () => {
           amount: 0,
           type: "expense",
           category_id: "",
-          date: new Date().toISOString().split('T')[0],
+          date: getLocalDateString(),
           account_id: "",
           credit_card_id: "",
           contact_id: "",
@@ -293,7 +294,7 @@ const TransacoesImproved = () => {
         if (newTransaction.payment_method === "credit_card" && newTransaction.is_installment && newTransaction.installments > 1) {
           // Create multiple transactions for installments
           const installmentAmount = baseTransactionData.amount / newTransaction.installments
-          const installmentDate = new Date(newTransaction.date)
+          const installmentDate = parseLocalDate(newTransaction.date)
           
           for (let i = 1; i <= newTransaction.installments; i++) {
             const installmentData = {
@@ -303,7 +304,7 @@ const TransacoesImproved = () => {
               installment_number: i,
               is_installment: true,
               description: `${baseTransactionData.description} (${i}/${newTransaction.installments})`,
-              date: new Date(installmentDate.getFullYear(), installmentDate.getMonth() + (i - 1), installmentDate.getDate()).toISOString().split('T')[0]
+              date: getLocalDateForMonth(installmentDate, i - 1)
             }
             await addTransaction(installmentData)
           }
@@ -386,7 +387,7 @@ const TransacoesImproved = () => {
         amount: 0,
         type: "expense",
         category_id: "",
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         account_id: "",
         credit_card_id: "",
         contact_id: "",
@@ -616,7 +617,7 @@ const TransacoesImproved = () => {
                     amount: 0,
                     type: "expense",
                     category_id: "",
-                    date: new Date().toISOString().split('T')[0],
+                    date: getLocalDateString(),
                     account_id: "",
                     credit_card_id: "",
                     contact_id: "",
