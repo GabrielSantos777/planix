@@ -978,7 +978,7 @@ export default function ContasImproved() {
                               </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-muted/30 border">
+                            {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-muted/30 border">
                               <div className="space-y-1">
                                 <Label className="text-xs text-muted-foreground">Disponível</Label>
                                 <p className="text-lg font-bold text-green-600">{formatCurrency(Math.max(0, (card.limit_amount || 0) - getUsedLimit(card.id)))}</p>
@@ -995,7 +995,7 @@ export default function ContasImproved() {
                                 <Label className="text-xs text-muted-foreground">Melhor Compra</Label>
                                 <p className="text-sm font-medium">{card.best_purchase_day ? `Dia ${card.best_purchase_day}` : 'N/A'}</p>
                               </div>
-                            </div>
+                            </div> */}
 
                             {/* Credit Card Invoices Component */}
                             <CreditCardInvoices 
