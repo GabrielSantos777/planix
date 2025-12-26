@@ -16,8 +16,13 @@ Deno.serve(async (req) => {
   try {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    
+    // Create client with anon key for auth verification
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey)
+    // Service role client for data queries (after auth verification)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     if (req.method !== 'POST') {
       return new Response(
@@ -29,94 +34,41 @@ Deno.serve(async (req) => {
       )
     }
 
-    const { user_id, phone_number, account_id, account_name } = await req.json()
-    console.log('Request data:', { user_id, phone_number, account_id, account_name })
-
-    if (!user_id && !phone_number) {
+    // ========== AUTHENTICATION CHECK ==========
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      console.error('No authorization header provided')
       return new Response(
-        JSON.stringify({ error: 'user_id ou phone_number é obrigatório' }), 
+        JSON.stringify({ error: 'Não autorizado: token de autenticação ausente' }), 
         { 
-          status: 400, 
+          status: 401, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
     }
 
-    let userId = user_id
-
-    // Se só temos o telefone, buscar o user_id
-    if (!userId && phone_number) {
-      console.log('Searching user by phone:', phone_number)
-      
-      // Normalizar o número removendo espaços, parênteses e formatação
-      const cleanPhone = phone_number.replace(/[\s\(\)\-]/g, '')
-      console.log('Clean phone:', cleanPhone)
-      
-      // Primeiro tentar busca exata
-      let { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('phone', phone_number)
-        .maybeSingle()
-
-      // Se não encontrar, tentar na tabela whatsapp_integrations
-      if (profileError || !profileData) {
-        console.log('Not found in profiles, trying whatsapp_integrations')
-        const { data: whatsappData, error: whatsappError } = await supabase
-          .from('whatsapp_integrations')
-          .select('user_id')
-          .eq('phone_number', phone_number)
-          .maybeSingle()
-        
-        if (whatsappData) {
-          profileData = whatsappData
-          profileError = null
-        } else {
-          // Busca flexível - remover caracteres especiais e tentar várias variações
-          const variations = [
-            cleanPhone,
-            cleanPhone.replace(/^\+55/, ''),  // Remove +55
-            '+55' + cleanPhone.replace(/^\+55/, ''), // Garante +55
-          ]
-          
-          console.log('Trying phone variations:', variations)
-          
-          for (const variation of variations) {
-            const { data: flexData, error: flexError } = await supabase
-              .from('whatsapp_integrations')
-              .select('user_id')
-              .ilike('phone_number', `%${variation.slice(-10)}%`) // Últimos 10 dígitos
-              .maybeSingle()
-            
-            if (flexData) {
-              profileData = flexData
-              profileError = null
-              console.log('Found with variation:', variation)
-              break
-            }
-          }
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+    
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message)
+      return new Response(
+        JSON.stringify({ error: 'Não autorizado: token inválido ou expirado' }), 
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      }
-
-      if (profileError || !profileData) {
-        console.error('User not found by phone after all attempts:', profileError)
-        return new Response(
-          JSON.stringify({ 
-            error: 'Usuário não encontrado com este telefone',
-            debug: {
-              searched_phone: phone_number,
-              clean_phone: cleanPhone,
-              message: 'Verifique se o telefone está cadastrado no sistema'
-            }
-          }), 
-          { 
-            status: 404, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
-      }
-      userId = profileData.user_id
+      )
     }
+
+    console.log('Authenticated user:', user.id)
+    // ========== END AUTHENTICATION CHECK ==========
+
+    const { account_id, account_name } = await req.json()
+    console.log('Request data:', { account_id, account_name })
+
+    // User can only access their own data - use the authenticated user's ID
+    const userId = user.id
 
     console.log('Using userId:', userId)
 
