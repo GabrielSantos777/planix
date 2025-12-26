@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { useCurrency } from '@/context/CurrencyContext'
 import { usePrivacy } from '@/context/PrivacyContext'
+import { parseLocalDate } from '@/utils/dateUtils'
 
 interface WealthEvolutionChartProps {
   className?: string
@@ -37,8 +38,9 @@ export const WealthEvolutionChart = ({ className }: WealthEvolutionChartProps) =
       
       // Filtrar TODAS as transações de contas até o final deste mês
       // Incluindo transferências, pois elas afetam o saldo das contas
+      // Usando parseLocalDate para evitar problemas de fuso horário
       const accountTransactionsUpToMonth = transactions.filter(t => {
-        const transactionDate = new Date(t.date)
+        const transactionDate = parseLocalDate(t.date)
         return transactionDate <= endOfMonth && t.account_id
       })
       

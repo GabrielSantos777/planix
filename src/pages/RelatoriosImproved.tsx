@@ -31,6 +31,7 @@ import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { parseLocalDate } from "@/utils/dateUtils"
 
 const COLORS = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16']
 
@@ -93,7 +94,7 @@ const RelatoriosImproved = () => {
       let statusMatch = true
       if (statusFilter !== "all") {
         const today = new Date()
-        const transactionDate = new Date(transaction.date)
+        const transactionDate = parseLocalDate(transaction.date)
         const isPaid = transactionDate <= today
         if (statusFilter === "paid" && !isPaid) statusMatch = false
         if (statusFilter === "pending" && isPaid) statusMatch = false
@@ -102,7 +103,7 @@ const RelatoriosImproved = () => {
       return dateMatch && descriptionMatch && categoryMatch && typeMatch && accountMatch && contactMatch && statusMatch
     })
 
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return filtered.sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
   }, [transactions, filterMonth, categoryFilter, typeFilter, accountFilter, statusFilter, descriptionFilter])
 
   // Calcular totais evitando dupla contagem de pagamento de fatura de cartão
@@ -180,7 +181,7 @@ const RelatoriosImproved = () => {
     return last12Months.map(({ month, year, monthIndex }) => {
       // Calcular todas as transações até o final deste mês
       const endOfMonth = new Date(year, monthIndex + 1, 0)
-      const transactionsUpToMonth = transactions.filter(t => new Date(t.date) <= endOfMonth)
+      const transactionsUpToMonth = transactions.filter(t => parseLocalDate(t.date) <= endOfMonth)
       
       // Somar saldos iniciais das contas
       const accountsBalance = accounts.reduce((sum, account) => sum + (account.initial_balance || 0), 0)
@@ -269,7 +270,7 @@ const RelatoriosImproved = () => {
         yPosition = 20
       }
       
-      const date = format(new Date(transaction.date), "dd/MM/yyyy")
+      const date = format(parseLocalDate(transaction.date), "dd/MM/yyyy")
       const description = transaction.description.substring(0, 25)
       const category = transaction.category?.name?.substring(0, 15) || 'N/A'
       const amount = formatCurrency(transaction.amount || 0)
@@ -306,7 +307,7 @@ const RelatoriosImproved = () => {
     
     // Primeira aba: Dados detalhados
     const detailedData = filteredTransactions.map(transaction => ({
-      'Data': format(new Date(transaction.date), "dd/MM/yyyy"),
+      'Data': format(parseLocalDate(transaction.date), "dd/MM/yyyy"),
       'Descrição': transaction.description,
       'Categoria': transaction.category?.name || 'Sem categoria',
       'Conta': transaction.account?.name || transaction.credit_card?.name || 'N/A',
@@ -807,13 +808,13 @@ const RelatoriosImproved = () => {
                 <div className="block sm:hidden">
                   <div className="max-h-[500px] overflow-y-auto space-y-3 p-3">
                     {filteredTransactions.map((transaction) => {
-                      const isPaid = new Date(transaction.date) <= new Date()
+                      const isPaid = parseLocalDate(transaction.date) <= new Date()
                       return (
                         <div key={transaction.id} className="p-3 border rounded-lg space-y-2">
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm truncate">{transaction.description}</p>
-                              <p className="text-xs text-muted-foreground">{format(new Date(transaction.date), "dd/MM/yyyy")}</p>
+                              <p className="text-xs text-muted-foreground">{format(parseLocalDate(transaction.date), "dd/MM/yyyy")}</p>
                             </div>
                             <Badge 
                               variant={transaction.type === "income" ? "default" : "destructive"}
@@ -868,11 +869,11 @@ const RelatoriosImproved = () => {
                       </TableHeader>
                       <TableBody>
                         {filteredTransactions.map((transaction) => {
-                          const isPaid = new Date(transaction.date) <= new Date()
+                          const isPaid = parseLocalDate(transaction.date) <= new Date()
                           return (
                             <TableRow key={transaction.id}>
                               <TableCell className="font-medium text-xs">
-                                {format(new Date(transaction.date), "dd/MM/yyyy")}
+                                {format(parseLocalDate(transaction.date), "dd/MM/yyyy")}
                               </TableCell>
                               <TableCell className="text-xs">{transaction.description}</TableCell>
                               <TableCell className="text-xs">

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-
+import { parseLocalDate } from '@/utils/dateUtils'
 interface CreditCard {
   id: string
   name: string
@@ -253,7 +253,7 @@ export function useCreditCardInvoice(
     today.setHours(0, 0, 0, 0)
     
     cardTransactions.forEach(transaction => {
-      const transactionDate = new Date(transaction.date)
+      const transactionDate = parseLocalDate(transaction.date)
       const invoiceInfo = getInvoiceForPurchase(transactionDate, card.closing_day, card.due_day)
       
       const key = `${invoiceInfo.year}-${invoiceInfo.month.toString().padStart(2, '0')}`

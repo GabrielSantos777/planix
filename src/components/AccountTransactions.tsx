@@ -6,6 +6,7 @@ import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { useCurrency } from '@/context/CurrencyContext'
 import { TrendingUp, TrendingDown, ArrowUpDown } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { parseLocalDate } from '@/utils/dateUtils'
 
 interface AccountTransactionsProps {
   accountId: string
@@ -21,7 +22,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
   const accountTransactions = useMemo(() => {
     return transactions
       .filter(t => t.account_id === accountId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
   }, [transactions, accountId])
 
   const getCategoryName = (categoryId: string | null) => {
@@ -78,7 +79,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                     <div>
                       <p className="font-medium">{transaction.description}</p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                        {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
                       </p>
                     </div>
                     <div className="text-right">
@@ -137,7 +138,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                 accountTransactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell className="whitespace-nowrap">
-                      {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                      {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell>{transaction.description}</TableCell>
                     <TableCell>{getCategoryName(transaction.category_id)}</TableCell>
