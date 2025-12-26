@@ -287,12 +287,14 @@ async function getOrCreateCategory(supabase: any, userId: string, categoryName: 
 async function sendWhatsAppMessage(phoneNumber: string, message: string): Promise<boolean> {
   try {
     const whatsappToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+    const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID') || '517099498154043';
+    
     if (!whatsappToken) {
       console.error('WhatsApp access token not found');
       return false;
     }
 
-    const response = await fetch(`https://graph.facebook.com/v17.0/YOUR_PHONE_NUMBER_ID/messages`, {
+    const response = await fetch(`https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${whatsappToken}`,
