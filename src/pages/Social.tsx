@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useState, useMemo } from "react"
+import { parseLocalDate } from "@/utils/dateUtils"
 
 interface Contact {
   id: string
@@ -102,51 +103,54 @@ export default function Social() {
   })
 
   // Filtrar transações considerando dia de pagamento do contato
-  // Se data da transação < dia de pagamento, aloca no mês anterior para receber no mês atual
+  // Lógica: O mês selecionado representa o mês de RECEBIMENTO/COBRANÇA
+  // - Se transação foi feita no mês X e o payment_day é dia 15:
+  //   - Transações do dia 1 ao 14 do mês X = ciclo do mês X-1, recebe no mês X (após dia 15)
+  //   - Transações do dia 15 ao 31 do mês X = ciclo do mês X, recebe no mês X+1 (após dia 15)
   const filteredContactsWithTransactions = useMemo(() => {
     if (!contactsWithTransactions || !selectedMonth) return contactsWithTransactions
 
-    const [year, month] = selectedMonth.split('-').map(Number)
+    const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number)
 
     return contactsWithTransactions.map(({ contact, transactions, total }) => {
+      const paymentDay = (contact as any).payment_day || null
+
       const filteredTransactions = transactions.filter(t => {
-        const transDate = new Date(t.date + 'T12:00:00') // Evitar problema de fuso
+        // Parse a data corretamente para evitar problemas de timezone
+        const transDate = parseLocalDate(t.date)
         const transYear = transDate.getFullYear()
         const transMonth = transDate.getMonth() + 1 // 1-12
         const transDay = transDate.getDate()
         
-        const paymentDay = (contact as any).payment_day || null
-        
         if (paymentDay) {
-          // Se a transação foi feita antes do dia de pagamento, ela cai no mês anterior
-          // e o recebimento é no mês atual
-          if (transDay < paymentDay) {
-            // Transação feita antes do dia de pagamento -> pertence ao ciclo do mês anterior
-            // Será cobrada/recebida no mês da transação
-            // Então para o mês selecionado, queremos transações do mês atual com dia < paymentDay
-            // OU transações do mês anterior com dia >= paymentDay
-            if (transYear === year && transMonth === month && transDay < paymentDay) {
-              return true
-            }
-            // Transações do mês anterior que passaram do dia de pagamento
-            const prevMonth = month === 1 ? 12 : month - 1
-            const prevYear = month === 1 ? year - 1 : year
-            if (transYear === prevYear && transMonth === prevMonth && transDay >= paymentDay) {
-              return true
-            }
-            return false
-          } else {
-            // Transação >= dia de pagamento -> pertence ao ciclo do mês seguinte
-            const nextMonth = month === 12 ? 1 : month + 1
-            const nextYear = month === 12 ? year + 1 : year
-            if (transYear === year && transMonth === month && transDay >= paymentDay) {
-              return true
-            }
-            return false
-          }
+          // Com payment_day definido:
+          // - Transações de dias < payment_day do mês M pertencem ao ciclo M-1 (cobradas no mês M)
+          // - Transações de dias >= payment_day do mês M pertencem ao ciclo M (cobradas no mês M+1)
+          
+          // Para o mês selecionado (mês de cobrança), queremos:
+          // 1. Transações do mês selecionado com dia < payment_day (ciclo mês anterior, cobra agora)
+          // 2. Transações do mês anterior com dia >= payment_day (ciclo mês anterior, cobra agora)
+          
+          // Calcular o mês anterior
+          const prevMonth = selectedMonthNum === 1 ? 12 : selectedMonthNum - 1
+          const prevYear = selectedMonthNum === 1 ? selectedYear - 1 : selectedYear
+          
+          // Caso 1: Transações do mês selecionado antes do dia de pagamento
+          const isCurrentMonthBeforePaymentDay = 
+            transYear === selectedYear && 
+            transMonth === selectedMonthNum && 
+            transDay < paymentDay
+          
+          // Caso 2: Transações do mês anterior a partir do dia de pagamento
+          const isPrevMonthAfterPaymentDay = 
+            transYear === prevYear && 
+            transMonth === prevMonth && 
+            transDay >= paymentDay
+          
+          return isCurrentMonthBeforePaymentDay || isPrevMonthAfterPaymentDay
         } else {
-          // Sem dia de pagamento, usa lógica padrão do mês
-          return transYear === year && transMonth === month
+          // Sem payment_day, filtra pelo mês da transação (comportamento simples)
+          return transYear === selectedYear && transMonth === selectedMonthNum
         }
       })
 
@@ -185,7 +189,7 @@ export default function Social() {
     const { contact, transactions, total } = selectedContactData
     const transactionList = transactions
       .map((t, index) => 
-        `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(new Date(t.date), "dd/MM/yyyy", { locale: ptBR })})`
+        `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(parseLocalDate(t.date), "dd/MM/yyyy", { locale: ptBR })})`
       )
       .join('\n')
 
@@ -205,7 +209,7 @@ export default function Social() {
     const { contact, transactions, total } = selectedContactData
     const transactionList = transactions
       .map((t, index) => 
-        `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(new Date(t.date), "dd/MM/yyyy", { locale: ptBR })})`
+        `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(parseLocalDate(t.date), "dd/MM/yyyy", { locale: ptBR })})`
       )
       .join('\n')
 
@@ -294,7 +298,7 @@ export default function Social() {
                         </div>
                         <div className="flex justify-between items-center text-xs text-muted-foreground">
                           <span>{transaction.categories?.name || 'Sem categoria'}</span>
-                          <span>{format(new Date(transaction.date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                          <span>{format(parseLocalDate(transaction.date), "dd/MM/yyyy", { locale: ptBR })}</span>
                         </div>
                       </div>
                     ))}
@@ -321,7 +325,7 @@ export default function Social() {
                               {transaction.categories?.name || 'Sem categoria'}
                             </TableCell>
                             <TableCell>
-                              {format(new Date(transaction.date), "dd/MM/yyyy", { locale: ptBR })}
+                              {format(parseLocalDate(transaction.date), "dd/MM/yyyy", { locale: ptBR })}
                             </TableCell>
                             <TableCell className="text-right text-destructive">
                               {formatCurrency(Math.abs(transaction.amount))}

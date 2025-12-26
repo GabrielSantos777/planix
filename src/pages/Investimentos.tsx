@@ -16,6 +16,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, 
 import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, ArrowDownToLine, ArrowUpFromLine, Edit } from "lucide-react"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
 import { supabase } from "@/integrations/supabase/client"
+import { getLocalDateString } from "@/utils/dateUtils"
 
 const Investimentos = () => {
   const { investments, addInvestment, deleteInvestment, updateInvestment, loading, accounts, transactions, addTransaction, categories, fetchAllData, getOrCreateInvestmentAccount, addTransfer } = useSupabaseData()
@@ -85,7 +86,7 @@ const Investimentos = () => {
         fromAccountId: newInvestment.account_id,
         toAccountId: investmentAccount.id,
         amount: totalInvestment,
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         description: `Aporte em ${newInvestment.name}`,
         notes: `Aplicação em ${newInvestment.symbol}`,
         investmentMetadata: {
@@ -205,7 +206,7 @@ const Investimentos = () => {
         fromAccountId: investmentAccount.id,
         toAccountId: selectedAccountId,
         amount: totalRedeem,
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         description: `Resgate de ${selectedInvestment.name}`,
         notes: `Resgate de ${actualRedeemQuantity.toFixed(4)} cotas de ${selectedInvestment.symbol}`,
         investmentMetadata: {
@@ -316,7 +317,7 @@ const Investimentos = () => {
           type: 'expense',
           category_id: categoryId,
           account_id: selectedAccountId,
-          date: new Date().toISOString().split('T')[0],
+          date: getLocalDateString(),
           currency: selectedInvestment.currency,
           notes: `Reinvestimento em ${selectedInvestment.symbol}`,
           installments: 1,
