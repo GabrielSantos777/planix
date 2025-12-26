@@ -115,9 +115,19 @@ serve(async (req) => {
 
     throw new Error('Invalid action');
   } catch (error) {
-    console.error('Error in boletos-consent:', error);
+    // SECURITY: Log full error details server-side, return generic message to client
+    const supportId = crypto.randomUUID();
+    console.error('Error in boletos-consent:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      supportId,
+      timestamp: new Date().toISOString()
+    });
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: 'An error occurred processing your request',
+        support_id: supportId 
+      }),
       {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

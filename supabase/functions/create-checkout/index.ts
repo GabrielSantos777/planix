@@ -78,9 +78,18 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    console.error("Error creating checkout session:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    // SECURITY: Log full error details server-side, return generic message to client
+    const supportId = crypto.randomUUID();
+    console.error("Error creating checkout session:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      supportId,
+      timestamp: new Date().toISOString()
+    });
+    return new Response(JSON.stringify({ 
+      error: 'An error occurred processing your request',
+      support_id: supportId 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
