@@ -296,11 +296,18 @@ Deno.serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Erro no transaction-manager:', error);
+    // SECURITY: Log full error details server-side, return generic message to client
+    const supportId = crypto.randomUUID();
+    console.error('Error in transaction-manager:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      supportId,
+      timestamp: new Date().toISOString()
+    });
     return new Response(
       JSON.stringify({ 
-        error: 'Erro interno do servidor', 
-        details: error instanceof Error ? error.message : 'Erro desconhecido' 
+        error: 'An error occurred processing your request',
+        support_id: supportId 
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
