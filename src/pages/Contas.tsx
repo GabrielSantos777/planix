@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast"
 import Layout from "@/components/Layout"
 import { CurrencyInput } from "@/components/ui/currency-input"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
+import { parseLocalDate } from "@/utils/dateUtils"
 
 const Contas = () => {
   const { toast } = useToast()
@@ -388,7 +389,7 @@ const Contas = () => {
                   {selectedAccount && getAccountTransactions(selectedAccount.id).map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell>
-                        {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                        {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">

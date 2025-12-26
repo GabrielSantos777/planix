@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { BudgetWithCategory } from './useBudget';
+import { getLocalDateString } from '@/utils/dateUtils';
 
 export interface CategorySpending {
   categoryId: string;
@@ -32,8 +33,8 @@ export const useBudgetAnalytics = (month: number, year: number, budgets: BudgetW
         .from('transactions')
         .select('category_id, amount, type')
         .eq('user_id', user.id)
-        .gte('date', firstDay.toISOString().split('T')[0])
-        .lte('date', lastDay.toISOString().split('T')[0]);
+        .gte('date', getLocalDateString(firstDay))
+        .lte('date', getLocalDateString(lastDay));
 
       if (error) throw error;
 

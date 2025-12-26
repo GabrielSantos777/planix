@@ -34,6 +34,7 @@ import Layout from "@/components/Layout"
 import { CreditCardInvoices } from "@/components/CreditCardInvoices"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from "@/components/ui/carousel"
 import { getBestPurchaseDay } from "@/hooks/useCreditCardInvoice"
+import { parseLocalDate } from "@/utils/dateUtils"
 
 const accountTypeLabels = {
   bank: "Conta Corrente",
@@ -141,7 +142,7 @@ export default function ContasImproved() {
     // Filtrar transações que pertencem a esta fatura
     const cardTransactions = transactions.filter(t => {
       if (t.credit_card_id !== cardId) return false
-      const tDate = new Date(t.date)
+      const tDate = parseLocalDate(t.date)
       
       // Calcular em qual fatura esta transação cai
       let invoiceMonth, invoiceYear
@@ -175,7 +176,7 @@ export default function ContasImproved() {
     const invoicesByMonth: { [key: string]: { transactions: any[], total: number, isPaid: boolean } } = {}
     
     cardTransactions.forEach(transaction => {
-      const transactionDate = new Date(transaction.date)
+      const transactionDate = parseLocalDate(transaction.date)
       
       // Aplicar a mesma lógica de faturas
       let invoiceMonth, invoiceYear

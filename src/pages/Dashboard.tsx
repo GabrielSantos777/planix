@@ -14,6 +14,7 @@ import { usePushNotifications } from "@/hooks/usePushNotifications"
 import { useNavigate } from "react-router-dom"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { getInvoiceForPurchase } from "@/hooks/useCreditCardInvoice"
+import { parseLocalDate } from "@/utils/dateUtils"
 
 const Dashboard = () => {
   const { user } = useAuth()
@@ -80,7 +81,7 @@ const Dashboard = () => {
   ]
 
   const currentMonthTransactions = transactions.filter(t => {
-    const transactionDate = new Date(t.date)
+    const transactionDate = parseLocalDate(t.date)
     return transactionDate.getMonth() === selectedMonth &&
       transactionDate.getFullYear() === selectedYear
   })
@@ -101,7 +102,7 @@ const Dashboard = () => {
     const card = creditCards.find(c => c.id === transaction.credit_card_id)
     if (!card) return false
     
-    const purchaseDate = new Date(transaction.date)
+    const purchaseDate = parseLocalDate(transaction.date)
     const invoiceInfo = getInvoiceForPurchase(purchaseDate, card.closing_day, card.due_day)
     
     return invoiceInfo.month === targetMonth && invoiceInfo.year === targetYear
@@ -153,7 +154,7 @@ const Dashboard = () => {
   const recentTransactions = useMemo(() => {
     return [...transactions]
       .filter(t => t.type !== "transfer")
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
       .slice(0, 5)
   }, [transactions])
 
@@ -456,7 +457,7 @@ const Dashboard = () => {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{transaction.description}</p>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                          {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
                           {transaction.category?.name && ` • ${transaction.category.name}`}
                         </p>
                       </div>

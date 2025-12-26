@@ -24,6 +24,7 @@ import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart,
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
 import { WealthEvolutionChart } from '@/components/WealthEvolutionChart'
+import { parseLocalDate } from '@/utils/dateUtils'
 
 const periodOptions = [
   { value: "current-month", label: "Mês Atual" },
@@ -72,7 +73,7 @@ const Relatorios = () => {
         startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
         const endDate = new Date(now.getFullYear(), now.getMonth(), 0)
         return transactions.filter(t => {
-          const transactionDate = new Date(t.date)
+          const transactionDate = parseLocalDate(t.date)
           return transactionDate >= startDate && transactionDate <= endDate
         })
       case "last-3-months":
@@ -89,7 +90,7 @@ const Relatorios = () => {
     }
 
     return transactions.filter(t => {
-      const transactionDate = new Date(t.date)
+      const transactionDate = parseLocalDate(t.date)
       const categoryMatch = selectedCategory === "all" || t.category?.name?.toLowerCase() === selectedCategory.toLowerCase()
       return transactionDate >= startDate && categoryMatch
     })

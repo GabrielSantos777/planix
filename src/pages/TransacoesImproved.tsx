@@ -488,7 +488,7 @@ const TransacoesImproved = () => {
       
       doc.setFontSize(10)
       doc.text(`${transaction.description} - ${formatCurrency(transaction.amount)}`, 20, yPosition)
-      doc.text(`Categoria - ${new Date(transaction.date).toLocaleDateString('pt-BR')}`, 20, yPosition + 5)
+      doc.text(`Categoria - ${parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}`, 20, yPosition + 5)
       yPosition += 15
     })
     
@@ -502,7 +502,7 @@ const TransacoesImproved = () => {
   const handleExportExcel = () => {
     const workbook = XLSX.utils.book_new()
         const data = filteredTransactions.map(transaction => ({
-          'Data': new Date(transaction.date).toLocaleDateString('pt-BR'),
+          'Data': parseLocalDate(transaction.date).toLocaleDateString('pt-BR'),
           'Descrição': transaction.description,
           'Tipo': transaction.type === 'income' ? 'Receita' : transaction.type === 'expense' ? 'Despesa' : 'Transferência',
           'Categoria': 'Categoria',
@@ -770,7 +770,7 @@ const TransacoesImproved = () => {
                             </div>
                             <p className="font-medium text-sm truncate">{transaction.description}</p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                              {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
                             </p>
                           </div>
                           <span className={`font-bold text-sm ml-2 flex-shrink-0 ${
@@ -850,7 +850,7 @@ const TransacoesImproved = () => {
                               {transaction.contact?.name || 'Você'}
                             </TableCell>
                             <TableCell className="text-xs">
-                              {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                              {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
                             </TableCell>
                             <TableCell className={`text-right font-medium text-xs ${
                               transaction.type === "income" ? "text-success" : "text-destructive"

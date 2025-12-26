@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useApp } from "@/context/AppContext"
 import { useSearchParams } from "react-router-dom"
 import Layout from "@/components/Layout"
-import { getLocalDateString } from "@/utils/dateUtils"
+import { getLocalDateString, parseLocalDate } from "@/utils/dateUtils"
 
 const Transacoes = () => {
   const { toast } = useToast()
@@ -278,7 +278,7 @@ const Transacoes = () => {
                       <TableCell>{transaction.category}</TableCell>
                       <TableCell>{transaction.account}</TableCell>
                       <TableCell>
-                        {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                        {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className={`text-right font-medium ${
                         transaction.type === "income" ? "text-success" : "text-destructive"

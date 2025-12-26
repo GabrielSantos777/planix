@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/AuthContext'
 import { useCreditCardInvoice, getBestPurchaseDay } from '@/hooks/useCreditCardInvoice'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { parseLocalDate } from '@/utils/dateUtils'
 
 interface MonthlyInvoice {
   month: number
@@ -419,7 +420,7 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
                       <div>
                         <p className="font-medium">{transaction.description}</p>
                         <p className="text-sm text-muted-foreground">
-                          {format(new Date(transaction.date), 'dd/MM/yyyy')}
+                          {format(parseLocalDate(transaction.date), 'dd/MM/yyyy')}
                         </p>
                       </div>
                       <div className="text-right">
