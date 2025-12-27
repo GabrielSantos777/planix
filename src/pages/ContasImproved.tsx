@@ -218,7 +218,7 @@ export default function ContasImproved() {
     )
     
     paymentTransactions.forEach(payment => {
-      const paymentDate = new Date(payment.date)
+      const paymentDate = parseLocalDate(payment.date)
       const paymentMonth = paymentDate.getMonth()
       const paymentYear = paymentDate.getFullYear()
       
@@ -564,7 +564,7 @@ export default function ContasImproved() {
     const today = new Date()
     
     cardTransactions.forEach(transaction => {
-      const transactionDate = new Date(transaction.date)
+      const transactionDate = parseLocalDate(transaction.date)
       
       // Determinar a qual fatura a transação pertence
       // REGRA: Compras NO DIA do fechamento ou DEPOIS → próxima fatura
@@ -844,8 +844,8 @@ export default function ContasImproved() {
                                             <div className="flex-1 min-w-0">
                                               <p className="font-medium text-sm truncate">{transaction.description}</p>
                                               <div className="flex flex-wrap gap-2 mt-1">
-                                                <p className="text-xs text-muted-foreground">
-                                                  {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                                              <p className="text-xs text-muted-foreground">
+                                                  {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
                                                 </p>
                                                 <Badge variant="outline" className="text-xs">
                                                   {typeLabel}
