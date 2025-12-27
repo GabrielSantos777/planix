@@ -6,21 +6,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { useAuth } from "@/context/AuthContext"
 import { useCurrency } from "@/context/CurrencyContext"
+import { useCategories } from "@/context/CategoriesContext"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
-import { MessageCircle, TrendingDown, Copy } from "lucide-react"
-import { useQuery } from "@tanstack/react-query"
-import { format } from "date-fns"
+import { MessageCircle, TrendingDown, Copy, Plus, Edit, Trash2, Loader2 } from "lucide-react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { format, addMonths } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useState, useMemo } from "react"
-import { parseLocalDate } from "@/utils/dateUtils"
+import { parseLocalDate, getLocalDateString } from "@/utils/dateUtils"
 
 interface Contact {
   id: string
   name: string
   phone: string
+  payment_day?: number | null
 }
 
 interface Transaction {
@@ -41,12 +44,27 @@ interface ContactWithTransactions {
 export default function Social() {
   const { user } = useAuth()
   const { formatCurrency } = useCurrency()
+  const { categories } = useCategories()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
+  
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false)
   const [selectedContactData, setSelectedContactData] = useState<ContactWithTransactions | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'))
+  
+  // Transaction edit/add modal state
+  const [transactionModalOpen, setTransactionModalOpen] = useState(false)
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [transactionForm, setTransactionForm] = useState({
+    description: '',
+    amount: '',
+    date: getLocalDateString(new Date()),
+    category_id: ''
+  })
 
-  const { data: contactsWithTransactions = [], isLoading } = useQuery({
+  const { data: contactsWithTransactions = [], isLoading, refetch } = useQuery({
     queryKey: ['social-contacts', user?.id],
     queryFn: async () => {
       if (!user?.id) return []
@@ -103,45 +121,29 @@ export default function Social() {
   })
 
   // Filtrar transações considerando dia de pagamento do contato
-  // Lógica: O mês selecionado representa o mês de RECEBIMENTO/COBRANÇA
-  // - Se transação foi feita no mês X e o payment_day é dia 15:
-  //   - Transações do dia 1 ao 14 do mês X = ciclo do mês X-1, recebe no mês X (após dia 15)
-  //   - Transações do dia 15 ao 31 do mês X = ciclo do mês X, recebe no mês X+1 (após dia 15)
   const filteredContactsWithTransactions = useMemo(() => {
     if (!contactsWithTransactions || !selectedMonth) return contactsWithTransactions
 
     const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number)
 
     return contactsWithTransactions.map(({ contact, transactions, total }) => {
-      const paymentDay = (contact as any).payment_day || null
+      const paymentDay = contact.payment_day || null
 
       const filteredTransactions = transactions.filter(t => {
-        // Parse a data corretamente para evitar problemas de timezone
         const transDate = parseLocalDate(t.date)
         const transYear = transDate.getFullYear()
-        const transMonth = transDate.getMonth() + 1 // 1-12
+        const transMonth = transDate.getMonth() + 1
         const transDay = transDate.getDate()
         
         if (paymentDay) {
-          // Com payment_day definido:
-          // - Transações de dias < payment_day do mês M pertencem ao ciclo M-1 (cobradas no mês M)
-          // - Transações de dias >= payment_day do mês M pertencem ao ciclo M (cobradas no mês M+1)
-          
-          // Para o mês selecionado (mês de cobrança), queremos:
-          // 1. Transações do mês selecionado com dia < payment_day (ciclo mês anterior, cobra agora)
-          // 2. Transações do mês anterior com dia >= payment_day (ciclo mês anterior, cobra agora)
-          
-          // Calcular o mês anterior
           const prevMonth = selectedMonthNum === 1 ? 12 : selectedMonthNum - 1
           const prevYear = selectedMonthNum === 1 ? selectedYear - 1 : selectedYear
           
-          // Caso 1: Transações do mês selecionado antes do dia de pagamento
           const isCurrentMonthBeforePaymentDay = 
             transYear === selectedYear && 
             transMonth === selectedMonthNum && 
             transDay < paymentDay
           
-          // Caso 2: Transações do mês anterior a partir do dia de pagamento
           const isPrevMonthAfterPaymentDay = 
             transYear === prevYear && 
             transMonth === prevMonth && 
@@ -149,7 +151,6 @@ export default function Social() {
           
           return isCurrentMonthBeforePaymentDay || isPrevMonthAfterPaymentDay
         } else {
-          // Sem payment_day, filtra pelo mês da transação (comportamento simples)
           return transYear === selectedYear && transMonth === selectedMonthNum
         }
       })
@@ -164,17 +165,30 @@ export default function Social() {
     }).filter(item => item.transactions.length > 0)
   }, [contactsWithTransactions, selectedMonth])
 
-  // Gerar lista de meses disponíveis (últimos 12 meses)
+  // Gerar lista de meses disponíveis (12 meses passados + 12 meses futuros)
   const availableMonths = useMemo(() => {
     const months: { value: string; label: string }[] = []
-    for (let i = 0; i < 12; i++) {
-      const date = new Date()
+    const now = new Date()
+    
+    // 12 meses passados
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(now)
       date.setMonth(date.getMonth() - i)
       months.push({
         value: format(date, 'yyyy-MM'),
         label: format(date, 'MMMM yyyy', { locale: ptBR })
       })
     }
+    
+    // 12 meses futuros
+    for (let i = 1; i <= 12; i++) {
+      const date = addMonths(now, i)
+      months.push({
+        value: format(date, 'yyyy-MM'),
+        label: format(date, 'MMMM yyyy', { locale: ptBR })
+      })
+    }
+    
     return months
   }, [])
 
@@ -215,6 +229,127 @@ export default function Social() {
 
     return `Olá ${contact.name}! 👋\n\nAqui está o resumo das suas compras:\n\n${transactionList}\n\n💰 *Total: ${formatCurrency(total)}*\n\nPor favor, realize o pagamento quando possível. Obrigado!`
   }
+
+  // Transaction CRUD handlers
+  const handleAddTransaction = (contact: Contact) => {
+    setSelectedContact(contact)
+    setEditingTransaction(null)
+    setTransactionForm({
+      description: '',
+      amount: '',
+      date: getLocalDateString(new Date()),
+      category_id: ''
+    })
+    setTransactionModalOpen(true)
+  }
+
+  const handleEditTransaction = (transaction: Transaction, contact: Contact) => {
+    setSelectedContact(contact)
+    setEditingTransaction(transaction)
+    setTransactionForm({
+      description: transaction.description,
+      amount: Math.abs(transaction.amount).toString(),
+      date: transaction.date,
+      category_id: transaction.category_id || ''
+    })
+    setTransactionModalOpen(true)
+  }
+
+  const handleDeleteTransaction = async (transactionId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta transação?')) return
+    
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', transactionId)
+      
+      if (error) throw error
+      
+      toast({
+        title: "Transação excluída!",
+        description: "A transação foi removida com sucesso."
+      })
+      
+      refetch()
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir transação.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleSubmitTransaction = async () => {
+    if (!user?.id || !selectedContact) return
+    
+    if (!transactionForm.description.trim() || !transactionForm.amount) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const amount = -Math.abs(parseFloat(transactionForm.amount)) // Negative because it's a receivable (expense for the contact)
+      
+      if (editingTransaction) {
+        const { error } = await supabase
+          .from('transactions')
+          .update({
+            description: transactionForm.description,
+            amount,
+            date: transactionForm.date,
+            category_id: transactionForm.category_id || null
+          })
+          .eq('id', editingTransaction.id)
+        
+        if (error) throw error
+        
+        toast({
+          title: "Transação atualizada!",
+          description: "A transação foi atualizada com sucesso."
+        })
+      } else {
+        const { error } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            description: transactionForm.description,
+            amount,
+            date: transactionForm.date,
+            type: 'expense',
+            contact_id: selectedContact.id,
+            category_id: transactionForm.category_id || null
+          })
+        
+        if (error) throw error
+        
+        toast({
+          title: "Transação criada!",
+          description: "A transação foi adicionada com sucesso."
+        })
+      }
+      
+      setTransactionModalOpen(false)
+      refetch()
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar transação.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const expenseCategories = categories.filter(c => c.type === 'expense')
 
   return (
     <Layout>
@@ -268,7 +403,12 @@ export default function Social() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <CardTitle>{contact.name}</CardTitle>
-                      <CardDescription>{contact.phone}</CardDescription>
+                      <CardDescription>
+                        {contact.phone}
+                        {contact.payment_day && (
+                          <span className="ml-2 text-xs">(Dia de pagamento: {contact.payment_day})</span>
+                        )}
+                      </CardDescription>
                     </div>
                     <div className="text-left sm:text-right">
                       <div className="text-2xl font-bold text-destructive">
@@ -300,6 +440,22 @@ export default function Social() {
                           <span>{transaction.categories?.name || 'Sem categoria'}</span>
                           <span>{format(parseLocalDate(transaction.date), "dd/MM/yyyy", { locale: ptBR })}</span>
                         </div>
+                        <div className="flex gap-1 pt-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditTransaction(transaction, contact)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTransaction(transaction.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -313,6 +469,7 @@ export default function Social() {
                           <TableHead>Categoria</TableHead>
                           <TableHead>Data</TableHead>
                           <TableHead className="text-right">Valor</TableHead>
+                          <TableHead className="w-20">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -330,6 +487,24 @@ export default function Social() {
                             <TableCell className="text-right text-destructive">
                               {formatCurrency(Math.abs(transaction.amount))}
                             </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditTransaction(transaction, contact)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteTransaction(transaction.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -337,6 +512,14 @@ export default function Social() {
                   </div>
                   
                   <div className="flex flex-col sm:flex-row justify-end gap-2">
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleAddTransaction(contact)}
+                      className="gap-2 w-full sm:w-auto"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Adicionar Transação
+                    </Button>
                     <Button 
                       variant="outline"
                       onClick={() => {
@@ -362,6 +545,7 @@ export default function Social() {
         )}
       </div>
 
+      {/* WhatsApp Modal */}
       <Dialog open={whatsappModalOpen} onOpenChange={setWhatsappModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -404,6 +588,79 @@ export default function Social() {
             <p className="text-xs text-muted-foreground text-center">
               Copie a mensagem e cole no WhatsApp do contato
             </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transaction Add/Edit Modal */}
+      <Dialog open={transactionModalOpen} onOpenChange={setTransactionModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingTransaction ? 'Editar Transação' : 'Nova Transação'}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedContact?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="description">Descrição</Label>
+              <Input
+                id="description"
+                value={transactionForm.description}
+                onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })}
+                placeholder="Ex: Almoço, Compra no mercado..."
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Valor</Label>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                value={transactionForm.amount}
+                onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })}
+                placeholder="0,00"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="date">Data</Label>
+              <Input
+                id="date"
+                type="date"
+                value={transactionForm.date}
+                onChange={(e) => setTransactionForm({ ...transactionForm, date: e.target.value })}
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="category">Categoria</Label>
+              <Select 
+                value={transactionForm.category_id || 'none'} 
+                onValueChange={(value) => setTransactionForm({ ...transactionForm, category_id: value === 'none' ? '' : value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem categoria</SelectItem>
+                  {expenseCategories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Button onClick={handleSubmitTransaction} className="w-full" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingTransaction ? 'Atualizar' : 'Criar'} Transação
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
