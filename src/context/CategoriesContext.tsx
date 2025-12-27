@@ -84,6 +84,7 @@ export interface Category {
   color: string
   is_default?: boolean
   user_id?: string
+  parent_id?: string | null
 }
 
 interface CategoriesContextType {
@@ -223,7 +224,8 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           icon: cat.icon || 'Folder',
           color: cat.color || '#6B7280',
           is_default: cat.is_default || false,
-          user_id: cat.user_id
+          user_id: cat.user_id,
+          parent_id: cat.parent_id || null
         }))
       
       setCategories(filteredData)
@@ -261,7 +263,8 @@ export const CategoriesProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         icon: data.icon || 'Folder',
         color: data.color || '#6B7280',
         is_default: data.is_default || false,
-        user_id: data.user_id
+        user_id: data.user_id,
+        parent_id: data.parent_id || null
       }
       
       setCategories(prev => [...prev, newCategory])
