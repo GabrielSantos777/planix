@@ -142,7 +142,7 @@ const Relatorios = () => {
   const monthlyData: MonthlyData[] = useMemo(() => {
     const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     const monthlyTotals = filteredTransactions.reduce((acc, transaction) => {
-      const date = new Date(transaction.date)
+      const date = parseLocalDate(transaction.date)
       const monthKey = `${date.getFullYear()}-${date.getMonth()}`
       const monthName = monthNames[date.getMonth()]
       
@@ -264,7 +264,7 @@ const Relatorios = () => {
     
     // Aba de transações detalhadas
     const transactionsWS = XLSX.utils.json_to_sheet(filteredTransactions.map(item => ({
-      'Data': new Date(item.date).toLocaleDateString('pt-BR'),
+      'Data': parseLocalDate(item.date).toLocaleDateString('pt-BR'),
       'Descrição': item.description,
       'Categoria': item.category?.name || 'Sem categoria',
       'Tipo': item.type === 'income' ? 'Receita' : 'Despesa',
