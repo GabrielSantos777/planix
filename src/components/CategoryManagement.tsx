@@ -41,6 +41,7 @@ interface CategoryFormData {
   type: 'income' | 'expense'
   icon: string
   color: string
+  parent_id: string | null
 }
 
 export const CategoryManagement = () => {
@@ -54,7 +55,8 @@ export const CategoryManagement = () => {
     name: '',
     type: 'expense',
     icon: 'Folder',
-    color: '#6B7280'
+    color: '#6B7280',
+    parent_id: null
   })
   
   // Refetch categories on mount
@@ -75,20 +77,32 @@ export const CategoryManagement = () => {
     setIsSubmitting(true)
     try {
       if (editingCategory) {
-        await updateCategory(editingCategory.id, formData)
+        await updateCategory(editingCategory.id, {
+          name: formData.name,
+          type: formData.type,
+          icon: formData.icon,
+          color: formData.color,
+          parent_id: formData.parent_id
+        })
         toast({
           title: "✅ Categoria atualizada!",
           description: `${formData.name} foi atualizada com sucesso.`
         })
       } else {
-        await addCategory(formData)
+        await addCategory({
+          name: formData.name,
+          type: formData.type,
+          icon: formData.icon,
+          color: formData.color,
+          parent_id: formData.parent_id
+        })
         toast({
           title: "✅ Categoria criada!",
           description: `${formData.name} foi criada com sucesso.`
         })
       }
 
-      setFormData({ name: '', type: 'expense', icon: 'Folder', color: '#6B7280' })
+      setFormData({ name: '', type: 'expense', icon: 'Folder', color: '#6B7280', parent_id: null })
       setEditingCategory(null)
       setIsDialogOpen(false)
     } catch (error) {
@@ -109,7 +123,8 @@ export const CategoryManagement = () => {
       name: category.name,
       type: category.type,
       icon: category.icon,
-      color: category.color
+      color: category.color,
+      parent_id: category.parent_id || null
     })
     setIsDialogOpen(true)
   }
@@ -130,8 +145,17 @@ export const CategoryManagement = () => {
     }
   }
 
-  const incomeCategories = categories.filter(cat => cat.type === 'income')
-  const expenseCategories = categories.filter(cat => cat.type === 'expense')
+  // Separate parent categories (without parent_id) and subcategories (with parent_id)
+  const parentIncomeCategories = categories.filter(cat => cat.type === 'income' && !cat.parent_id)
+  const parentExpenseCategories = categories.filter(cat => cat.type === 'expense' && !cat.parent_id)
+  
+  const getSubcategories = (parentId: string) => 
+    categories.filter(cat => cat.parent_id === parentId)
+  
+  // For the dropdown, only show parent categories of the selected type
+  const availableParentCategories = categories.filter(
+    cat => cat.type === formData.type && !cat.parent_id && cat.id !== editingCategory?.id
+  )
 
   return (
     <div className="space-y-6">
@@ -145,7 +169,7 @@ export const CategoryManagement = () => {
           <DialogTrigger asChild>
             <Button onClick={() => {
               setEditingCategory(null)
-              setFormData({ name: '', type: 'expense', icon: 'Folder', color: '#6B7280' })
+              setFormData({ name: '', type: 'expense', icon: 'Folder', color: '#6B7280', parent_id: null })
             }}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Categoria
@@ -186,6 +210,28 @@ export const CategoryManagement = () => {
                     <SelectItem value="expense">Despesa</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              
+              {/* Parent Category Selector */}
+              <div className="grid gap-2">
+                <Label>Categoria Pai (opcional)</Label>
+                <Select 
+                  value={formData.parent_id || 'none'} 
+                  onValueChange={(value) => setFormData({ ...formData, parent_id: value === 'none' ? null : value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Nenhuma (categoria principal)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma (categoria principal)</SelectItem>
+                    {availableParentCategories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Selecione uma categoria pai para criar uma subcategoria
+                </p>
               </div>
               
               <div className="grid gap-2">
@@ -252,44 +298,76 @@ export const CategoryManagement = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg text-green-600">Categorias de Receita</CardTitle>
-            <CardDescription>{incomeCategories.length} categoria(s)</CardDescription>
+            <CardDescription>{parentIncomeCategories.length} categoria(s) principal(is)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {incomeCategories.map((category) => {
+              {parentIncomeCategories.map((category) => {
                 const IconComponent = getCategoryIcon(category.icon)
+                const subcategories = getSubcategories(category.id)
                 return (
-                  <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: category.color + '20', color: category.color }}
-                      >
-                        <IconComponent className="h-4 w-4" />
+                  <div key={category.id} className="space-y-2">
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: category.color + '20', color: category.color }}
+                        >
+                          <IconComponent className="h-4 w-4" />
+                        </div>
+                        <span className="font-medium">{category.name}</span>
+                        {(category as any).is_default && (
+                          <Badge variant="secondary" className="text-xs">Padrão</Badge>
+                        )}
                       </div>
-                      <span className="font-medium">{category.name}</span>
-                      {(category as any).is_default && (
-                        <Badge variant="secondary" className="text-xs">Padrão</Badge>
-                      )}
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(category)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {!(category as any).is_default && (
+                      <div className="flex gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(category.id)}
+                          onClick={() => handleEdit(category)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Edit className="h-4 w-4" />
                         </Button>
-                      )}
+                        {!(category as any).is_default && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(category.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
+                    {/* Subcategories */}
+                    {subcategories.length > 0 && (
+                      <div className="ml-6 space-y-2">
+                        {subcategories.map((sub) => {
+                          const SubIcon = getCategoryIcon(sub.icon)
+                          return (
+                            <div key={sub.id} className="flex items-center justify-between p-2 border rounded-lg bg-muted/30">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-6 h-6 rounded-full flex items-center justify-center"
+                                  style={{ backgroundColor: sub.color + '20', color: sub.color }}
+                                >
+                                  <SubIcon className="h-3 w-3" />
+                                </div>
+                                <span className="text-sm">{sub.name}</span>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => handleEdit(sub)}>
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDelete(sub.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -301,44 +379,76 @@ export const CategoryManagement = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg text-red-600">Categorias de Despesa</CardTitle>
-            <CardDescription>{expenseCategories.length} categoria(s)</CardDescription>
+            <CardDescription>{parentExpenseCategories.length} categoria(s) principal(is)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {expenseCategories.map((category) => {
+              {parentExpenseCategories.map((category) => {
                 const IconComponent = getCategoryIcon(category.icon)
+                const subcategories = getSubcategories(category.id)
                 return (
-                  <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: category.color + '20', color: category.color }}
-                      >
-                        <IconComponent className="h-4 w-4" />
+                  <div key={category.id} className="space-y-2">
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: category.color + '20', color: category.color }}
+                        >
+                          <IconComponent className="h-4 w-4" />
+                        </div>
+                        <span className="font-medium">{category.name}</span>
+                        {(category as any).is_default && (
+                          <Badge variant="secondary" className="text-xs">Padrão</Badge>
+                        )}
                       </div>
-                      <span className="font-medium">{category.name}</span>
-                      {(category as any).is_default && (
-                        <Badge variant="secondary" className="text-xs">Padrão</Badge>
-                      )}
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(category)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {!(category as any).is_default && (
+                      <div className="flex gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(category.id)}
+                          onClick={() => handleEdit(category)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Edit className="h-4 w-4" />
                         </Button>
-                      )}
+                        {!(category as any).is_default && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(category.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
+                    {/* Subcategories */}
+                    {subcategories.length > 0 && (
+                      <div className="ml-6 space-y-2">
+                        {subcategories.map((sub) => {
+                          const SubIcon = getCategoryIcon(sub.icon)
+                          return (
+                            <div key={sub.id} className="flex items-center justify-between p-2 border rounded-lg bg-muted/30">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-6 h-6 rounded-full flex items-center justify-center"
+                                  style={{ backgroundColor: sub.color + '20', color: sub.color }}
+                                >
+                                  <SubIcon className="h-3 w-3" />
+                                </div>
+                                <span className="text-sm">{sub.name}</span>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => handleEdit(sub)}>
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDelete(sub.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )
               })}
