@@ -84,6 +84,7 @@ export interface Category {
   color: string
   is_default?: boolean
   user_id?: string
+  parent_id?: string | null
 }
 
 interface CategoriesContextType {

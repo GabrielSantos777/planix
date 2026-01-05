@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Checkbox } from "@/components/ui/checkbox"
 import { 
   Plus, 
   Upload, 
@@ -60,6 +61,7 @@ const TransacoesImproved = () => {
   const [filterCreditCard, setFilterCreditCard] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
   
   const [newTransaction, setNewTransaction] = useState({
     description: "",
@@ -426,6 +428,46 @@ const TransacoesImproved = () => {
     }
   }
 
+  // Selection functions
+  const toggleTransactionSelection = (id: string) => {
+    setSelectedTransactions(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const toggleAllTransactions = () => {
+    if (selectedTransactions.size === filteredTransactions.length) {
+      setSelectedTransactions(new Set())
+    } else {
+      setSelectedTransactions(new Set(filteredTransactions.map(t => t.id)))
+    }
+  }
+
+  const handleDeleteSelectedTransactions = async () => {
+    try {
+      for (const id of selectedTransactions) {
+        await deleteTransaction(id)
+      }
+      toast({
+        title: "🗑️ Transações Excluídas",
+        description: `${selectedTransactions.size} transação(ões) removida(s)`,
+      })
+      setSelectedTransactions(new Set())
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir transações.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const handleEditTransaction = (transaction: any) => {
     setEditingTransaction(transaction)
     setNewTransaction({
@@ -742,10 +784,25 @@ const TransacoesImproved = () => {
         {/* Transactions Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Transações</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
-              {filteredTransactions.length} transações encontrada(s)
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base sm:text-lg">Transações</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  {filteredTransactions.length} transações encontrada(s)
+                </CardDescription>
+              </div>
+              {selectedTransactions.size > 0 && (
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={handleDeleteSelectedTransactions}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir ({selectedTransactions.size})
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0 sm:p-6">
             {filteredTransactions.length === 0 ? (
@@ -761,8 +818,16 @@ const TransacoesImproved = () => {
                 <div className="block sm:hidden">
                   <div className="max-h-[600px] overflow-y-auto space-y-3 p-3">
                     {filteredTransactions.map((transaction) => (
-                      <div key={transaction.id} className="p-3 border rounded-lg space-y-3">
-                        <div className="flex items-start justify-between">
+                      <div 
+                        key={transaction.id} 
+                        className={`p-3 border rounded-lg space-y-3 ${selectedTransactions.has(transaction.id) ? 'ring-2 ring-primary' : ''}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <Checkbox
+                            checked={selectedTransactions.has(transaction.id)}
+                            onCheckedChange={() => toggleTransactionSelection(transaction.id)}
+                            className="mt-1"
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               {getTypeIcon(transaction.type)}
@@ -818,6 +883,12 @@ const TransacoesImproved = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-10">
+                            <Checkbox
+                              checked={selectedTransactions.size === filteredTransactions.length && filteredTransactions.length > 0}
+                              onCheckedChange={toggleAllTransactions}
+                            />
+                          </TableHead>
                           <TableHead className="text-xs">Tipo</TableHead>
                           <TableHead className="text-xs">Descrição</TableHead>
                           <TableHead className="text-xs">Categoria</TableHead>
@@ -830,7 +901,16 @@ const TransacoesImproved = () => {
                       </TableHeader>
                       <TableBody>
                         {filteredTransactions.map((transaction) => (
-                          <TableRow key={transaction.id}>
+                          <TableRow 
+                            key={transaction.id}
+                            className={selectedTransactions.has(transaction.id) ? 'bg-accent' : ''}
+                          >
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedTransactions.has(transaction.id)}
+                                onCheckedChange={() => toggleTransactionSelection(transaction.id)}
+                              />
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 {getTypeIcon(transaction.type)}
