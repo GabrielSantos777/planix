@@ -96,6 +96,8 @@ const Dashboard = () => {
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
   // Helper function to check if a credit card transaction belongs to a specific invoice month/year
+  // A fatura de DEZEMBRO contém compras que serão PAGAS em JANEIRO
+  // Então quando o usuário seleciona "Dezembro", ele quer ver a fatura de dezembro (compras de ~10/nov até ~09/dez)
   const isCreditCardTransactionInInvoice = (transaction: typeof transactions[0], targetMonth: number, targetYear: number) => {
     if (!transaction.credit_card_id) return false
     
@@ -105,10 +107,13 @@ const Dashboard = () => {
     const purchaseDate = parseLocalDate(transaction.date)
     const invoiceInfo = getInvoiceForPurchase(purchaseDate, card.closing_day, card.due_day)
     
+    // A fatura é identificada pelo mês/ano em que FECHA (não quando é paga)
+    // invoiceInfo.month/year já retorna o mês da fatura corretamente
     return invoiceInfo.month === targetMonth && invoiceInfo.year === targetYear
   }
 
   // Monthly credit card expenses - using invoice logic
+  // Isso agrupa as transações pela FATURA em que elas caem, não pelo mês calendário
   const monthlyCreditCardExpenses = transactions
     .filter(t => t.type === "expense" && t.credit_card_id && isCreditCardTransactionInInvoice(t, selectedMonth, selectedYear))
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
@@ -116,16 +121,17 @@ const Dashboard = () => {
   // Total expenses + credit card
   const totalExpenses = monthlyExpenses + monthlyCreditCardExpenses
 
-  // Expenses made by me (without contact_id)
+  // Expenses made by me (without contact_id) - account transactions
   const myExpenses = currentMonthTransactions
     .filter(t => t.type === "expense" && !t.contact_id && t.account_id)
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
-  // My credit card expenses - using invoice logic
+  // My credit card expenses - using invoice logic (gastos feitos por mim no cartão)
   const myCreditCardExpenses = transactions
     .filter(t => t.type === "expense" && !t.contact_id && t.credit_card_id && isCreditCardTransactionInInvoice(t, selectedMonth, selectedYear))
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
+  // Total de gastos feitos por mim (conta + cartão, usando lógica de fatura)
   const myTotalExpenses = myExpenses + myCreditCardExpenses
 
   // Total balance from all accounts (initial + all movements)
