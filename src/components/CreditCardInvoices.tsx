@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ChevronDown, ChevronUp, Calendar, CreditCard, Edit, Info, Sparkles } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -16,6 +19,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useCreditCardInvoice, getBestPurchaseDay } from '@/hooks/useCreditCardInvoice'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { parseLocalDate } from '@/utils/dateUtils'
+import { CurrencyInput } from '@/components/ui/currency-input'
 
 interface MonthlyInvoice {
   month: number
@@ -36,7 +40,7 @@ interface CreditCardInvoicesProps {
 }
 
 export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: CreditCardInvoicesProps) => {
-  const { transactions, creditCards, addTransaction, creditCardInvoices, upsertCreditCardInvoice } = useSupabaseData()
+  const { transactions, creditCards, categories, addTransaction, creditCardInvoices, upsertCreditCardInvoice, updateTransaction } = useSupabaseData()
   const { formatCurrency } = useCurrency()
   const { toast } = useToast()
   const { user } = useAuth()
@@ -48,6 +52,16 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
   const [invoiceToPayAmount, setInvoiceToPayAmount] = useState(0)
   const [currentEditingInvoice, setCurrentEditingInvoice] = useState<any>(null)
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
+  
+  // State for editing individual transactions
+  const [editingTransaction, setEditingTransaction] = useState<any>(null)
+  const [editForm, setEditForm] = useState({
+    description: '',
+    amount: 0,
+    date: '',
+    category_id: '',
+    notes: ''
+  })
 
   // Toggle transaction selection
   const toggleTransactionSelection = (transactionId: string) => {
@@ -76,6 +90,46 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
       }
     })
   }
+
+  // Handle editing a transaction
+  const handleEditTransaction = (transaction: any) => {
+    setEditingTransaction(transaction)
+    setEditForm({
+      description: transaction.description,
+      amount: Math.abs(transaction.amount),
+      date: transaction.date,
+      category_id: transaction.category_id || '',
+      notes: transaction.notes || ''
+    })
+  }
+
+  const handleSaveTransaction = async () => {
+    if (!editingTransaction) return
+
+    try {
+      await updateTransaction(editingTransaction.id, {
+        description: editForm.description,
+        amount: -Math.abs(editForm.amount), // Always negative for credit card expenses
+        date: editForm.date,
+        category_id: editForm.category_id || null,
+        notes: editForm.notes || null
+      })
+
+      toast({
+        title: "Sucesso",
+        description: "Transação atualizada com sucesso!"
+      })
+      setEditingTransaction(null)
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar transação",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const expenseCategories = categories.filter(c => c.type === 'expense')
 
   // Usar o hook de faturas com a lógica correta
   const card = creditCards.find(c => c.id === cardId)
@@ -423,10 +477,18 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
                           {format(parseLocalDate(transaction.date), 'dd/MM/yyyy')}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="flex items-center gap-2">
                         <p className="font-bold text-destructive">
                           {formatCurrency(transaction.amount)}
                         </p>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={() => handleEditTransaction(transaction)}
+                          title="Editar transação"
+                        >
+                          <Info className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -467,6 +529,64 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
         cardName={cardName}
         onSave={handleSaveInvoice}
       />
+
+      {/* Modal for editing individual transactions */}
+      <Dialog open={!!editingTransaction} onOpenChange={() => setEditingTransaction(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Transação</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Descrição</Label>
+              <Input 
+                value={editForm.description} 
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} 
+              />
+            </div>
+            <div>
+              <Label>Valor</Label>
+              <CurrencyInput 
+                value={editForm.amount} 
+                onChange={(v) => setEditForm({ ...editForm, amount: v })} 
+              />
+            </div>
+            <div>
+              <Label>Data</Label>
+              <Input 
+                type="date" 
+                value={editForm.date} 
+                onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} 
+              />
+            </div>
+            <div>
+              <Label>Categoria</Label>
+              <Select 
+                value={editForm.category_id} 
+                onValueChange={(v) => setEditForm({ ...editForm, category_id: v })}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {expenseCategories.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Observações</Label>
+              <Input 
+                value={editForm.notes} 
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} 
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingTransaction(null)}>Cancelar</Button>
+            <Button onClick={handleSaveTransaction}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </TooltipProvider>
   )
