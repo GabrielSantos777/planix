@@ -12,13 +12,21 @@ import { useCurrency } from "@/context/CurrencyContext"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
-import { MessageCircle, TrendingDown, Copy, Plus, Edit, Trash2 } from "lucide-react"
+import { MessageCircle, TrendingDown, Copy, Plus, Edit, Trash2, MinusCircle } from "lucide-react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useState, useMemo } from "react"
 import { parseLocalDate, getLocalDateString } from "@/utils/dateUtils"
 import { CurrencyInput } from "@/components/ui/currency-input"
+
+interface SocialAdjustment {
+  id: string
+  contact_id: string
+  description: string
+  amount: number
+  date: string
+}
 
 interface Contact {
   id: string
@@ -38,7 +46,10 @@ interface Transaction {
 interface ContactWithTransactions {
   contact: Contact
   transactions: Transaction[]
+  adjustments: SocialAdjustment[]
   total: number
+  adjustmentsTotal: number
+  finalTotal: number
 }
 
 export default function Social() {
@@ -61,6 +72,32 @@ export default function Social() {
     date: getLocalDateString(),
     category_id: '',
     account_id: ''
+  })
+
+  // Adjustment modal state
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false)
+  const [editingAdjustment, setEditingAdjustment] = useState<SocialAdjustment | null>(null)
+  const [selectedContactForAdjustment, setSelectedContactForAdjustment] = useState<Contact | null>(null)
+  const [adjustmentForm, setAdjustmentForm] = useState({
+    description: '',
+    amount: 0,
+    date: getLocalDateString()
+  })
+
+  // Query for social adjustments
+  const { data: socialAdjustments = [] } = useQuery({
+    queryKey: ['social-adjustments', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return []
+      const { data, error } = await supabase
+        .from('social_adjustments')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+      if (error) throw error
+      return data as SocialAdjustment[]
+    },
+    enabled: !!user?.id,
   })
 
   const { data: contactsWithTransactions = [], isLoading } = useQuery({
@@ -105,7 +142,10 @@ export default function Social() {
           contactMap.set(contact.id, {
             contact,
             transactions: [],
+            adjustments: [],
             total: 0,
+            adjustmentsTotal: 0,
+            finalTotal: 0,
           })
         }
 
@@ -119,46 +159,30 @@ export default function Social() {
     enabled: !!user?.id,
   })
 
-  // Filtrar transações considerando dia de pagamento do contato
-  // Lógica: O mês selecionado representa o mês de RECEBIMENTO/COBRANÇA
-  // - Se transação foi feita no mês X e o payment_day é dia 15:
-  //   - Transações do dia 1 ao 14 do mês X = ciclo do mês X-1, recebe no mês X (após dia 15)
-  //   - Transações do dia 15 ao 31 do mês X = ciclo do mês X, recebe no mês X+1 (após dia 15)
+  // Filtrar transações e ajustes considerando dia de pagamento do contato
   const filteredContactsWithTransactions = useMemo(() => {
     if (!contactsWithTransactions || !selectedMonth) return contactsWithTransactions
 
     const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number)
 
-    return contactsWithTransactions.map(({ contact, transactions, total }) => {
+    return contactsWithTransactions.map(({ contact, transactions }) => {
       const paymentDay = (contact as any).payment_day || null
 
       const filteredTransactions = transactions.filter(t => {
-        // Parse a data corretamente para evitar problemas de timezone
         const transDate = parseLocalDate(t.date)
         const transYear = transDate.getFullYear()
-        const transMonth = transDate.getMonth() + 1 // 1-12
+        const transMonth = transDate.getMonth() + 1
         const transDay = transDate.getDate()
         
         if (paymentDay) {
-          // Com payment_day definido:
-          // - Transações de dias < payment_day do mês M pertencem ao ciclo M-1 (cobradas no mês M)
-          // - Transações de dias >= payment_day do mês M pertencem ao ciclo M (cobradas no mês M+1)
-          
-          // Para o mês selecionado (mês de cobrança), queremos:
-          // 1. Transações do mês selecionado com dia < payment_day (ciclo mês anterior, cobra agora)
-          // 2. Transações do mês anterior com dia >= payment_day (ciclo mês anterior, cobra agora)
-          
-          // Calcular o mês anterior
           const prevMonth = selectedMonthNum === 1 ? 12 : selectedMonthNum - 1
           const prevYear = selectedMonthNum === 1 ? selectedYear - 1 : selectedYear
           
-          // Caso 1: Transações do mês selecionado antes do dia de pagamento
           const isCurrentMonthBeforePaymentDay = 
             transYear === selectedYear && 
             transMonth === selectedMonthNum && 
             transDay < paymentDay
           
-          // Caso 2: Transações do mês anterior a partir do dia de pagamento
           const isPrevMonthAfterPaymentDay = 
             transYear === prevYear && 
             transMonth === prevMonth && 
@@ -166,20 +190,52 @@ export default function Social() {
           
           return isCurrentMonthBeforePaymentDay || isPrevMonthAfterPaymentDay
         } else {
-          // Sem payment_day, filtra pelo mês da transação (comportamento simples)
           return transYear === selectedYear && transMonth === selectedMonthNum
         }
       })
 
+      // Filter adjustments for this contact and month
+      const contactAdjustments = socialAdjustments.filter(adj => {
+        if (adj.contact_id !== contact.id) return false
+        const adjDate = parseLocalDate(adj.date)
+        const adjYear = adjDate.getFullYear()
+        const adjMonth = adjDate.getMonth() + 1
+        
+        if (paymentDay) {
+          const adjDay = adjDate.getDate()
+          const prevMonth = selectedMonthNum === 1 ? 12 : selectedMonthNum - 1
+          const prevYear = selectedMonthNum === 1 ? selectedYear - 1 : selectedYear
+          
+          const isCurrentMonthBeforePaymentDay = 
+            adjYear === selectedYear && 
+            adjMonth === selectedMonthNum && 
+            adjDay < paymentDay
+          
+          const isPrevMonthAfterPaymentDay = 
+            adjYear === prevYear && 
+            adjMonth === prevMonth && 
+            adjDay >= paymentDay
+          
+          return isCurrentMonthBeforePaymentDay || isPrevMonthAfterPaymentDay
+        } else {
+          return adjYear === selectedYear && adjMonth === selectedMonthNum
+        }
+      })
+
       const filteredTotal = filteredTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0)
+      const adjustmentsTotal = contactAdjustments.reduce((sum, a) => sum + a.amount, 0)
+      const finalTotal = filteredTotal - adjustmentsTotal // Adjustments reduce the amount owed
 
       return {
         contact,
         transactions: filteredTransactions,
-        total: filteredTotal
+        adjustments: contactAdjustments,
+        total: filteredTotal,
+        adjustmentsTotal,
+        finalTotal
       }
-    }).filter(item => item.transactions.length > 0)
-  }, [contactsWithTransactions, selectedMonth])
+    }).filter(item => item.transactions.length > 0 || item.adjustments.length > 0)
+  }, [contactsWithTransactions, selectedMonth, socialAdjustments])
 
   // Gerar lista de meses disponíveis (6 meses passados + mês atual + 6 meses futuros)
   const availableMonths = useMemo(() => {
@@ -218,15 +274,7 @@ export default function Social() {
   const copyMessageToClipboard = () => {
     if (!selectedContactData) return
     
-    const { contact, transactions, total } = selectedContactData
-    const transactionList = transactions
-      .map((t, index) => 
-        `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(parseLocalDate(t.date), "dd/MM/yyyy", { locale: ptBR })})`
-      )
-      .join('\n')
-
-    const message = `Olá ${contact.name}! 👋\n\nAqui está o resumo das suas compras:\n\n${transactionList}\n\n💰 *Total: ${formatCurrency(total)}*\n\nPor favor, realize o pagamento quando possível. Obrigado!`
-    
+    const message = getWhatsAppMessage()
     navigator.clipboard.writeText(message)
     
     toast({
@@ -238,14 +286,28 @@ export default function Social() {
   const getWhatsAppMessage = () => {
     if (!selectedContactData) return ""
     
-    const { contact, transactions, total } = selectedContactData
+    const { contact, transactions, adjustments, total, adjustmentsTotal, finalTotal } = selectedContactData
     const transactionList = transactions
       .map((t, index) => 
         `${index + 1}. ${t.description} - ${formatCurrency(Math.abs(t.amount))} (${format(parseLocalDate(t.date), "dd/MM/yyyy", { locale: ptBR })})`
       )
       .join('\n')
 
-    return `Olá ${contact.name}! 👋\n\nAqui está o resumo das suas compras:\n\n${transactionList}\n\n💰 *Total: ${formatCurrency(total)}*\n\nPor favor, realize o pagamento quando possível. Obrigado!`
+    let message = `Olá ${contact.name}! 👋\n\nAqui está o resumo das suas compras:\n\n${transactionList}\n\n💰 *Subtotal: ${formatCurrency(total)}*`
+    
+    if (adjustments.length > 0) {
+      const adjustmentsList = adjustments
+        .map((a, index) => 
+          `${index + 1}. ${a.description} - ${formatCurrency(a.amount)} (${format(parseLocalDate(a.date), "dd/MM/yyyy", { locale: ptBR })})`
+        )
+        .join('\n')
+      
+      message += `\n\n📝 *Abatimentos/Ajustes:*\n${adjustmentsList}\n\n💵 *Total ajustes: -${formatCurrency(adjustmentsTotal)}*`
+    }
+    
+    message += `\n\n🎯 *Total a pagar: ${formatCurrency(Math.max(0, finalTotal))}*\n\nPor favor, realize o pagamento quando possível. Obrigado!`
+    
+    return message
   }
 
   // Open modal to add new transaction for a contact
@@ -341,6 +403,99 @@ export default function Social() {
     }
   }
 
+  // Adjustment handlers
+  const handleAddAdjustment = (contact: Contact) => {
+    setSelectedContactForAdjustment(contact)
+    setEditingAdjustment(null)
+    setAdjustmentForm({
+      description: '',
+      amount: 0,
+      date: getLocalDateString()
+    })
+    setIsAdjustmentModalOpen(true)
+  }
+
+  const handleEditAdjustment = (adjustment: SocialAdjustment, contact: Contact) => {
+    setSelectedContactForAdjustment(contact)
+    setEditingAdjustment(adjustment)
+    setAdjustmentForm({
+      description: adjustment.description,
+      amount: adjustment.amount,
+      date: adjustment.date
+    })
+    setIsAdjustmentModalOpen(true)
+  }
+
+  const handleSaveAdjustment = async () => {
+    if (!user || !selectedContactForAdjustment) return
+
+    try {
+      if (editingAdjustment) {
+        const { error } = await supabase
+          .from('social_adjustments')
+          .update({
+            description: adjustmentForm.description,
+            amount: adjustmentForm.amount,
+            date: adjustmentForm.date
+          })
+          .eq('id', editingAdjustment.id)
+        
+        if (error) throw error
+        toast({
+          title: "Ajuste atualizado!",
+          description: "O ajuste foi atualizado com sucesso."
+        })
+      } else {
+        const { error } = await supabase
+          .from('social_adjustments')
+          .insert({
+            user_id: user.id,
+            contact_id: selectedContactForAdjustment.id,
+            description: adjustmentForm.description,
+            amount: adjustmentForm.amount,
+            date: adjustmentForm.date
+          })
+        
+        if (error) throw error
+        toast({
+          title: "Ajuste adicionado!",
+          description: "O ajuste foi adicionado ao contato."
+        })
+      }
+
+      setIsAdjustmentModalOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['social-adjustments'] })
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar ajuste. Tente novamente.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDeleteAdjustment = async (adjustmentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('social_adjustments')
+        .delete()
+        .eq('id', adjustmentId)
+      
+      if (error) throw error
+      toast({
+        title: "Ajuste excluído!",
+        description: "O ajuste foi removido."
+      })
+      queryClient.invalidateQueries({ queryKey: ['social-adjustments'] })
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir ajuste.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const expenseCategories = categories.filter(c => c.type === 'expense')
 
   return (
@@ -389,7 +544,7 @@ export default function Social() {
           </Card>
         ) : (
           <div className="grid gap-6">
-            {filteredContactsWithTransactions.map(({ contact, transactions, total }) => (
+            {filteredContactsWithTransactions.map(({ contact, transactions, adjustments, total, adjustmentsTotal, finalTotal }) => (
               <Card key={contact.id}>
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -398,26 +553,54 @@ export default function Social() {
                       <CardDescription>{contact.phone}</CardDescription>
                     </div>
                     <div className="text-left sm:text-right">
+                      {adjustmentsTotal > 0 && (
+                        <>
+                          <div className="text-sm text-muted-foreground line-through">
+                            {formatCurrency(total)}
+                          </div>
+                          <div className="text-xs text-success">
+                            Ajustes: -{formatCurrency(adjustmentsTotal)}
+                          </div>
+                        </>
+                      )}
                       <div className="text-2xl font-bold text-destructive">
-                        {formatCurrency(total)}
+                        {formatCurrency(Math.max(0, finalTotal))}
                       </div>
-                      <Badge variant="secondary" className="mt-1">
-                        {transactions.length} transação(ões)
-                      </Badge>
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        <Badge variant="secondary">
+                          {transactions.length} transação(ões)
+                        </Badge>
+                        {adjustments.length > 0 && (
+                          <Badge variant="outline" className="text-success border-success">
+                            {adjustments.length} ajuste(s)
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Button to add new transaction */}
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleAddTransaction(contact)}
-                    className="w-full gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Adicionar Transação
-                  </Button>
+                  {/* Buttons to add transaction or adjustment */}
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleAddTransaction(contact)}
+                      className="flex-1 gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Transação
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleAddAdjustment(contact)}
+                      className="flex-1 gap-2"
+                    >
+                      <MinusCircle className="h-4 w-4 text-success" />
+                      Ajuste/Abatimento
+                    </Button>
+                  </div>
 
                   {/* Mobile - Cards */}
                   <div className="md:hidden space-y-2 max-h-64 overflow-y-auto">
@@ -458,6 +641,45 @@ export default function Social() {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Adjustments mobile */}
+                    {adjustments.map((adjustment) => (
+                      <div 
+                        key={adjustment.id}
+                        className="border border-success/30 rounded-md p-3 space-y-1 bg-success/5"
+                      >
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="font-medium text-sm flex-1 line-clamp-2 text-success">
+                            {adjustment.description}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-success font-semibold text-sm shrink-0">
+                              -{formatCurrency(adjustment.amount)}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleEditAdjustment(adjustment, contact)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-destructive"
+                              onClick={() => handleDeleteAdjustment(adjustment.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                          <span>Ajuste</span>
+                          <span>{format(parseLocalDate(adjustment.date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Desktop - Table */}
@@ -466,7 +688,7 @@ export default function Social() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Descrição</TableHead>
-                          <TableHead>Categoria</TableHead>
+                          <TableHead>Tipo</TableHead>
                           <TableHead>Data</TableHead>
                           <TableHead className="text-right">Valor</TableHead>
                           <TableHead className="text-right">Ações</TableHead>
@@ -509,6 +731,46 @@ export default function Social() {
                             </TableCell>
                           </TableRow>
                         ))}
+                        
+                        {/* Adjustments rows */}
+                        {adjustments.map((adjustment) => (
+                          <TableRow key={adjustment.id} className="bg-success/5">
+                            <TableCell className="font-medium text-success">
+                              {adjustment.description}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-success border-success">
+                                Ajuste
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {format(parseLocalDate(adjustment.date), "dd/MM/yyyy", { locale: ptBR })}
+                            </TableCell>
+                            <TableCell className="text-right text-success">
+                              -{formatCurrency(adjustment.amount)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => handleEditAdjustment(adjustment, contact)}
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-destructive"
+                                  onClick={() => handleDeleteAdjustment(adjustment.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
@@ -517,7 +779,7 @@ export default function Social() {
                     <Button 
                       variant="outline"
                       onClick={() => {
-                        window.location.href = `/transacoes?type=income&contact=${contact.name}&amount=${total}`
+                        window.location.href = `/transacoes?type=income&contact=${contact.name}&amount=${finalTotal}`
                       }}
                       className="gap-2 w-full sm:w-auto"
                     >
@@ -525,7 +787,7 @@ export default function Social() {
                       Marcar como Pago
                     </Button>
                     <Button 
-                      onClick={() => handleSendWhatsApp({ contact, transactions, total })}
+                      onClick={() => handleSendWhatsApp({ contact, transactions, adjustments, total, adjustmentsTotal, finalTotal })}
                       className="gap-2 w-full sm:w-auto"
                     >
                       <MessageCircle className="h-4 w-4" />
@@ -664,6 +926,56 @@ export default function Social() {
 
             <Button onClick={handleSaveTransaction} className="w-full">
               {editingTransaction ? 'Atualizar' : 'Adicionar'} Transação
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Adjustment Modal */}
+      <Dialog open={isAdjustmentModalOpen} onOpenChange={setIsAdjustmentModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingAdjustment ? 'Editar Ajuste' : 'Novo Ajuste/Abatimento'}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedContactForAdjustment ? `Ajuste para ${selectedContactForAdjustment.name}` : ''}
+              <br />
+              <span className="text-xs">Este ajuste reduz o valor que a pessoa te deve. Não afeta suas transações reais.</span>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="adj-description">Descrição</Label>
+              <Input
+                id="adj-description"
+                value={adjustmentForm.description}
+                onChange={(e) => setAdjustmentForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Ex: Comprou algo pra mim"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="adj-amount">Valor do Abatimento</Label>
+              <CurrencyInput
+                value={adjustmentForm.amount}
+                onChange={(value) => setAdjustmentForm(prev => ({ ...prev, amount: value }))}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="adj-date">Data</Label>
+              <Input
+                id="adj-date"
+                type="date"
+                value={adjustmentForm.date}
+                onChange={(e) => setAdjustmentForm(prev => ({ ...prev, date: e.target.value }))}
+              />
+            </div>
+
+            <Button onClick={handleSaveAdjustment} className="w-full">
+              {editingAdjustment ? 'Atualizar' : 'Adicionar'} Ajuste
             </Button>
           </div>
         </DialogContent>
