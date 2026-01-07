@@ -96,11 +96,8 @@ const Dashboard = () => {
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
 
   // Helper function to check if a credit card transaction belongs to a specific invoice month/year
-  // LÓGICA CORRIGIDA: A fatura de DEZEMBRO são as compras que serão PAGAS em dezembro
-  // ou seja, compras do período que FECHA em dezembro
-  // Exemplo: Cartão fecha dia 8 - compras de 9/Nov até 8/Dez = fatura paga em Dez
-  // getInvoiceForPurchase retorna o mês em que a fatura FECHA, que é o mês de PAGAMENTO
-  // Para exibir no Dashboard do mês correto, usamos diretamente o mês retornado
+  // A fatura de DEZEMBRO contém compras que serão PAGAS em JANEIRO
+  // Então quando o usuário seleciona "Dezembro", ele quer ver a fatura de dezembro (compras de ~10/nov até ~09/dez)
   const isCreditCardTransactionInInvoice = (transaction: typeof transactions[0], targetMonth: number, targetYear: number) => {
     if (!transaction.credit_card_id) return false
     
@@ -110,16 +107,9 @@ const Dashboard = () => {
     const purchaseDate = parseLocalDate(transaction.date)
     const invoiceInfo = getInvoiceForPurchase(purchaseDate, card.closing_day, card.due_day)
     
-    // invoiceInfo.month retorna o mês em que a fatura FECHA (e será paga)
-    // Para o Dashboard de "Dezembro", queremos a fatura que será paga em Dezembro
-    // Isso significa compras do período que termina no dia de fechamento de Dezembro
-    
-    // Porém o usuário quer ver no Dashboard de "Dezembro" as compras feitas EM dezembro
-    // que cairão na fatura de Janeiro. Então precisamos olhar o MÊS DA COMPRA, não o mês da fatura
-    const purchaseMonth = purchaseDate.getMonth()
-    const purchaseYear = purchaseDate.getFullYear()
-    
-    return purchaseMonth === targetMonth && purchaseYear === targetYear
+    // A fatura é identificada pelo mês/ano em que FECHA (não quando é paga)
+    // invoiceInfo.month/year já retorna o mês da fatura corretamente
+    return invoiceInfo.month === targetMonth && invoiceInfo.year === targetYear
   }
 
   // Monthly credit card expenses - using invoice logic
