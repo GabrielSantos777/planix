@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { useCurrency } from '@/context/CurrencyContext'
-import { TrendingUp, TrendingDown, ArrowUpDown, Edit, Trash2, User, Calendar } from 'lucide-react'
+import { TrendingDown, Edit, Trash2, User, Calendar } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { parseLocalDate } from '@/utils/dateUtils'
 import { CurrencyInput } from '@/components/ui/currency-input'
@@ -18,13 +18,14 @@ import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-interface AccountTransactionsProps {
-  accountId: string
-  accountName: string
+interface CreditCardTransactionsProps {
+  cardId: string
+  cardName: string
+  closingDay: number
   className?: string
 }
 
-export const AccountTransactions = ({ accountId, accountName, className }: AccountTransactionsProps) => {
+export const CreditCardTransactions = ({ cardId, cardName, closingDay, className }: CreditCardTransactionsProps) => {
   const { transactions, categories, contacts, updateTransaction, deleteTransaction } = useSupabaseData()
   const { formatCurrency } = useCurrency()
   const isMobile = useIsMobile()
@@ -40,39 +41,58 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
     date: '',
     category_id: '',
     contact_id: '',
-    type: 'expense' as 'income' | 'expense' | 'transfer',
     notes: ''
   })
 
-  // Get available months from transactions
-  const availableMonths = useMemo(() => {
+  // Get invoice month for a transaction
+  const getInvoiceMonth = (transactionDate: Date) => {
+    let invoiceMonth, invoiceYear
+    if (transactionDate.getDate() >= closingDay) {
+      if (transactionDate.getMonth() === 11) {
+        invoiceMonth = 0
+        invoiceYear = transactionDate.getFullYear() + 1
+      } else {
+        invoiceMonth = transactionDate.getMonth() + 1
+        invoiceYear = transactionDate.getFullYear()
+      }
+    } else {
+      invoiceMonth = transactionDate.getMonth()
+      invoiceYear = transactionDate.getFullYear()
+    }
+    return { invoiceMonth, invoiceYear }
+  }
+
+  // Get available invoice months from transactions
+  const availableInvoiceMonths = useMemo(() => {
     const months = new Map<string, { month: number; year: number }>()
     
     transactions
-      .filter(t => t.account_id === accountId)
+      .filter(t => t.credit_card_id === cardId)
       .forEach(t => {
         const tDate = parseLocalDate(t.date)
-        const key = `${tDate.getFullYear()}-${tDate.getMonth().toString().padStart(2, '0')}`
+        const { invoiceMonth, invoiceYear } = getInvoiceMonth(tDate)
+        const key = `${invoiceYear}-${invoiceMonth.toString().padStart(2, '0')}`
         if (!months.has(key)) {
-          months.set(key, { month: tDate.getMonth(), year: tDate.getFullYear() })
+          months.set(key, { month: invoiceMonth, year: invoiceYear })
         }
       })
     
     return Array.from(months.entries())
       .sort((a, b) => b[0].localeCompare(a[0]))
-  }, [transactions, accountId])
+  }, [transactions, cardId, closingDay])
 
-  const accountTransactions = useMemo(() => {
+  const cardTransactions = useMemo(() => {
     let filtered = transactions
-      .filter(t => t.account_id === accountId)
+      .filter(t => t.credit_card_id === cardId)
       .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
     
-    // Apply month filter
+    // Apply month filter (by invoice month)
     if (monthFilter !== "all") {
       const [year, month] = monthFilter.split('-').map(Number)
       filtered = filtered.filter(t => {
         const tDate = parseLocalDate(t.date)
-        return tDate.getMonth() === month && tDate.getFullYear() === year
+        const { invoiceMonth, invoiceYear } = getInvoiceMonth(tDate)
+        return invoiceMonth === month && invoiceYear === year
       })
     }
     
@@ -84,13 +104,13 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
     }
     
     return filtered
-  }, [transactions, accountId, responsibleFilter, monthFilter])
+  }, [transactions, cardId, responsibleFilter, monthFilter, closingDay])
 
   // Calculate totals by responsible
   const totalByResponsible = useMemo(() => {
-    const total = accountTransactions.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+    const total = cardTransactions.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
     return total
-  }, [accountTransactions])
+  }, [cardTransactions])
 
   const getCategoryName = (categoryId: string | null) => {
     if (!categoryId) return '-'
@@ -104,32 +124,6 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
     return contact?.name || '-'
   }
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "income":
-        return <TrendingUp className="h-4 w-4 text-success" />
-      case "expense":
-        return <TrendingDown className="h-4 w-4 text-destructive" />
-      case "transfer":
-        return <ArrowUpDown className="h-4 w-4 text-blue-500" />
-      default:
-        return null
-    }
-  }
-
-  const getTypeBadge = (type: string) => {
-    switch (type) {
-      case "income":
-        return <Badge className="bg-success/10 text-success hover:bg-success/20">Receita</Badge>
-      case "expense":
-        return <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/20">Despesa</Badge>
-      case "transfer":
-        return <Badge className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20">Transferência</Badge>
-      default:
-        return null
-    }
-  }
-
   const handleEditClick = (transaction: any) => {
     setEditingTransaction(transaction)
     setEditForm({
@@ -138,7 +132,6 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
       date: transaction.date,
       category_id: transaction.category_id || '',
       contact_id: transaction.contact_id || '',
-      type: transaction.type,
       notes: transaction.notes || ''
     })
   }
@@ -170,15 +163,12 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
     if (!editingTransaction) return
 
     try {
-      const amount = editForm.type === 'expense' ? -Math.abs(editForm.amount) : Math.abs(editForm.amount)
-      
       await updateTransaction(editingTransaction.id, {
         description: editForm.description,
-        amount,
+        amount: -Math.abs(editForm.amount), // Credit card transactions are always expenses
         date: editForm.date,
         category_id: editForm.category_id || null,
         contact_id: editForm.contact_id || null,
-        type: editForm.type,
         notes: editForm.notes || null
       })
 
@@ -196,7 +186,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
     }
   }
 
-  const filteredCategories = categories.filter(c => c.type === editForm.type)
+  const expenseCategories = categories.filter(c => c.type === 'expense')
 
   const ResponsibleFilterText = () => {
     if (responsibleFilter === "all") return "Todos os responsáveis"
@@ -206,7 +196,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
   }
 
   const MonthFilterText = () => {
-    if (monthFilter === "all") return "Todos os meses"
+    if (monthFilter === "all") return "Todas as faturas"
     const [year, month] = monthFilter.split('-').map(Number)
     return format(new Date(year, month, 1), 'MMMM yyyy', { locale: ptBR })
   }
@@ -216,22 +206,22 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
       <>
         <Card className={className}>
           <CardHeader>
-            <CardTitle>Transações de {accountName}</CardTitle>
+            <CardTitle>Transações de {cardName}</CardTitle>
             <CardDescription>
-              {accountTransactions.length} transação(ões) encontrada(s)
+              {cardTransactions.length} transação(ões) encontrada(s)
             </CardDescription>
             
             {/* Filters */}
             <div className="pt-2 space-y-3">
               <div className="space-y-2">
-                <Label className="text-sm">Mês</Label>
+                <Label className="text-sm">Fatura</Label>
                 <Select value={monthFilter} onValueChange={setMonthFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
+                    <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos os meses</SelectItem>
-                    {availableMonths.map(([key, { month, year }]) => (
+                    <SelectItem value="all">Todas as faturas</SelectItem>
+                    {availableInvoiceMonths.map(([key, { month, year }]) => (
                       <SelectItem key={key} value={key}>
                         {format(new Date(year, month, 1), 'MMMM yyyy', { locale: ptBR })}
                       </SelectItem>
@@ -264,12 +254,12 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {accountTransactions.length === 0 ? (
+            {cardTransactions.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
                 Nenhuma transação encontrada
               </div>
             ) : (
-              accountTransactions.map((transaction) => (
+              cardTransactions.map((transaction) => (
                 <Card key={transaction.id} className="p-4">
                   <div className="space-y-2">
                     <div className="flex justify-between items-start">
@@ -280,13 +270,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <div className={
-                          transaction.type === 'income' 
-                            ? 'text-success font-semibold' 
-                            : transaction.type === 'expense'
-                            ? 'text-destructive font-semibold'
-                            : 'font-semibold'
-                        }>
+                        <div className="text-destructive font-semibold">
                           {formatCurrency(transaction.amount)}
                         </div>
                         <Button size="icon" variant="ghost" onClick={() => handleEditClick(transaction)}>
@@ -305,7 +289,6 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                           {getContactName(transaction.contact_id)}
                         </Badge>
                       </div>
-                      {getTypeBadge(transaction.type)}
                     </div>
                   </div>
                 </Card>
@@ -334,21 +317,11 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                 <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
               </div>
               <div>
-                <Label>Tipo</Label>
-                <Select value={editForm.type} onValueChange={(v: any) => setEditForm({ ...editForm, type: v, category_id: '' })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="income">Receita</SelectItem>
-                    <SelectItem value="expense">Despesa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
                 <Label>Categoria</Label>
                 <Select value={editForm.category_id} onValueChange={(v) => setEditForm({ ...editForm, category_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {filteredCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {expenseCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -397,9 +370,9 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle>Transações de {accountName}</CardTitle>
+              <CardTitle>Transações de {cardName}</CardTitle>
               <CardDescription>
-                {accountTransactions.length} transação(ões) encontrada(s)
+                {cardTransactions.length} transação(ões) encontrada(s)
               </CardDescription>
             </div>
             
@@ -408,12 +381,12 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <Select value={monthFilter} onValueChange={setMonthFilter}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Todos os meses" />
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Todas as faturas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos os meses</SelectItem>
-                    {availableMonths.map(([key, { month, year }]) => (
+                    <SelectItem value="all">Todas as faturas</SelectItem>
+                    {availableInvoiceMonths.map(([key, { month, year }]) => (
                       <SelectItem key={key} value={key}>
                         {format(new Date(year, month, 1), 'MMMM yyyy', { locale: ptBR })}
                       </SelectItem>
@@ -456,20 +429,19 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                   <TableHead>Descrição</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Responsável</TableHead>
-                  <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="w-20">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {accountTransactions.length === 0 ? (
+                {cardTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
                       Nenhuma transação encontrada
                     </TableCell>
                   </TableRow>
                 ) : (
-                  accountTransactions.map((transaction) => (
+                  cardTransactions.map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell className="whitespace-nowrap">
                         {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
@@ -482,23 +454,16 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                           {getContactName(transaction.contact_id)}
                         </Badge>
                       </TableCell>
-                      <TableCell>{getTypeBadge(transaction.type)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {getTypeIcon(transaction.type)}
-                          <span className={
-                            transaction.type === 'income' 
-                              ? 'text-success font-medium' 
-                              : transaction.type === 'expense'
-                              ? 'text-destructive font-medium'
-                              : 'font-medium'
-                          }>
+                          <TrendingDown className="h-4 w-4 text-destructive" />
+                          <span className="text-destructive font-medium">
                             {formatCurrency(transaction.amount)}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
+                        <div className="flex justify-end gap-1">
                           <Button size="icon" variant="ghost" onClick={() => handleEditClick(transaction)}>
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -536,21 +501,11 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
               <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
             </div>
             <div>
-              <Label>Tipo</Label>
-              <Select value={editForm.type} onValueChange={(v: any) => setEditForm({ ...editForm, type: v, category_id: '' })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="income">Receita</SelectItem>
-                  <SelectItem value="expense">Despesa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
               <Label>Categoria</Label>
               <Select value={editForm.category_id} onValueChange={(v) => setEditForm({ ...editForm, category_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  {filteredCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {expenseCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
