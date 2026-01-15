@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast"
 import Layout from "@/components/Layout"
 import { CreditCardInvoices } from "@/components/CreditCardInvoices"
 import { AccountTransactions } from "@/components/AccountTransactions"
+import { CreditCardTransactions } from "@/components/CreditCardTransactions"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from "@/components/ui/carousel"
 import { getBestPurchaseDay } from "@/hooks/useCreditCardInvoice"
 import { parseLocalDate } from "@/utils/dateUtils"
@@ -941,6 +942,13 @@ export default function ContasImproved() {
                               cardName={card.name} 
                               closingDay={card.closing_day}
                               dueDay={card.due_day}
+                            />
+
+                            {/* Credit Card Transactions Component */}
+                            <CreditCardTransactions 
+                              cardId={card.id} 
+                              cardName={card.name} 
+                              closingDay={card.closing_day}
                             />
                           </div>
                         </CardContent>
