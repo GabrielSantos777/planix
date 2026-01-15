@@ -7,11 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { useCurrency } from '@/context/CurrencyContext'
-import { TrendingUp, TrendingDown, ArrowUpDown, Info, X } from 'lucide-react'
+import { TrendingUp, TrendingDown, ArrowUpDown, Edit, Trash2, User } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { parseLocalDate, getLocalDateString } from '@/utils/dateUtils'
+import { parseLocalDate } from '@/utils/dateUtils'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useToast } from '@/hooks/use-toast'
 
@@ -22,31 +23,55 @@ interface AccountTransactionsProps {
 }
 
 export const AccountTransactions = ({ accountId, accountName, className }: AccountTransactionsProps) => {
-  const { transactions, categories, updateTransaction } = useSupabaseData()
+  const { transactions, categories, contacts, updateTransaction, deleteTransaction } = useSupabaseData()
   const { formatCurrency } = useCurrency()
   const isMobile = useIsMobile()
   const { toast } = useToast()
 
+  const [responsibleFilter, setResponsibleFilter] = useState("all")
   const [editingTransaction, setEditingTransaction] = useState<any>(null)
+  const [deletingTransaction, setDeletingTransaction] = useState<any>(null)
   const [editForm, setEditForm] = useState({
     description: '',
     amount: 0,
     date: '',
     category_id: '',
+    contact_id: '',
     type: 'expense' as 'income' | 'expense' | 'transfer',
     notes: ''
   })
 
   const accountTransactions = useMemo(() => {
-    return transactions
+    let filtered = transactions
       .filter(t => t.account_id === accountId)
       .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
-  }, [transactions, accountId])
+    
+    // Apply responsible filter
+    if (responsibleFilter === "me") {
+      filtered = filtered.filter(t => t.contact_id === null)
+    } else if (responsibleFilter !== "all") {
+      filtered = filtered.filter(t => t.contact_id === responsibleFilter)
+    }
+    
+    return filtered
+  }, [transactions, accountId, responsibleFilter])
+
+  // Calculate totals by responsible
+  const totalByResponsible = useMemo(() => {
+    const total = accountTransactions.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
+    return total
+  }, [accountTransactions])
 
   const getCategoryName = (categoryId: string | null) => {
     if (!categoryId) return '-'
     const category = categories.find(c => c.id === categoryId)
     return category?.name || '-'
+  }
+
+  const getContactName = (contactId: string | null) => {
+    if (!contactId) return 'Eu'
+    const contact = contacts.find(c => c.id === contactId)
+    return contact?.name || '-'
   }
 
   const getTypeIcon = (type: string) => {
@@ -82,9 +107,33 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
       amount: Math.abs(transaction.amount),
       date: transaction.date,
       category_id: transaction.category_id || '',
+      contact_id: transaction.contact_id || '',
       type: transaction.type,
       notes: transaction.notes || ''
     })
+  }
+
+  const handleDeleteClick = (transaction: any) => {
+    setDeletingTransaction(transaction)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deletingTransaction) return
+
+    try {
+      await deleteTransaction(deletingTransaction.id)
+      toast({
+        title: "Sucesso",
+        description: "Transação excluída com sucesso!"
+      })
+      setDeletingTransaction(null)
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir transação",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleSaveEdit = async () => {
@@ -98,6 +147,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
         amount,
         date: editForm.date,
         category_id: editForm.category_id || null,
+        contact_id: editForm.contact_id || null,
         type: editForm.type,
         notes: editForm.notes || null
       })
@@ -118,6 +168,13 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
 
   const filteredCategories = categories.filter(c => c.type === editForm.type)
 
+  const ResponsibleFilterText = () => {
+    if (responsibleFilter === "all") return "Todos os responsáveis"
+    if (responsibleFilter === "me") return "Eu"
+    const contact = contacts.find(c => c.id === responsibleFilter)
+    return contact?.name || "Responsável"
+  }
+
   if (isMobile) {
     return (
       <>
@@ -127,6 +184,30 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
             <CardDescription>
               {accountTransactions.length} transação(ões) encontrada(s)
             </CardDescription>
+            
+            {/* Filtro por responsável */}
+            <div className="pt-2 space-y-2">
+              <Label className="text-sm">Filtrar por Responsável</Label>
+              <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="me">Eu</SelectItem>
+                  {contacts.map(contact => (
+                    <SelectItem key={contact.id} value={contact.id}>
+                      {contact.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {responsibleFilter !== "all" && (
+                <div className="text-sm font-medium text-primary">
+                  Total ({ResponsibleFilterText()}): {formatCurrency(totalByResponsible)}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {accountTransactions.length === 0 ? (
@@ -144,7 +225,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                           {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <div className={
                           transaction.type === 'income' 
                             ? 'text-success font-semibold' 
@@ -155,12 +236,21 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                           {formatCurrency(transaction.amount)}
                         </div>
                         <Button size="icon" variant="ghost" onClick={() => handleEditClick(transaction)}>
-                          <Info className="h-4 w-4" />
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(transaction)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">{getCategoryName(transaction.category_id)}</span>
+                    <div className="flex flex-wrap justify-between items-center text-sm gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">{getCategoryName(transaction.category_id)}</span>
+                        <Badge variant="outline" className="text-xs">
+                          <User className="h-3 w-3 mr-1" />
+                          {getContactName(transaction.contact_id)}
+                        </Badge>
+                      </div>
                       {getTypeBadge(transaction.type)}
                     </div>
                   </div>
@@ -170,6 +260,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
           </CardContent>
         </Card>
 
+        {/* Edit Dialog */}
         <Dialog open={!!editingTransaction} onOpenChange={() => setEditingTransaction(null)}>
           <DialogContent>
             <DialogHeader>
@@ -207,6 +298,16 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>Responsável</Label>
+                <Select value={editForm.contact_id || "me"} onValueChange={(v) => setEditForm({ ...editForm, contact_id: v === "me" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="me">Eu</SelectItem>
+                    {contacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditingTransaction(null)}>Cancelar</Button>
@@ -214,6 +315,24 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation */}
+        <AlertDialog open={!!deletingTransaction} onOpenChange={() => setDeletingTransaction(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir a transação "{deletingTransaction?.description}"? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </>
     )
   }
@@ -222,10 +341,39 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
     <>
       <Card className={className}>
         <CardHeader>
-          <CardTitle>Transações de {accountName}</CardTitle>
-          <CardDescription>
-            {accountTransactions.length} transação(ões) encontrada(s)
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle>Transações de {accountName}</CardTitle>
+              <CardDescription>
+                {accountTransactions.length} transação(ões) encontrada(s)
+              </CardDescription>
+            </div>
+            
+            {/* Filtro por responsável */}
+            <div className="flex items-center gap-3">
+              <Label className="text-sm whitespace-nowrap">Responsável:</Label>
+              <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="me">Eu</SelectItem>
+                  {contacts.map(contact => (
+                    <SelectItem key={contact.id} value={contact.id}>
+                      {contact.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {responsibleFilter !== "all" && (
+            <div className="text-sm font-medium text-primary pt-2">
+              Total ({ResponsibleFilterText()}): {formatCurrency(totalByResponsible)}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -235,15 +383,16 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                   <TableHead>Data</TableHead>
                   <TableHead>Descrição</TableHead>
                   <TableHead>Categoria</TableHead>
+                  <TableHead>Responsável</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="w-10"></TableHead>
+                  <TableHead className="w-20">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {accountTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
                       Nenhuma transação encontrada
                     </TableCell>
                   </TableRow>
@@ -255,6 +404,12 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                       </TableCell>
                       <TableCell>{transaction.description}</TableCell>
                       <TableCell>{getCategoryName(transaction.category_id)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          <User className="h-3 w-3 mr-1" />
+                          {getContactName(transaction.contact_id)}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{getTypeBadge(transaction.type)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -271,9 +426,14 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button size="icon" variant="ghost" onClick={() => handleEditClick(transaction)}>
-                          <Info className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => handleEditClick(transaction)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(transaction)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -284,6 +444,7 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
         </CardContent>
       </Card>
 
+      {/* Edit Dialog */}
       <Dialog open={!!editingTransaction} onOpenChange={() => setEditingTransaction(null)}>
         <DialogContent>
           <DialogHeader>
@@ -321,6 +482,16 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Responsável</Label>
+              <Select value={editForm.contact_id || "me"} onValueChange={(v) => setEditForm({ ...editForm, contact_id: v === "me" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="me">Eu</SelectItem>
+                  {contacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingTransaction(null)}>Cancelar</Button>
@@ -328,6 +499,24 @@ export const AccountTransactions = ({ accountId, accountName, className }: Accou
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deletingTransaction} onOpenChange={() => setDeletingTransaction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a transação "{deletingTransaction?.description}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
