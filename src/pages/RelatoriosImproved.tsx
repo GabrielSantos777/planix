@@ -45,6 +45,7 @@ const RelatoriosImproved = () => {
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
   const [accountFilter, setAccountFilter] = useState("all")
+  const [creditCardFilter, setCreditCardFilter] = useState("all")
   const [contactFilter, setContactFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [descriptionFilter, setDescriptionFilter] = useState("")
@@ -55,6 +56,7 @@ const RelatoriosImproved = () => {
     setCategoryFilter("all")
     setTypeFilter("all")
     setAccountFilter("all")
+    setCreditCardFilter("all")
     setContactFilter("all")
     setStatusFilter("all")
     setDescriptionFilter("")
@@ -62,7 +64,7 @@ const RelatoriosImproved = () => {
 
   // Verificar se há filtros ativos
   const hasActiveFilters = categoryFilter !== "all" || 
-    typeFilter !== "all" || accountFilter !== "all" || contactFilter !== "all" || statusFilter !== "all" || descriptionFilter
+    typeFilter !== "all" || accountFilter !== "all" || creditCardFilter !== "all" || contactFilter !== "all" || statusFilter !== "all" || descriptionFilter
 
   // Filter transactions based on all filters
   const filteredTransactions = useMemo(() => {
@@ -81,14 +83,25 @@ const RelatoriosImproved = () => {
       // Filtro de tipo
       const typeMatch = typeFilter === "all" || transaction.type === typeFilter
       
-      // Filtro de conta (incluindo cartões de crédito)
+      // Filtro de conta bancária
       let accountMatch = true
       if (accountFilter !== "all") {
-        accountMatch = transaction.account_id === accountFilter || transaction.credit_card_id === accountFilter
+        accountMatch = transaction.account_id === accountFilter
       }
       
-      // Filtro de contato (responsável)
-      const contactMatch = contactFilter === "all" || transaction.contact_id === contactFilter
+      // Filtro de cartão de crédito
+      let creditCardMatch = true
+      if (creditCardFilter !== "all") {
+        creditCardMatch = transaction.credit_card_id === creditCardFilter
+      }
+      
+      // Filtro de contato (responsável) - "me" = sem contato (eu mesmo)
+      let contactMatch = true
+      if (contactFilter === "me") {
+        contactMatch = transaction.contact_id === null
+      } else if (contactFilter !== "all") {
+        contactMatch = transaction.contact_id === contactFilter
+      }
       
       // Filtro de status (simulado baseado na data - se futuro = pendente)
       let statusMatch = true
@@ -100,11 +113,11 @@ const RelatoriosImproved = () => {
         if (statusFilter === "pending" && isPaid) statusMatch = false
       }
 
-      return dateMatch && descriptionMatch && categoryMatch && typeMatch && accountMatch && contactMatch && statusMatch
+      return dateMatch && descriptionMatch && categoryMatch && typeMatch && accountMatch && creditCardMatch && contactMatch && statusMatch
     })
 
     return filtered.sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
-  }, [transactions, filterMonth, categoryFilter, typeFilter, accountFilter, statusFilter, descriptionFilter])
+  }, [transactions, filterMonth, categoryFilter, typeFilter, accountFilter, creditCardFilter, contactFilter, statusFilter, descriptionFilter])
 
   // Calcular totais evitando dupla contagem de pagamento de fatura de cartão
   const totalIncome = filteredTransactions
@@ -344,12 +357,6 @@ const RelatoriosImproved = () => {
     })
   }
 
-  // Combinar contas e cartões para o filtro
-  const allAccounts = [
-    ...accounts.map(acc => ({ id: acc.id, name: acc.name, type: 'account' })),
-    ...creditCards.map(cc => ({ id: cc.id, name: cc.name, type: 'credit_card' }))
-  ]
-
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
@@ -381,12 +388,13 @@ const RelatoriosImproved = () => {
               <div className="flex items-center gap-2">
                 <Filter className="h-5 w-5" />
                 <CardTitle>Filtros de Relatório</CardTitle>
-                {hasActiveFilters && (
+              {hasActiveFilters && (
                   <Badge variant="secondary" className="ml-2">
                     {[
                       categoryFilter !== "all" && "Categoria",
                       typeFilter !== "all" && "Tipo",
                       accountFilter !== "all" && "Conta",
+                      creditCardFilter !== "all" && "Cartão",
                       contactFilter !== "all" && "Responsável",
                       statusFilter !== "all" && "Status",
                       descriptionFilter && "Descrição"
@@ -403,7 +411,7 @@ const RelatoriosImproved = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
               {/* Filtro de Tipo */}
               <div className="space-y-2">
                 <Label>Filtro por Tipo</Label>
@@ -447,9 +455,27 @@ const RelatoriosImproved = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas as contas</SelectItem>
-                    {allAccounts.map(account => (
+                    {accounts.map(account => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.name} {account.type === 'credit_card' && '(Cartão)'}
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro de Cartão de Crédito */}
+              <div className="space-y-2">
+                <Label>Filtro por Cartão</Label>
+                <Select value={creditCardFilter} onValueChange={setCreditCardFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os cartões</SelectItem>
+                    {creditCards.map(card => (
+                      <SelectItem key={card.id} value={card.id}>
+                        {card.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -465,6 +491,7 @@ const RelatoriosImproved = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="me">Eu</SelectItem>
                     {contacts.map(contact => (
                       <SelectItem key={contact.id} value={contact.id}>
                         {contact.name}

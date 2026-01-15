@@ -32,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import Layout from "@/components/Layout"
 import { CreditCardInvoices } from "@/components/CreditCardInvoices"
+import { AccountTransactions } from "@/components/AccountTransactions"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from "@/components/ui/carousel"
 import { getBestPurchaseDay } from "@/hooks/useCreditCardInvoice"
 import { parseLocalDate } from "@/utils/dateUtils"
@@ -805,74 +806,11 @@ export default function ContasImproved() {
                               </div>
                             </div>
                             
-                            {/* Recent Transactions */}
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-sm font-medium">Transações Recentes</Label>
-                                {getAccountTransactions(account.id).length > 0 && (
-                                  <div className="flex items-center gap-2">
-                                    <Checkbox
-                                      id={`select-all-${account.id}`}
-                                      checked={getAccountTransactions(account.id).slice(0, 8).every(t => selectedTransactions.has(t.id))}
-                                      onCheckedChange={() => toggleAllTransactions(getAccountTransactions(account.id).slice(0, 8).map(t => t.id))}
-                                    />
-                                    <label htmlFor={`select-all-${account.id}`} className="text-xs text-muted-foreground cursor-pointer">
-                                      Selecionar todas
-                                    </label>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="space-y-2 max-h-80 overflow-y-auto rounded-lg border bg-muted/30 p-3">
-                                {getAccountTransactions(account.id).length > 0 ? (
-                                  getAccountTransactions(account.id).slice(0, 8).map((transaction) => {
-                                    const category = transaction.category_id ? 
-                                      (transactions.find(t => t.id === transaction.id) as any)?.categories?.name : 
-                                      '-'
-                                    const typeLabel = transaction.is_transfer ? 'Transferência' : 
-                                      transaction.type === 'income' ? 'Receita' : 'Despesa'
-                                    
-                                    return (
-                                      <div key={transaction.id} className={`p-3 rounded-md bg-background border hover:bg-accent/50 transition-colors ${selectedTransactions.has(transaction.id) ? 'ring-2 ring-primary' : ''}`}>
-                                        <div className="flex items-start gap-3">
-                                          <Checkbox
-                                            id={`transaction-${transaction.id}`}
-                                            checked={selectedTransactions.has(transaction.id)}
-                                            onCheckedChange={() => toggleTransactionSelection(transaction.id)}
-                                            className="mt-1"
-                                          />
-                                          <div className="flex-1 min-w-0 flex justify-between items-start gap-3">
-                                            <div className="flex-1 min-w-0">
-                                              <p className="font-medium text-sm truncate">{transaction.description}</p>
-                                              <div className="flex flex-wrap gap-2 mt-1">
-                                              <p className="text-xs text-muted-foreground">
-                                                  {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
-                                                </p>
-                                                <Badge variant="outline" className="text-xs">
-                                                  {typeLabel}
-                                                </Badge>
-                                                {category && category !== '-' && (
-                                                  <Badge variant="secondary" className="text-xs">
-                                                    {category}
-                                                  </Badge>
-                                                )}
-                                              </div>
-                                            </div>
-                                            <p className={`font-bold text-sm whitespace-nowrap ${
-                                              transaction.type === 'income' ? 'text-green-600' : 
-                                              transaction.is_transfer ? 'text-blue-600' : 'text-red-600'
-                                            }`}>
-                                              {transaction.type === 'income' || transaction.is_transfer ? '+' : ''}{formatCurrency(Math.abs(transaction.amount))}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )
-                                  })
-                                ) : (
-                                  <p className="text-sm text-muted-foreground text-center py-4">Nenhuma transação encontrada</p>
-                                )}
-                              </div>
-                            </div>
+                            {/* Recent Transactions - Using AccountTransactions component */}
+                            <AccountTransactions 
+                              accountId={account.id} 
+                              accountName={account.name}
+                            />
                           </div>
                         </CardContent>
                       </Card>
