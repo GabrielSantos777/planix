@@ -9,52 +9,65 @@ export interface CategorySpending {
   categoryName: string;
   categoryType: 'income' | 'expense';
   categoryColor: string;
+  budgetName?: string;
   planned: number;
   actual: number;
   remaining: number;
   percentageUsed: number;
   percentageOfTotal: number;
+  transactions: Array<{
+    id: string;
+    description: string;
+    amount: number;
+    date: string;
+    type: string;
+  }>;
 }
 
 export const useBudgetAnalytics = (month: number, year: number, budgets: BudgetWithCategory[]) => {
   const { user } = useAuth();
 
-  // Fetch actual spending per category for the month
+  const budgetIds = budgets.map(b => b.id).sort().join(',');
+
   const { data: categorySpending = [], isLoading } = useQuery({
-    queryKey: ['budget-analytics', user?.id, month, year],
+    queryKey: ['budget-analytics', user?.id, month, year, budgetIds],
     queryFn: async () => {
       if (!user?.id || budgets.length === 0) return [];
 
-      // Get first and last day of the month
       const firstDay = new Date(year, month - 1, 1);
       const lastDay = new Date(year, month, 0);
 
       const { data: transactions, error } = await supabase
         .from('transactions')
-        .select('category_id, amount, type')
+        .select('id, category_id, amount, type, description, date')
         .eq('user_id', user.id)
         .gte('date', getLocalDateString(firstDay))
         .lte('date', getLocalDateString(lastDay));
 
       if (error) throw error;
 
-      // Group transactions by category
-      const spendingByCategory = transactions.reduce((acc, t) => {
-        if (!t.category_id) return acc;
-        if (!acc[t.category_id]) {
-          acc[t.category_id] = 0;
-        }
-        // For expenses, amount is negative, for income it's positive
-        acc[t.category_id] += Math.abs(t.amount);
-        return acc;
-      }, {} as Record<string, number>);
+      const spendingByCategory: Record<string, number> = {};
+      const transactionsByCategory: Record<string, Array<{ id: string; description: string; amount: number; date: string; type: string }>> = {};
 
-      // Calculate totals
+      transactions.forEach(t => {
+        if (!t.category_id) return;
+        spendingByCategory[t.category_id] = (spendingByCategory[t.category_id] || 0) + Math.abs(t.amount);
+        if (!transactionsByCategory[t.category_id]) {
+          transactionsByCategory[t.category_id] = [];
+        }
+        transactionsByCategory[t.category_id].push({
+          id: t.id,
+          description: t.description,
+          amount: t.amount,
+          date: t.date,
+          type: t.type,
+        });
+      });
+
       const totalPlanned = budgets
         .filter(b => b.category.type === 'expense')
         .reduce((sum, b) => sum + b.planned_amount, 0);
 
-      // Map budgets with actual spending
       const analytics: CategorySpending[] = budgets.map(budget => {
         const actual = spendingByCategory[budget.category_id] || 0;
         const remaining = budget.planned_amount - actual;
@@ -70,11 +83,13 @@ export const useBudgetAnalytics = (month: number, year: number, budgets: BudgetW
           categoryName: budget.category.name,
           categoryType: budget.category.type,
           categoryColor: budget.category.color,
+          budgetName: (budget as any).name || undefined,
           planned: budget.planned_amount,
           actual,
           remaining,
           percentageUsed,
           percentageOfTotal,
+          transactions: transactionsByCategory[budget.category_id] || [],
         };
       });
 
@@ -83,7 +98,6 @@ export const useBudgetAnalytics = (month: number, year: number, budgets: BudgetW
     enabled: !!user?.id && budgets.length > 0,
   });
 
-  // Calculate summary statistics
   const totalPlanned = categorySpending
     .filter(c => c.categoryType === 'expense')
     .reduce((sum, c) => sum + c.planned, 0);

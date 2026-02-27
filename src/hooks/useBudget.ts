@@ -10,6 +10,7 @@ export interface Budget {
   month: number;
   year: number;
   planned_amount: number;
+  name?: string;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -39,7 +40,6 @@ export const useBudget = (month: number, year: number) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch budgets for a specific month/year
   const { data: budgets = [], isLoading } = useQuery({
     queryKey: ['budgets', user?.id, month, year],
     queryFn: async () => {
@@ -62,7 +62,6 @@ export const useBudget = (month: number, year: number) => {
     enabled: !!user?.id,
   });
 
-  // Fetch budget settings
   const { data: settings } = useQuery({
     queryKey: ['budget-settings', user?.id],
     queryFn: async () => {
@@ -80,12 +79,10 @@ export const useBudget = (month: number, year: number) => {
     enabled: !!user?.id,
   });
 
-  // Create or update budget
   const upsertBudget = useMutation({
-    mutationFn: async (budget: Partial<Budget> & { category_id: string; month: number; year: number; planned_amount: number }) => {
+    mutationFn: async (budget: Partial<Budget> & { category_id: string; month: number; year: number; planned_amount: number; name?: string }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
-      // Check if budget already exists
       const { data: existingBudget } = await supabase
         .from('budgets')
         .select('id')
@@ -95,27 +92,27 @@ export const useBudget = (month: number, year: number) => {
         .eq('year', budget.year)
         .maybeSingle();
 
-      const budgetData = {
+      const budgetData: any = {
         user_id: user.id,
         category_id: budget.category_id,
         month: budget.month,
         year: budget.year,
         planned_amount: budget.planned_amount,
-        notes: budget.notes || undefined,
+        name: budget.name || null,
+        notes: budget.notes || null,
       };
 
       let data, error;
 
-      if (existingBudget) {
-        // Update existing budget
+      if (budget.id || existingBudget) {
+        const id = budget.id || existingBudget!.id;
         ({ data, error } = await supabase
           .from('budgets')
           .update(budgetData)
-          .eq('id', existingBudget.id)
+          .eq('id', id)
           .select()
           .single());
       } else {
-        // Insert new budget
         ({ data, error } = await supabase
           .from('budgets')
           .insert(budgetData)
@@ -127,7 +124,7 @@ export const useBudget = (month: number, year: number) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets', user?.id, month, year] });
       queryClient.invalidateQueries({ queryKey: ['budget-analytics'] });
       toast.success('Orçamento salvo com sucesso');
     },
@@ -137,7 +134,6 @@ export const useBudget = (month: number, year: number) => {
     },
   });
 
-  // Delete budget
   const deleteBudget = useMutation({
     mutationFn: async (budgetId: string) => {
       const { error } = await supabase
@@ -148,7 +144,7 @@ export const useBudget = (month: number, year: number) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets', user?.id, month, year] });
       queryClient.invalidateQueries({ queryKey: ['budget-analytics'] });
       toast.success('Orçamento removido');
     },
@@ -158,7 +154,6 @@ export const useBudget = (month: number, year: number) => {
     },
   });
 
-  // Copy budgets from previous month
   const copyFromPreviousMonth = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error('Usuário não autenticado');
@@ -166,10 +161,9 @@ export const useBudget = (month: number, year: number) => {
       const prevMonth = month === 1 ? 12 : month - 1;
       const prevYear = month === 1 ? year - 1 : year;
 
-      // Fetch previous month budgets
       const { data: prevBudgets, error: fetchError } = await supabase
         .from('budgets')
-        .select('category_id, planned_amount, notes')
+        .select('category_id, planned_amount, notes, name')
         .eq('user_id', user.id)
         .eq('month', prevMonth)
         .eq('year', prevYear);
@@ -179,14 +173,14 @@ export const useBudget = (month: number, year: number) => {
         throw new Error('Nenhum orçamento encontrado no mês anterior');
       }
 
-      // Insert new budgets for current month
-      const newBudgets = prevBudgets.map(b => ({
+      const newBudgets = prevBudgets.map((b: any) => ({
         user_id: user.id,
         category_id: b.category_id,
         month,
         year,
         planned_amount: b.planned_amount,
-        notes: b.notes || undefined,
+        notes: b.notes || null,
+        name: b.name || null,
       }));
 
       const { error: insertError } = await supabase
@@ -198,7 +192,8 @@ export const useBudget = (month: number, year: number) => {
       return newBudgets;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets', user?.id, month, year] });
+      queryClient.invalidateQueries({ queryKey: ['budget-analytics'] });
       toast.success('Orçamento copiado do mês anterior');
     },
     onError: (error: any) => {
@@ -207,7 +202,6 @@ export const useBudget = (month: number, year: number) => {
     },
   });
 
-  // Update budget settings
   const updateSettings = useMutation({
     mutationFn: async (newSettings: Partial<BudgetSettings>) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
