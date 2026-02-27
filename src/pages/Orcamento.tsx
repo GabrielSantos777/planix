@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, TrendingDown, TrendingUp, AlertCircle, Plus, ChevronLeft, ChevronRight, Settings, Copy, PieChart } from 'lucide-react';
+import { Calendar, AlertCircle, Plus, ChevronLeft, ChevronRight, Settings, Copy, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
 import { useBudget } from '@/hooks/useBudget';
 import { useBudgetAnalytics } from '@/hooks/useBudgetAnalytics';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
@@ -19,6 +19,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Cell, Pie, PieChart as RechartsPie, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { useCurrency } from '@/context/CurrencyContext';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -33,6 +36,7 @@ export default function Orcamento() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<any>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const { categories } = useSupabaseData();
   const { budgets, settings, isLoading, upsertBudget, deleteBudget, copyFromPreviousMonth, updateSettings } = useBudget(selectedMonth, selectedYear);
@@ -41,6 +45,7 @@ export default function Orcamento() {
   const [formData, setFormData] = useState({
     category_id: '',
     planned_amount: 0,
+    name: '',
     notes: '',
   });
 
@@ -81,10 +86,11 @@ export default function Orcamento() {
       month: selectedMonth,
       year: selectedYear,
       planned_amount: formData.planned_amount,
+      name: formData.name || undefined,
       notes: formData.notes || undefined,
     });
 
-    setFormData({ category_id: '', planned_amount: 0, notes: '' });
+    setFormData({ category_id: '', planned_amount: 0, name: '', notes: '' });
     setEditingBudget(null);
     setIsAddDialogOpen(false);
   };
@@ -94,6 +100,7 @@ export default function Orcamento() {
     setFormData({
       category_id: budget.category_id,
       planned_amount: Number(budget.planned_amount),
+      name: budget.name || '',
       notes: budget.notes || '',
     });
     setIsAddDialogOpen(true);
@@ -104,6 +111,18 @@ export default function Orcamento() {
     setIsSettingsDialogOpen(false);
   };
 
+  const toggleExpand = (categoryId: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  };
+
   const expenseCategories = categories.filter(c => c.type === 'expense');
   const incomeCategories = categories.filter(c => c.type === 'income');
 
@@ -111,7 +130,7 @@ export default function Orcamento() {
   const incomeSpending = categorySpending.filter(c => c.categoryType === 'income');
 
   const chartData = expenseSpending.map(c => ({
-    name: c.categoryName,
+    name: c.budgetName || c.categoryName,
     value: c.planned,
     color: c.categoryColor,
   }));
@@ -120,15 +139,162 @@ export default function Orcamento() {
   const savingsGoal = (summary.totalIncomeActual * (settings?.savings_goal_percentage || 20)) / 100;
   const savingsProgress = savingsGoal > 0 ? (savingsAmount / savingsGoal) * 100 : 0;
 
-  type SummaryType = typeof summary & {
-    totalRemaining: number;
-    percentageUsed: number;
-  };
-
-  const summaryWithCalculated: SummaryType = {
+  const summaryWithCalculated = {
     ...summary,
     totalRemaining: summary.totalPlanned - summary.totalActual,
     percentageUsed: summary.totalPlanned > 0 ? (summary.totalActual / summary.totalPlanned) * 100 : 0,
+  };
+
+  const renderBudgetTable = (spending: typeof categorySpending, type: 'expense' | 'income') => {
+    if (spending.length === 0) {
+      return (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Nenhum orçamento de {type === 'expense' ? 'despesa' : 'receita'} definido para este mês
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="py-3 px-4 text-left font-medium">Nome</th>
+                  <th className="py-3 px-4 text-left font-medium">Categoria</th>
+                  <th className="py-3 px-4 text-right font-medium">Planejado</th>
+                  <th className="py-3 px-4 text-right font-medium">Realizado</th>
+                  <th className="py-3 px-4 text-right font-medium">Restante</th>
+                  <th className="py-3 px-4 text-right font-medium">% Usado</th>
+                  <th className="py-3 px-4 text-center font-medium">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spending.map((row) => {
+                  const budget = budgets.find(b => b.category_id === row.categoryId);
+                  const isExpanded = expandedRows.has(row.categoryId);
+                  const displayName = row.budgetName || row.categoryName;
+
+                  return (
+                    <>
+                      <tr key={row.categoryId} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => toggleExpand(row.categoryId)}
+                            className="flex items-center gap-2 font-medium hover:text-primary transition-colors"
+                          >
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            <span>{displayName}</span>
+                          </button>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: row.categoryColor }} />
+                            {row.categoryName}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right font-medium">
+                          {formatCurrency(row.planned, selectedCurrency.code)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-medium">
+                          {formatCurrency(row.actual, selectedCurrency.code)}
+                        </td>
+                        <td className={`py-3 px-4 text-right font-medium ${row.remaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {formatCurrency(row.remaining, selectedCurrency.code)}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Progress 
+                              value={Math.min(row.percentageUsed, 100)} 
+                              className={`w-16 h-2 ${row.percentageUsed > 100 ? '[&>div]:bg-destructive' : ''}`}
+                            />
+                            <span className="text-xs w-12 text-right">
+                              {row.percentageUsed.toFixed(0)}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex justify-center gap-1">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => budget && handleEdit(budget)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => budget && deleteBudget.mutate(budget.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr key={`${row.categoryId}-details`}>
+                          <td colSpan={7} className="bg-muted/20 px-4 py-3">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold">
+                                  Transações de "{displayName}" neste mês
+                                </h4>
+                                <Badge variant={row.transactions.length > 0 ? 'default' : 'secondary'}>
+                                  {row.transactions.length} transaç{row.transactions.length === 1 ? 'ão' : 'ões'}
+                                </Badge>
+                              </div>
+                              {row.transactions.length === 0 ? (
+                                <p className="text-sm text-muted-foreground py-2">Nenhuma transação registrada nesta categoria.</p>
+                              ) : (
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b">
+                                        <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Data</th>
+                                        <th className="py-2 px-3 text-left text-xs font-medium text-muted-foreground">Descrição</th>
+                                        <th className="py-2 px-3 text-right text-xs font-medium text-muted-foreground">Valor</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {row.transactions
+                                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                        .map((t) => (
+                                          <tr key={t.id} className="border-b last:border-0">
+                                            <td className="py-2 px-3 text-xs">
+                                              {format(new Date(t.date + 'T00:00:00'), 'dd/MM/yyyy')}
+                                            </td>
+                                            <td className="py-2 px-3 text-xs">{t.description}</td>
+                                            <td className={`py-2 px-3 text-xs text-right font-medium ${t.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                              {formatCurrency(Math.abs(t.amount), selectedCurrency.code)}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot>
+                                      <tr className="border-t font-medium">
+                                        <td colSpan={2} className="py-2 px-3 text-xs">Total</td>
+                                        <td className="py-2 px-3 text-xs text-right font-bold">
+                                          {formatCurrency(row.actual, selectedCurrency.code)}
+                                        </td>
+                                      </tr>
+                                    </tfoot>
+                                  </table>
+                                </div>
+                              )}
+                              {budget?.notes && (
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  <span className="font-medium">Obs:</span> {budget.notes}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
@@ -145,9 +311,9 @@ export default function Orcamento() {
           <div className="flex flex-wrap gap-2">
             <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="sm:size-icon">
+                <Button variant="outline" size="sm">
                   <Settings className="h-4 w-4" />
-                  <span className="sm:hidden ml-2">Configurações</span>
+                  <span className="hidden sm:inline ml-2">Configurações</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -188,13 +354,19 @@ export default function Orcamento() {
                 </div>
               </DialogContent>
             </Dialog>
-            <Button onClick={() => copyFromPreviousMonth.mutate()} variant="outline" size="sm" className="flex-shrink-0">
+            <Button onClick={() => copyFromPreviousMonth.mutate()} variant="outline" size="sm">
               <Copy className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Copiar Mês Anterior</span>
             </Button>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+              setIsAddDialogOpen(open);
+              if (!open) {
+                setEditingBudget(null);
+                setFormData({ category_id: '', planned_amount: 0, name: '', notes: '' });
+              }
+            }}>
               <DialogTrigger asChild>
-                <Button size="sm" className="flex-shrink-0">
+                <Button size="sm">
                   <Plus className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Adicionar Orçamento</span>
                 </Button>
@@ -207,6 +379,14 @@ export default function Orcamento() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nome do Orçamento</Label>
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Ex: Alimentação do mês, Conta de luz..."
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label>Categoria</Label>
                     <Select
@@ -316,7 +496,7 @@ export default function Orcamento() {
               <CardTitle className="text-sm font-medium">Receita Prevista</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-success">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                 {formatCurrency(summary.totalIncomePlanned, selectedCurrency.code)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -344,7 +524,7 @@ export default function Orcamento() {
               <CardTitle className="text-sm font-medium">Saldo Restante</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${summaryWithCalculated.totalRemaining >= 0 ? 'text-success' : 'text-destructive'}`}>
+              <div className={`text-2xl font-bold ${summaryWithCalculated.totalRemaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                 {formatCurrency(summaryWithCalculated.totalRemaining, selectedCurrency.code)}
               </div>
               <Progress value={summaryWithCalculated.percentageUsed} className="mt-2" />
@@ -380,134 +560,27 @@ export default function Orcamento() {
           </Alert>
         )}
 
-        {/* Main Content */}
-        <Tabs defaultValue="expenses" className="space-y-4">
+        {/* Main Content - Default to table */}
+        <Tabs defaultValue="table" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="expenses">Despesas</TabsTrigger>
-            <TabsTrigger value="income">Receitas</TabsTrigger>
-            <TabsTrigger value="charts">Gráficos</TabsTrigger>
             <TabsTrigger value="table">Tabela</TabsTrigger>
+            <TabsTrigger value="charts">Gráficos</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="expenses" className="space-y-4">
-            {expenseSpending.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  Nenhum orçamento de despesa definido para este mês
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {expenseSpending.map((spending) => {
-                  const budget = budgets.find(b => b.category_id === spending.categoryId);
-                  return (
-                    <Card key={spending.categoryId} className="cursor-pointer hover:bg-accent/50" onClick={() => budget && handleEdit(budget)}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-4 h-4 rounded-full"
-                              style={{ backgroundColor: spending.categoryColor }}
-                            />
-                            <CardTitle className="text-lg">{spending.categoryName}</CardTitle>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm text-muted-foreground">
-                              {spending.percentageOfTotal.toFixed(1)}% do total
-                            </div>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-sm text-muted-foreground">Planejado</span>
-                            <div className="text-xl font-bold">
-                              {formatCurrency(spending.planned, selectedCurrency.code)}
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-sm text-muted-foreground">Realizado</span>
-                            <div className="text-xl font-bold text-destructive">
-                              {formatCurrency(spending.actual, selectedCurrency.code)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center pt-2 border-t">
-                          <span className="text-sm text-muted-foreground">Restante</span>
-                          <span className={`text-lg font-bold ${spending.remaining >= 0 ? 'text-success' : 'text-destructive'}`}>
-                            {formatCurrency(spending.remaining, selectedCurrency.code)}
-                          </span>
-                        </div>
-                        <Progress 
-                          value={Math.min(spending.percentageUsed, 100)} 
-                          className={spending.percentageUsed > 100 ? '[&>div]:bg-destructive' : ''}
-                        />
-                        <div className="text-xs text-muted-foreground text-right">
-                          {spending.percentageUsed.toFixed(1)}% utilizado
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </>
-            )}
-          </TabsContent>
+          <TabsContent value="table" className="space-y-6">
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <span className="text-destructive">●</span> Despesas
+              </h3>
+              {renderBudgetTable(expenseSpending, 'expense')}
+            </div>
 
-          <TabsContent value="income" className="space-y-4">
-            {incomeSpending.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  Nenhum orçamento de receita definido para este mês
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {incomeSpending.map((spending) => {
-                  const budget = budgets.find(b => b.category_id === spending.categoryId);
-                  return (
-                    <Card key={spending.categoryId} className="cursor-pointer hover:bg-accent/50" onClick={() => budget && handleEdit(budget)}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-4 h-4 rounded-full"
-                              style={{ backgroundColor: spending.categoryColor }}
-                            />
-                            <CardTitle className="text-lg">{spending.categoryName}</CardTitle>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-sm text-muted-foreground">Previsto</span>
-                            <div className="text-xl font-bold text-success">
-                              {formatCurrency(spending.planned, selectedCurrency.code)}
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-sm text-muted-foreground">Recebido</span>
-                            <div className="text-xl font-bold text-success">
-                              {formatCurrency(spending.actual, selectedCurrency.code)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center pt-2 border-t">
-                          <span className="text-sm text-muted-foreground">Diferença</span>
-                          <span className={`text-lg font-bold ${spending.actual >= spending.planned ? 'text-success' : 'text-destructive'}`}>
-                            {formatCurrency(spending.actual - spending.planned, selectedCurrency.code)}
-                          </span>
-                        </div>
-                        <Progress 
-                          value={spending.planned > 0 ? Math.min((spending.actual / spending.planned) * 100, 100) : 0} 
-                        />
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </>
-            )}
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <span className="text-green-600 dark:text-green-400">●</span> Receitas
+              </h3>
+              {renderBudgetTable(incomeSpending, 'income')}
+            </div>
           </TabsContent>
 
           <TabsContent value="charts" className="space-y-4">
@@ -562,7 +635,7 @@ export default function Orcamento() {
                         .filter(s => s.remaining < 0)
                         .map(s => (
                           <div key={s.categoryId} className="flex justify-between items-center">
-                            <span className="text-sm">{s.categoryName}</span>
+                            <span className="text-sm">{s.budgetName || s.categoryName}</span>
                             <span className="text-sm font-semibold text-destructive">
                               {formatCurrency(Math.abs(s.remaining), selectedCurrency.code)}
                             </span>
@@ -588,8 +661,8 @@ export default function Orcamento() {
                         .slice(0, 5)
                         .map(s => (
                           <div key={s.categoryId} className="flex justify-between items-center">
-                            <span className="text-sm">{s.categoryName}</span>
-                            <span className="text-sm font-semibold text-success">
+                            <span className="text-sm">{s.budgetName || s.categoryName}</span>
+                            <span className="text-sm font-semibold text-green-600 dark:text-green-400">
                               {formatCurrency(s.remaining, selectedCurrency.code)}
                             </span>
                           </div>
@@ -599,58 +672,6 @@ export default function Orcamento() {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="table" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Tabela de Orçamentos</CardTitle>
-                <CardDescription>Edite ou exclua orçamentos diretamente na tabela</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left">
-                        <th className="py-2 px-3">Categoria</th>
-                        <th className="py-2 px-3">Tipo</th>
-                        <th className="py-2 px-3 text-right">Planejado</th>
-                        <th className="py-2 px-3 text-right">Realizado</th>
-                        <th className="py-2 px-3 text-right">Restante</th>
-                        <th className="py-2 px-3 text-right">% Usado</th>
-                        <th className="py-2 px-3 text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {categorySpending.map((row) => {
-                        const budget = budgets.find(b => b.category_id === row.categoryId);
-                        return (
-                          <tr key={row.categoryId} className="border-t">
-                            <td className="py-2 px-3">
-                              <div className="flex items-center gap-2">
-                                <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: row.categoryColor }} />
-                                {row.categoryName}
-                              </div>
-                            </td>
-                            <td className="py-2 px-3 capitalize">{row.categoryType}</td>
-                            <td className="py-2 px-3 text-right">{formatCurrency(row.planned, selectedCurrency.code)}</td>
-                            <td className="py-2 px-3 text-right">{formatCurrency(row.actual, selectedCurrency.code)}</td>
-                            <td className={`py-2 px-3 text-right ${row.remaining >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(row.remaining, selectedCurrency.code)}</td>
-                            <td className="py-2 px-3 text-right">{row.percentageUsed.toFixed(0)}%</td>
-                            <td className="py-2 px-3">
-                              <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="outline" onClick={() => budget && handleEdit(budget)}>Editar</Button>
-                                <Button size="sm" variant="destructive" onClick={() => budget && deleteBudget.mutate(budget.id)}>Excluir</Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>
