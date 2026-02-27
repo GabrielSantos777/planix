@@ -182,6 +182,7 @@ export type Database = {
           created_at: string
           id: string
           month: number
+          name: string | null
           notes: string | null
           planned_amount: number
           updated_at: string
@@ -193,6 +194,7 @@ export type Database = {
           created_at?: string
           id?: string
           month: number
+          name?: string | null
           notes?: string | null
           planned_amount?: number
           updated_at?: string
@@ -204,6 +206,7 @@ export type Database = {
           created_at?: string
           id?: string
           month?: number
+          name?: string | null
           notes?: string | null
           planned_amount?: number
           updated_at?: string
