@@ -9,6 +9,18 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    headers: {
+      // Prevent browsers from sniffing content type
+      'X-Content-Type-Options': 'nosniff',
+      // Block rendering inside iframes (clickjacking protection)
+      'X-Frame-Options': 'DENY',
+      // Enable browser XSS filter
+      'X-XSS-Protection': '1; mode=block',
+      // Only send referrer to same origin
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      // Restrict browser features/APIs
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    },
   },
   plugins: [
     react(),
@@ -66,6 +78,19 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-popover', '@radix-ui/react-tabs', '@radix-ui/react-tooltip'],
+          'vendor-charts': ['recharts'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-export': ['jspdf', 'xlsx'],
+        },
+      },
     },
   },
 }));
