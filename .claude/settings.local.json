@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\FRIDAY\\\\Desktop\\\\planix\" -Recurse -Filter \"*.tsx\" -o Name)",
+      "Bash(Select-String -Pattern \"\\(Investimentos|Investment\\)\")",
+      "Bash(npm run *)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":5173\")",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(find /mnt/c/Users/FRIDAY/Desktop/planix -type f | head -100)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\FRIDAY\\\\Desktop\\\\planix\" -Recurse -Depth 4 | Where-Object { !$_.PSIsContainer } | Select-Object -ExpandProperty FullName)",
+      "PowerShell(netstat -ano)"
+    ]
+  }
+}
