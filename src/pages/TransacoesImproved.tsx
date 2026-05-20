@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+﻿import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
 import { 
@@ -16,7 +16,8 @@ import {
   Edit, 
   Trash2, 
   Search,
-  Filter,
+  SlidersHorizontal,
+  RotateCcw,
   TrendingUp,
   TrendingDown,
   ArrowUpDown,
@@ -29,7 +30,9 @@ import { useSearchParams, useNavigate } from "react-router-dom"
 import Layout from "@/components/Layout"
 import { CurrencyInput } from "@/components/ui/currency-input"
 import { useCurrency } from "@/context/CurrencyContext"
+import { EmptyState } from "@/components/EmptyState"
 import { getLocalDateString, getLocalDateForMonth, parseLocalDate } from "@/utils/dateUtils"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
 
@@ -52,13 +55,20 @@ const TransacoesImproved = () => {
     fetchAllData,
   } = useSupabaseData()
   const [searchParams] = useSearchParams()
+
+  const currentMonthValue = useMemo(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  }, [])
   
   const [filterType, setFilterType] = useState<string>("all")
   const [filterCategory, setFilterCategory] = useState<string>("all")
-  const [filterMonth, setFilterMonth] = useState<string>("all") // "all" or YYYY-MM format
+  const [filterMonth, setFilterMonth] = useState<string>(currentMonthValue) // "all" or YYYY-MM format
   const [filterContact, setFilterContact] = useState<string>("all")
   const [filterAccount, setFilterAccount] = useState<string>("all")
   const [filterCreditCard, setFilterCreditCard] = useState<string>("all")
+  const [searchText, setSearchText] = useState("")
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
@@ -98,34 +108,124 @@ const TransacoesImproved = () => {
     setNewTransaction(prev => ({ ...prev, payment_method: defaultPaymentMethod }))
   }, [accounts, creditCards])
 
-  const filteredTransactions = transactions.filter(transaction => {
-    // Ocultar a perna da transferência na conta de investimentos para evitar "duplicados"
-    if (
-      transaction.type === 'transfer' &&
-      transaction.account &&
-      (transaction.account.name === 'Investimentos' || transaction.account.type === 'investment')
-    ) {
-      return false
-    }
+  const filteredTransactions = useMemo(() => {
+    return transactions
+      .filter(transaction => {
+      // Ocultar a perna da transferência na conta de investimentos para evitar "duplicados"
+      if (
+        transaction.type === 'transfer' &&
+        transaction.account &&
+        (transaction.account.name === 'Investimentos' || transaction.account.type === 'investment')
+      ) {
+        return false
+      }
 
-    const matchesAccount = filterAccount === "all" || transaction.account_id === filterAccount
-    const matchesCreditCard = filterCreditCard === "all" || transaction.credit_card_id === filterCreditCard
-    const matchesType = filterType === "all" || transaction.type === filterType
-    const matchesCategory = filterCategory === "all" || transaction.category_id === filterCategory
-    const matchesContact = filterContact === "all" || 
-                          (filterContact === "me" && !transaction.contact_id) || 
-                          transaction.contact_id === filterContact
-    
-    // Filter by month (YYYY-MM) - only if not "all"
-    const transactionMonth = transaction.date.slice(0, 7) // Get YYYY-MM from date
-    const matchesMonth = filterMonth === "all" || transactionMonth === filterMonth
- 
-    return matchesType && matchesCategory && matchesMonth && matchesContact && matchesAccount && matchesCreditCard
-  })
+      const matchesAccount = filterAccount === "all" || transaction.account_id === filterAccount
+      const matchesCreditCard = filterCreditCard === "all" || transaction.credit_card_id === filterCreditCard
+      const matchesType = filterType === "all" || transaction.type === filterType
+      const matchesCategory = filterCategory === "all" || transaction.category_id === filterCategory
+      const matchesContact =
+        filterContact === "all" ||
+        (filterContact === "me" && !transaction.contact_id) ||
+        transaction.contact_id === filterContact
+
+      // Filter by month (YYYY-MM) - only if not "all"
+      const transactionMonth = transaction.date.slice(0, 7)
+      const matchesMonth = filterMonth === "all" || transactionMonth === filterMonth
+
+      // Search text filter
+      const matchesSearch =
+        searchText.trim() === "" ||
+        transaction.description?.toLowerCase().includes(searchText.toLowerCase()) ||
+        transaction.category?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
+        transaction.notes?.toLowerCase().includes(searchText.toLowerCase())
+
+        return matchesType && matchesCategory && matchesMonth && matchesContact && matchesAccount && matchesCreditCard && matchesSearch
+      })
+      .sort((a, b) => {
+        const byDate = parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
+        if (byDate !== 0) return byDate
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+  }, [
+    transactions,
+    filterAccount,
+    filterCreditCard,
+    filterType,
+    filterCategory,
+    filterContact,
+    filterMonth,
+    searchText,
+  ])
+
+  const monthOptions = useMemo(() => {
+    return Array.from({ length: 24 }, (_, i) => {
+      const date = new Date()
+      date.setDate(1)
+      date.setMonth(date.getMonth() - i)
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+      const label = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+      return {
+        value,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+      }
+    })
+  }, [])
+
+  const filteredTotal = useMemo(() => {
+    return filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0)
+  }, [filteredTransactions])
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (searchText.trim()) count += 1
+    if (filterType !== "all") count += 1
+    if (filterCategory !== "all") count += 1
+    if (filterContact !== "all") count += 1
+    if (filterAccount !== "all") count += 1
+    if (filterCreditCard !== "all") count += 1
+    if (filterMonth !== currentMonthValue) count += 1
+    return count
+  }, [
+    searchText,
+    filterType,
+    filterCategory,
+    filterContact,
+    filterAccount,
+    filterCreditCard,
+    filterMonth,
+    currentMonthValue,
+  ])
+
+  const clearFilters = () => {
+    setSearchText("")
+    setFilterType("all")
+    setFilterCategory("all")
+    setFilterContact("all")
+    setFilterAccount("all")
+    setFilterCreditCard("all")
+    setFilterMonth(currentMonthValue)
+    setShowAdvancedFilters(false)
+  }
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setIsDialogOpen(open)
+    if (!open) {
+      setEditingTransaction(null)
+    }
+  }
+
+  useEffect(() => {
+    const availableIds = new Set(filteredTransactions.map(t => t.id))
+    setSelectedTransactions(prev => {
+      const next = new Set([...prev].filter(id => availableIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [filteredTransactions])
 
   const handleAddTransaction = async () => {
     // Validação para transferência
-    if (newTransaction.type === "transfer") {
+    if (newTransaction.type === "transfer" && !editingTransaction) {
       if (!newTransaction.description || !newTransaction.amount) {
         toast({
           title: "Erro de Validação",
@@ -201,7 +301,7 @@ const TransacoesImproved = () => {
     }
     
     // Validation for normal transactions
-    if (!newTransaction.description || !newTransaction.amount || !newTransaction.category_id) {
+    if (!newTransaction.description || !newTransaction.amount || (newTransaction.type !== "transfer" && !newTransaction.category_id)) {
       toast({
         title: "Erro de Validação",
         description: "Por favor, preencha todos os campos obrigatórios.",
@@ -221,7 +321,7 @@ const TransacoesImproved = () => {
     }
 
     // Validate payment method selection
-    if (newTransaction.payment_method === "account" && !newTransaction.account_id) {
+    if (newTransaction.type !== "transfer" && newTransaction.payment_method === "account" && !newTransaction.account_id) {
       toast({
         title: "Erro de Validação",
         description: "Por favor, selecione uma conta bancária.",
@@ -230,7 +330,7 @@ const TransacoesImproved = () => {
       return
     }
 
-    if (newTransaction.payment_method === "credit_card" && !newTransaction.credit_card_id) {
+    if (newTransaction.type !== "transfer" && newTransaction.payment_method === "credit_card" && !newTransaction.credit_card_id) {
       toast({
         title: "Erro de Validação",
         description: "Por favor, selecione um cartão de crédito.",
@@ -274,7 +374,7 @@ const TransacoesImproved = () => {
         description: newTransaction.description,
         amount: newTransaction.type === "expense" ? -Math.abs(newTransaction.amount) : newTransaction.amount,
         type: newTransaction.type,
-        category_id: newTransaction.category_id,
+        category_id: newTransaction.type === "transfer" ? null : newTransaction.category_id,
         date: newTransaction.date,
         notes: newTransaction.notes,
         user_id: user?.id,
@@ -469,6 +569,14 @@ const TransacoesImproved = () => {
   }
 
   const handleEditTransaction = (transaction: any) => {
+    if (transaction.type === "transfer") {
+      toast({
+        title: "Edição indisponível para transferências",
+        description: "Para manter a consistência entre contas, exclua e lance a transferência novamente.",
+      })
+      return
+    }
+
     setEditingTransaction(transaction)
     setNewTransaction({
       description: transaction.description,
@@ -497,7 +605,6 @@ const TransacoesImproved = () => {
         try {
           const text = e.target?.result as string
           const lines = text.split('\n')
-          const headers = lines[0].split(',')
           
           // Process CSV data here
           toast({
@@ -518,23 +625,53 @@ const TransacoesImproved = () => {
 
   const handleExportPDF = () => {
     const doc = new jsPDF()
-    doc.setFontSize(16)
-    doc.text('Relatório de Transações', 20, 20)
+    doc.setFontSize(18)
+    doc.text('PLANIX - Relatório de Transações', 20, 20)
+    doc.setFontSize(10)
+    doc.setTextColor(120)
+    doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} · ${filteredTransactions.length} transações`, 20, 28)
+    doc.setTextColor(0)
     
-    let yPosition = 40
-    filteredTransactions.forEach((transaction, index) => {
-      if (yPosition > 270) {
+    // Summary
+    const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0)
+    const totalExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+    
+    doc.setFontSize(11)
+    doc.text(`Receitas: ${formatCurrency(totalIncome)}`, 20, 38)
+    doc.text(`Despesas: ${formatCurrency(totalExpense)}`, 20, 44)
+    doc.text(`Saldo: ${formatCurrency(totalIncome - totalExpense)}`, 20, 50)
+    
+    // Table header
+    let yPosition = 62
+    doc.setFontSize(9)
+    doc.setFont(undefined!, 'bold')
+    doc.text('Data', 20, yPosition)
+    doc.text('Descrição', 45, yPosition)
+    doc.text('Categoria', 105, yPosition)
+    doc.text('Valor', 155, yPosition)
+    doc.setFont(undefined!, 'normal')
+    yPosition += 8
+    
+    filteredTransactions.forEach((transaction) => {
+      if (yPosition > 275) {
         doc.addPage()
         yPosition = 20
       }
       
-      doc.setFontSize(10)
-      doc.text(`${transaction.description} - ${formatCurrency(transaction.amount)}`, 20, yPosition)
-      doc.text(`Categoria - ${parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}`, 20, yPosition + 5)
-      yPosition += 15
+      doc.setFontSize(8)
+      doc.text(parseLocalDate(transaction.date).toLocaleDateString('pt-BR'), 20, yPosition)
+      doc.text((transaction.description || '').substring(0, 30), 45, yPosition)
+      doc.text((transaction.category?.name || '-').substring(0, 20), 105, yPosition)
+      
+      const amountStr = formatCurrency(transaction.amount)
+      doc.setTextColor(transaction.type === 'income' ? 34 : 220, transaction.type === 'income' ? 139 : 38, transaction.type === 'income' ? 34 : 38)
+      doc.text(amountStr, 155, yPosition)
+      doc.setTextColor(0)
+      
+      yPosition += 6
     })
     
-    doc.save('transacoes.pdf')
+    doc.save('planix-transacoes.pdf')
     toast({
       title: "PDF Exportado",
       description: "Relatório em PDF foi baixado com sucesso",
@@ -547,8 +684,9 @@ const TransacoesImproved = () => {
           'Data': parseLocalDate(transaction.date).toLocaleDateString('pt-BR'),
           'Descrição': transaction.description,
           'Tipo': transaction.type === 'income' ? 'Receita' : transaction.type === 'expense' ? 'Despesa' : 'Transferência',
-          'Categoria': 'Categoria',
-          'Conta': 'Conta',
+          'Categoria': transaction.category?.name || 'Sem categoria',
+          'Conta': transaction.account?.name || transaction.credit_card?.name || '-',
+          'Responsável': transaction.contact?.name || 'Você',
           'Valor': transaction.amount,
           'Observações': transaction.notes || ''
         }))
@@ -589,13 +727,8 @@ const TransacoesImproved = () => {
     }
   }
 
-  // Mostrar todas as categorias disponíveis para cada tipo de transação
-  // mas priorizar as do tipo correto
   const incomeCategories = categories.filter(cat => cat.type === 'income')
   const expenseCategories = categories.filter(cat => cat.type === 'expense')
-  
-  // Para permitir flexibilidade, mostrar todas as categorias na seleção
-  const allCategoriesForSelection = categories
 
   return (
     <Layout>
@@ -683,99 +816,165 @@ const TransacoesImproved = () => {
         </div>
 
         {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Filtros</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="border-primary/20">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os tipos</SelectItem>
-                      <SelectItem value="income">Receitas</SelectItem>
-                      <SelectItem value="expense">Despesas</SelectItem>
-                      <SelectItem value="transfer">Transferências</SelectItem>
-                    </SelectContent>
-                </Select>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filtros
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm mt-1">
+                  A visualização inicia no mês atual. Se quiser, altere para todos os meses.
+                </CardDescription>
               </div>
-              <div>
-                <Select value={filterCategory} onValueChange={setFilterCategory}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as categorias</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Select value={filterCreditCard} onValueChange={setFilterCreditCard}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Cartão" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os cartões</SelectItem>
-                    {creditCards.map((card) => (
-                      <SelectItem key={card.id} value={card.id}>
-                        {card.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Select value={filterMonth} onValueChange={setFilterMonth}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Mês" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os meses</SelectItem>
-                    {Array.from({ length: 12 }, (_, i) => {
-                      const date = new Date()
-                      date.setMonth(date.getMonth() - i)
-                      const monthValue = date.toISOString().slice(0, 7)
-                      const monthLabel = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-                      return (
-                        <SelectItem key={monthValue} value={monthValue}>
-                          {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Select value={filterContact} onValueChange={setFilterContact}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os responsáveis</SelectItem>
-                    <SelectItem value="me">Você</SelectItem>
-                    {contacts.map((contact) => (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        {contact.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={activeFilterCount > 0 ? "default" : "secondary"} className="h-8">
+                  {activeFilterCount} filtro(s) ativo(s)
+                </Badge>
+                <Button
+                  variant={filterMonth === currentMonthValue ? "default" : "outline"}
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setFilterMonth(currentMonthValue)}
+                >
+                  <Calendar className="h-4 w-4" />
+                  Mês atual
+                </Button>
+                <Button
+                  variant={filterMonth === "all" ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterMonth("all")}
+                >
+                  Todos os meses
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2"
+                  onClick={clearFilters}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Limpar
+                </Button>
               </div>
             </div>
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="relative lg:col-span-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por descrição, categoria ou observação..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={filterMonth} onValueChange={setFilterMonth}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={currentMonthValue}>Mês atual</SelectItem>
+                  <SelectItem value="all">Todos os meses</SelectItem>
+                  {monthOptions.filter((month) => month.value !== currentMonthValue).map((month) => (
+                    <SelectItem key={month.value} value={month.value}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  <SelectItem value="income">Receitas</SelectItem>
+                  <SelectItem value="expense">Despesas</SelectItem>
+                  <SelectItem value="transfer">Transferências</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as categorias</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Collapsible open={showAdvancedFilters} onOpenChange={setShowAdvancedFilters}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                  {showAdvancedFilters ? "Ocultar filtros avançados" : "Mostrar filtros avançados"}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <Select value={filterAccount} onValueChange={setFilterAccount}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as contas</SelectItem>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={filterCreditCard} onValueChange={setFilterCreditCard}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Cartão" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os cartões</SelectItem>
+                      {creditCards.map((card) => (
+                        <SelectItem key={card.id} value={card.id}>
+                          {card.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={filterContact} onValueChange={setFilterContact}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os responsáveis</SelectItem>
+                      <SelectItem value="me">Você</SelectItem>
+                      {contacts.map((contact) => (
+                        <SelectItem key={contact.id} value={contact.id}>
+                          {contact.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            <div className="pt-2 flex items-center justify-between border-t text-sm">
+              <p className="text-muted-foreground">
                 {filteredTransactions.length} transação(ões) encontrada(s)
               </p>
-              <div className="text-sm font-medium">
-                Total: {formatCurrency(filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0))}
+              <div className="font-medium">
+                Saldo filtrado: {formatCurrency(filteredTotal)}
               </div>
             </div>
           </CardContent>
@@ -806,12 +1005,18 @@ const TransacoesImproved = () => {
           </CardHeader>
           <CardContent className="p-0 sm:p-6">
             {filteredTransactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <h3 className="text-lg font-medium mb-2">Nenhuma transação encontrada</h3>
-                <p className="text-muted-foreground mb-4">
-                  Adicione sua primeira transação para começar
-                </p>
-              </div>
+              <EmptyState
+                variant="transactions"
+                title="Nenhuma transação encontrada"
+                description={activeFilterCount > 0
+                  ? "Tente ajustar os filtros para encontrar o que procura."
+                  : "Adicione sua primeira transação para começar a controlar suas finanças."}
+                actionLabel={activeFilterCount === 0 ? "Nova Transação" : undefined}
+                onAction={activeFilterCount === 0 ? () => {
+                  setEditingTransaction(null)
+                  setIsDialogOpen(true)
+                } : undefined}
+              />
             ) : (
               <>
                 {/* Mobile View - Cards */}
@@ -858,6 +1063,8 @@ const TransacoesImproved = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => handleEditTransaction(transaction)}
+                              disabled={transaction.type === "transfer"}
+                              title={transaction.type === "transfer" ? "Exclua e recrie para ajustar transferências" : "Editar transação"}
                               className="h-7 w-7 p-0"
                             >
                               <Edit className="h-3 w-3" />
@@ -944,6 +1151,8 @@ const TransacoesImproved = () => {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleEditTransaction(transaction)}
+                                  disabled={transaction.type === "transfer"}
+                                  title={transaction.type === "transfer" ? "Exclua e recrie para ajustar transferências" : "Editar transação"}
                                   className="h-7 w-7 p-0"
                                 >
                                   <Edit className="h-3 w-3" />
@@ -970,8 +1179,8 @@ const TransacoesImproved = () => {
         </Card>
 
         {/* Add/Edit Transaction Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="w-[95vw] max-w-[525px] max-h-[90vh] overflow-y-auto mx-auto">
+        <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
+          <DialogContent className="w-[95vw] max-w-[620px] max-h-[90vh] overflow-y-auto mx-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingTransaction ? "Editar Transação" : "Nova Transação"}
@@ -984,8 +1193,8 @@ const TransacoesImproved = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="description">Descrição</Label>
                   <Input
