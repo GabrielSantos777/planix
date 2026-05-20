@@ -80,8 +80,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       )
     }
 
-    // Se a assinatura estiver expirada
-    if (hasActiveSubscription && profile?.subscription_end && new Date(profile.subscription_end) < new Date()) {
+    // Se a assinatura estiver expirada (tinha assinatura mas venceu)
+    if (!hasActiveSubscription && profile?.subscription_plan && profile.subscription_plan !== 'basic' && profile?.subscription_end) {
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
           <Card className="w-full max-w-md border-warning/20">

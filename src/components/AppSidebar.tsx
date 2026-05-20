@@ -13,7 +13,9 @@ import {
   Users,
   Share2,
   PieChart,
-  FileText
+  FileText,
+  Tags,
+  UserCircle
 } from "lucide-react"
 
 import { useSidebar } from "@/components/ui/sidebar"
@@ -46,15 +48,15 @@ const items = [
     url: "/metas", 
     icon: Target 
   },
-  { 
-    title: "Orçamento", 
-    url: "/orcamento", 
-    icon: PieChart 
+  {
+    title: "Orçamento",
+    url: "/orcamento",
+    icon: PieChart
   },
-  { 
-    title: "Relatórios", 
-    url: "/relatorios", 
-    icon: BarChart3 
+  {
+    title: "Relatórios",
+    url: "/relatorios",
+    icon: BarChart3
   },
   { 
     title: "Conexão", 
@@ -125,9 +127,7 @@ export function AppSidebar() {
           "fixed left-0 top-0 h-full bg-background border-r border-border z-50 shadow-lg",
           "transition-transform duration-300 ease-in-out",
           // Desktop: 250px de largura
-          "w-64 md:w-60 lg:w-64",
-          // Mobile: tela cheia
-          "sm:w-full",
+          "w-[85vw] max-w-[280px] sm:w-64 md:w-60 lg:w-64",
           // Animação de entrada
           "transform translate-x-0"
         )}
@@ -170,9 +170,11 @@ export function AppSidebar() {
                   to={item.url} 
                   end 
                   onClick={() => {
-                    // Fechar sidebar ao navegar em mobile
+                    // Fechar sidebar ao navegar
                     if (isMobile) {
                       setOpenMobile(false)
+                    } else {
+                      setOpen(false)
                     }
                   }}
                   className={({ isActive }) => 

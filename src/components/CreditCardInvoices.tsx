@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { ChevronDown, ChevronUp, Calendar, CreditCard, Edit, Info, Sparkles } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Edit, Sparkles, ChevronDown, ChevronUp, List } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useCurrency } from '@/context/CurrencyContext'
 import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { CreditCardInvoiceModal } from './CreditCardInvoiceModal'
 import { CreditCardInvoiceEditModal } from './CreditCardInvoiceEditModal'
+import { CreditCardTransactions } from './CreditCardTransactions'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/AuthContext'
 import { useCreditCardInvoice, getBestPurchaseDay } from '@/hooks/useCreditCardInvoice'
@@ -35,69 +36,38 @@ interface CreditCardInvoicesProps {
   dueDay: number
 }
 
+const statusConfig = {
+  paid:    { label: 'Paga',     className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300' },
+  partial: { label: 'Parcial',  className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300' },
+  closed:  { label: 'Fechada',  className: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300' },
+  overdue: { label: 'Vencida',  className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300' },
+  open:    { label: 'Aberta',   className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300' },
+}
+
 export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: CreditCardInvoicesProps) => {
   const { transactions, creditCards, addTransaction, creditCardInvoices, upsertCreditCardInvoice } = useSupabaseData()
   const { formatCurrency } = useCurrency()
   const { toast } = useToast()
   const { user } = useAuth()
-  
+
   const [selectedMonth, setSelectedMonth] = useState<string>('')
-  const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [txModalOpen, setTxModalOpen] = useState(false)
   const [invoiceToPayAmount, setInvoiceToPayAmount] = useState(0)
   const [currentEditingInvoice, setCurrentEditingInvoice] = useState<any>(null)
-  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set())
 
-  // Toggle transaction selection
-  const toggleTransactionSelection = (transactionId: string) => {
-    setSelectedTransactions(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(transactionId)) {
-        newSet.delete(transactionId)
-      } else {
-        newSet.add(transactionId)
-      }
-      return newSet
-    })
-  }
-
-  const toggleAllInvoiceTransactions = (transactionIds: string[]) => {
-    setSelectedTransactions(prev => {
-      const allSelected = transactionIds.every(id => prev.has(id))
-      if (allSelected) {
-        const newSet = new Set(prev)
-        transactionIds.forEach(id => newSet.delete(id))
-        return newSet
-      } else {
-        const newSet = new Set(prev)
-        transactionIds.forEach(id => newSet.add(id))
-        return newSet
-      }
-    })
-  }
-
-  // Usar o hook de faturas com a lógica correta
   const card = creditCards.find(c => c.id === cardId)
-  const { 
-    bestPurchaseDay, 
-    currentInvoiceData, 
-    allInvoices,
-    getInvoiceForPurchase 
-  } = useCreditCardInvoice(
-    card ? { ...card, closing_day: closingDay, due_day: dueDay } : null, 
+  const { bestPurchaseDay, currentInvoiceData, allInvoices } = useCreditCardInvoice(
+    card ? { ...card, closing_day: closingDay, due_day: dueDay } : null,
     transactions
   )
 
-  // Converter para o formato esperado pelo componente
-  const invoices = allInvoices.map(inv => {
-    // Verificar status no banco de dados
+  const invoices: MonthlyInvoice[] = allInvoices.map(inv => {
     const dbInvoice = creditCardInvoices.find(
-      dbInv => dbInv.credit_card_id === cardId && 
-               dbInv.month === inv.month && 
-               dbInv.year === inv.year
+      db => db.credit_card_id === cardId && db.month === inv.month && db.year === inv.year
     )
-    
     return {
       month: inv.month,
       year: inv.year,
@@ -105,27 +75,20 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
       total: inv.total,
       dueDate: inv.dueDate,
       closingDate: inv.closingDate,
-      status: (dbInvoice?.status || inv.status) as 'open' | 'closed' | 'paid' | 'partial' | 'overdue',
+      status: (dbInvoice?.status || inv.status) as MonthlyInvoice['status'],
       isCurrent: inv.isCurrent
     }
   })
 
-  // Encontrar a fatura atual baseada na lógica correta
-  const currentInvoice = invoices.find(inv => inv.isCurrent) || currentInvoiceData
+  const currentInvoice = invoices.find(inv => inv.isCurrent) || currentInvoiceData as any
+  const displayInvoice: MonthlyInvoice | undefined =
+    selectedMonth && selectedMonth !== 'current'
+      ? invoices.find(inv => `${inv.year}-${inv.month.toString().padStart(2, '0')}` === selectedMonth)
+      : currentInvoice
 
-  const displayInvoice = selectedMonth && selectedMonth !== 'current'
-    ? invoices.find(inv => `${inv.year}-${inv.month.toString().padStart(2, '0')}` === selectedMonth)
-    : currentInvoice
-
-  const handlePayInvoice = async (paymentData: {
-    account_id: string
-    payment_date: Date
-    amount: number
-  }) => {
+  const handlePayInvoice = async (paymentData: { account_id: string; payment_date: Date; amount: number }) => {
     if (!user || !displayInvoice) return
-    
     try {
-      // Create expense transaction for payment
       await addTransaction({
         description: `Pagamento Fatura ${cardName}`,
         amount: -Math.abs(paymentData.amount),
@@ -135,8 +98,6 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
         currency: 'BRL',
         user_id: user.id
       })
-
-      // Mark invoice as paid in database
       await upsertCreditCardInvoice({
         credit_card_id: cardId,
         month: displayInvoice.month,
@@ -146,30 +107,17 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
         status: paymentData.amount >= displayInvoice.total ? 'paid' : 'partial',
         payment_date: format(paymentData.payment_date, 'yyyy-MM-dd')
       })
-
-      toast({
-        title: "Sucesso",
-        description: "Pagamento da fatura registrado com sucesso!",
-      })
-      
+      toast({ title: "Pagamento registrado com sucesso!" })
       setPaymentModalOpen(false)
-    } catch (error) {
-      console.error('Error processing payment:', error)
-      toast({
-        title: "Erro",
-        description: "Erro ao processar pagamento. Tente novamente.",
-        variant: "destructive"
-      })
+    } catch {
+      toast({ title: "Erro ao processar pagamento", variant: "destructive" })
     }
   }
 
   const handleEditInvoice = (invoice: MonthlyInvoice) => {
-    const dbInvoice = creditCardInvoices.find(inv => 
-      inv.credit_card_id === cardId && 
-      inv.month === invoice.month && 
-      inv.year === invoice.year
+    const dbInvoice = creditCardInvoices.find(
+      inv => inv.credit_card_id === cardId && inv.month === invoice.month && inv.year === invoice.year
     )
-    
     setCurrentEditingInvoice({
       id: dbInvoice?.id,
       month: invoice.month,
@@ -197,113 +145,52 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
         payment_date: invoiceData.payment_date ? format(invoiceData.payment_date, 'yyyy-MM-dd') : undefined,
         notes: invoiceData.notes
       })
-
-      toast({
-        title: "Sucesso",
-        description: "Fatura atualizada com sucesso!",
-      })
-    } catch (error) {
-      console.error('Error saving invoice:', error)
-      toast({
-        title: "Erro",
-        description: "Erro ao salvar fatura. Tente novamente.",
-        variant: "destructive"
-      })
+      toast({ title: "Fatura atualizada com sucesso!" })
+    } catch {
+      toast({ title: "Erro ao salvar fatura", variant: "destructive" })
     }
   }
 
   const today = new Date()
   const currentDay = today.getDate()
   const isBeforeClosing = currentDay < closingDay
-  const isClosingDay = currentDay === closingDay
+  const sc = displayInvoice ? statusConfig[displayInvoice.status] || statusConfig.open : statusConfig.open
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return <Badge variant="default" className="bg-green-500">Paga</Badge>
-      case 'partial':
-        return <Badge variant="secondary">Parcial</Badge>
-      case 'closed':
-        return <Badge variant="outline">Fechada</Badge>
-      case 'overdue':
-        return <Badge variant="destructive">Vencida</Badge>
-      default:
-        return <Badge variant="outline" className="border-yellow-500 text-yellow-600">Aberta</Badge>
-    }
-  }
+  const visibleTransactions = displayInvoice
+    ? expanded
+      ? displayInvoice.transactions
+      : displayInvoice.transactions.slice(0, 6)
+    : []
+
+  // Group transactions by date for real-statement look
+  const groupedByDate = visibleTransactions.reduce((acc, t) => {
+    const key = t.date
+    if (!acc[key]) acc[key] = []
+    acc[key].push(t)
+    return acc
+  }, {} as Record<string, any[]>)
+
+  const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a))
 
   return (
     <TooltipProvider>
       <div className="space-y-4">
-        {/* Informações da lógica de faturas */}
-        <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Info className="h-4 w-4 text-primary" />
-            Informações do Cartão
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            <div className="space-y-1">
-              <span className="text-muted-foreground">Fechamento</span>
-              <p className="font-medium">Dia {closingDay}</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-muted-foreground">Vencimento</span>
-              <p className="font-medium">Dia {dueDay}</p>
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-yellow-500" />
-                <span className="text-muted-foreground">Melhor dia de compra</span>
-              </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <p className="font-medium text-green-600 cursor-help">Dia {bestPurchaseDay}</p>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Compras a partir do dia {bestPurchaseDay} terão o maior prazo para pagamento</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="space-y-1">
-              <span className="text-muted-foreground">Status hoje</span>
-              <p className="font-medium">
-                {isClosingDay ? (
-                  <span className="text-orange-500">Dia do fechamento</span>
-                ) : isBeforeClosing ? (
-                  <span className="text-blue-500">Fatura aberta</span>
-                ) : (
-                  <span className="text-green-500">Próxima fatura</span>
-                )}
-              </p>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            {isBeforeClosing 
-              ? `Compras até dia ${closingDay} entram na fatura atual. A partir do dia ${closingDay + 1}, entram na próxima.`
-              : `Compras de hoje em diante entram na fatura de ${format(new Date(today.getFullYear(), today.getMonth() + 1, 1), 'MMMM', { locale: ptBR })}.`
-            }
-          </p>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Faturas - {cardName}
-          </h3>
-          
+        {/* Invoice period selector */}
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Fatura</h3>
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[180px] h-8 text-sm">
               <SelectValue placeholder="Fatura Atual" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="current">Fatura Atual</SelectItem>
-              {invoices.map((invoice) => (
-                <SelectItem 
-                  key={`${invoice.year}-${invoice.month}`}
-                  value={`${invoice.year}-${invoice.month.toString().padStart(2, '0')}`}
+              {invoices.map((inv) => (
+                <SelectItem
+                  key={`${inv.year}-${inv.month}`}
+                  value={`${inv.year}-${inv.month.toString().padStart(2, '0')}`}
                 >
-                  {format(new Date(invoice.year, invoice.month, 1), 'MMMM yyyy', { locale: ptBR })}
-                  {invoice.isCurrent && ' (Atual)'}
+                  {format(new Date(inv.year, inv.month, 1), 'MMMM yyyy', { locale: ptBR })}
+                  {inv.isCurrent && ' ·  Atual'}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -311,162 +198,192 @@ export const CreditCardInvoices = ({ cardId, cardName, closingDay, dueDay }: Cre
         </div>
 
         {displayInvoice ? (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-lg">
-                    Fatura {format(new Date(displayInvoice.year, displayInvoice.month, 1), 'MMMM yyyy', { locale: ptBR })}
-                  </CardTitle>
-                  {displayInvoice.isCurrent && (
-                    <Badge variant="outline" className="text-xs">Atual</Badge>
-                  )}
+          <div className="rounded-xl border overflow-hidden">
+            {/* Statement Header */}
+            <div className="bg-muted/40 px-5 py-4">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">
+                      {format(new Date(displayInvoice.year, displayInvoice.month, 1), 'MMMM yyyy', { locale: ptBR })}
+                    </span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${sc.className}`}>
+                      {sc.label}
+                    </span>
+                    {displayInvoice.isCurrent && (
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Atual</span>
+                    )}
+                  </div>
+                  <p className="text-3xl font-bold">{formatCurrency(displayInvoice.total)}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(displayInvoice.status)}
-                  <Button 
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleEditInvoice(displayInvoice)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Editar
-                  </Button>
-                  {displayInvoice.status !== 'paid' && (
-                    <Button 
-                      size="sm"
-                      onClick={() => {
-                        setInvoiceToPayAmount(displayInvoice.total)
-                        setPaymentModalOpen(true)
-                      }}
-                    >
-                      Pagar Fatura
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <div className="text-2xl font-bold text-destructive">
-                  {formatCurrency(displayInvoice.total)}
-                </div>
-                <div className="text-right">
+
+                <div className="flex flex-col gap-1 text-right text-sm">
                   {displayInvoice.closingDate && (
-                    <p className="text-xs text-muted-foreground">
-                      Fecha em: {format(displayInvoice.closingDate, 'dd/MM/yyyy')}
+                    <p className="text-muted-foreground">
+                      Fechamento: <span className="font-medium text-foreground">
+                        {format(displayInvoice.closingDate, 'dd/MM/yyyy')}
+                      </span>
                     </p>
                   )}
-                  <p className="text-sm text-muted-foreground">
-                    Vencimento: {format(displayInvoice.dueDate, 'dd/MM/yyyy')}
+                  <p className="text-muted-foreground">
+                    Vencimento: <span className="font-semibold text-foreground">
+                      {format(displayInvoice.dueDate, 'dd/MM/yyyy')}
+                    </span>
                   </p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-muted-foreground flex items-center justify-end gap-1 cursor-help">
+                          <Sparkles className="h-3 w-3 text-amber-500" />
+                          Melhor compra:{' '}
+                          <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                            Dia {bestPurchaseDay}
+                          </span>
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Compras a partir do dia {bestPurchaseDay} têm o maior prazo para pagamento</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
-              </div>
-            </CardHeader>
-          
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="font-medium">
-                    {displayInvoice.transactions.length} transação(ões)
-                  </span>
-                  {displayInvoice.transactions.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id={`select-all-invoice-${displayInvoice.year}-${displayInvoice.month}`}
-                        checked={displayInvoice.transactions.every(t => selectedTransactions.has(t.id))}
-                        onCheckedChange={() => toggleAllInvoiceTransactions(displayInvoice.transactions.map(t => t.id))}
-                      />
-                      <label 
-                        htmlFor={`select-all-invoice-${displayInvoice.year}-${displayInvoice.month}`} 
-                        className="text-xs text-muted-foreground cursor-pointer"
-                      >
-                        Selecionar todas
-                      </label>
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setExpandedInvoice(
-                    expandedInvoice === `${displayInvoice.year}-${displayInvoice.month}` 
-                      ? null 
-                      : `${displayInvoice.year}-${displayInvoice.month}`
-                  )}
-                >
-                  {expandedInvoice === `${displayInvoice.year}-${displayInvoice.month}` ? (
-                    <>Mostrar menos <ChevronUp className="h-4 w-4 ml-1" /></>
-                  ) : (
-                    <>Ver todas <ChevronDown className="h-4 w-4 ml-1" /></>
-                  )}
-                </Button>
               </div>
 
-              <div className="space-y-2">
-                {(expandedInvoice === `${displayInvoice.year}-${displayInvoice.month}` 
-                  ? displayInvoice.transactions 
-                  : displayInvoice.transactions.slice(0, 5)
-                ).map((transaction) => (
-                  <div 
-                    key={transaction.id} 
-                    className={`flex items-center gap-3 p-2 border rounded transition-colors ${selectedTransactions.has(transaction.id) ? 'ring-2 ring-primary bg-primary/5' : ''}`}
-                  >
-                    <Checkbox
-                      id={`invoice-transaction-${transaction.id}`}
-                      checked={selectedTransactions.has(transaction.id)}
-                      onCheckedChange={() => toggleTransactionSelection(transaction.id)}
-                    />
-                    <div className="flex-1 flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{transaction.description}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {format(parseLocalDate(transaction.date), 'dd/MM/yyyy')}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-destructive">
-                          {formatCurrency(transaction.amount)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {!expandedInvoice && displayInvoice.transactions.length > 5 && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    +{displayInvoice.transactions.length - 5} transações...
-                  </p>
+              {/* Info strip */}
+              <div className="mt-3 pt-3 border-t border-border/50 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+                <span>Fechamento: <strong className="text-foreground">dia {closingDay}</strong></span>
+                <span>Vencimento: <strong className="text-foreground">dia {dueDay}</strong></span>
+                <span>
+                  {isBeforeClosing
+                    ? `Compras até dia ${closingDay} entram nesta fatura`
+                    : `Compras de hoje entram na próxima fatura`}
+                </span>
+              </div>
+            </div>
+
+            {/* Action row */}
+            <div className="flex items-center justify-between px-5 py-2.5 bg-background border-b flex-wrap gap-2">
+              <span className="text-xs text-muted-foreground">
+                {displayInvoice.transactions.length} lançamento{displayInvoice.transactions.length !== 1 ? 's' : ''}
+              </span>
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setTxModalOpen(true)}>
+                  <List className="h-3.5 w-3.5 mr-1" />
+                  Ver lançamentos
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleEditInvoice(displayInvoice)}>
+                  <Edit className="h-3.5 w-3.5 mr-1" />
+                  Editar fatura
+                </Button>
+                {displayInvoice.status !== 'paid' && (
+                  <Button size="sm" className="h-7 text-xs" onClick={() => { setInvoiceToPayAmount(displayInvoice.total); setPaymentModalOpen(true) }}>
+                    Pagar fatura
+                  </Button>
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="text-center py-8">
-            <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
-              Nenhuma fatura encontrada para o período selecionado
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
-      <CreditCardInvoiceModal
-        isOpen={paymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
-        invoiceAmount={invoiceToPayAmount}
-        cardName={cardName}
-        onPayment={handlePayInvoice}
-      />
+            {/* Transactions — real statement style */}
+            {displayInvoice.transactions.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+                Nenhum lançamento nesta fatura
+              </div>
+            ) : (
+              <div className="divide-y">
+                {sortedDates.map(dateKey => (
+                  <div key={dateKey}>
+                    <div className="px-5 py-2 bg-muted/20">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        {format(parseLocalDate(dateKey), "dd 'de' MMMM", { locale: ptBR })}
+                      </span>
+                    </div>
+                    {groupedByDate[dateKey].map((transaction: any) => (
+                      <div key={transaction.id} className="flex items-center justify-between px-5 py-3 hover:bg-muted/20 transition-colors">
+                        <div className="flex-1 min-w-0 mr-4">
+                          <p className="text-sm font-medium truncate">{transaction.description}</p>
+                          {transaction.category?.name && (
+                            <p className="text-xs text-muted-foreground">{transaction.category.name}</p>
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-destructive whitespace-nowrap">
+                          {formatCurrency(Math.abs(transaction.amount))}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
 
-      <CreditCardInvoiceEditModal
-        isOpen={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        invoice={currentEditingInvoice}
-        cardName={cardName}
-        onSave={handleSaveInvoice}
-      />
+            {/* Show more / less */}
+            {displayInvoice.transactions.length > 6 && (
+              <>
+                <Separator />
+                <div className="px-5 py-2.5 flex items-center justify-between">
+                  {!expanded && (
+                    <span className="text-xs text-muted-foreground">
+                      +{displayInvoice.transactions.length - 6} lançamentos ocultos
+                    </span>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs ml-auto"
+                    onClick={() => setExpanded(e => !e)}
+                  >
+                    {expanded ? (
+                      <><ChevronUp className="h-3.5 w-3.5 mr-1" />Mostrar menos</>
+                    ) : (
+                      <><ChevronDown className="h-3.5 w-3.5 mr-1" />Ver todos</>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* Statement footer — subtotal */}
+            {displayInvoice.transactions.length > 0 && (
+              <div className="flex items-center justify-between px-5 py-3 bg-muted/40 border-t font-medium">
+                <span className="text-sm">Total da Fatura</span>
+                <span className="text-sm font-bold">{formatCurrency(displayInvoice.total)}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+            Nenhuma fatura encontrada para o período selecionado
+          </div>
+        )}
+
+        <CreditCardInvoiceModal
+          isOpen={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          invoiceAmount={invoiceToPayAmount}
+          cardName={cardName}
+          onPayment={handlePayInvoice}
+        />
+
+        <CreditCardInvoiceEditModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          invoice={currentEditingInvoice}
+          cardName={cardName}
+          onSave={handleSaveInvoice}
+        />
+
+        {/* Transactions Modal */}
+        <Dialog open={txModalOpen} onOpenChange={setTxModalOpen}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Lançamentos — {cardName}</DialogTitle>
+            </DialogHeader>
+            <CreditCardTransactions
+              cardId={cardId}
+              cardName={cardName}
+              closingDay={closingDay}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   )

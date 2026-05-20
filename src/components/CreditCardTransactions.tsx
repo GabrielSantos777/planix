@@ -1,6 +1,4 @@
-import { useMemo, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useMemo, useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,7 +9,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useSupabaseData } from '@/hooks/useSupabaseData'
 import { useCurrency } from '@/context/CurrencyContext'
 import { TrendingDown, Edit, Trash2, User, Calendar } from 'lucide-react'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { parseLocalDate } from '@/utils/dateUtils'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useToast } from '@/hooks/use-toast'
@@ -28,522 +25,279 @@ interface CreditCardTransactionsProps {
 export const CreditCardTransactions = ({ cardId, cardName, closingDay, className }: CreditCardTransactionsProps) => {
   const { transactions, categories, contacts, updateTransaction, deleteTransaction } = useSupabaseData()
   const { formatCurrency } = useCurrency()
-  const isMobile = useIsMobile()
   const { toast } = useToast()
 
-  const [responsibleFilter, setResponsibleFilter] = useState("all")
-  const [monthFilter, setMonthFilter] = useState("all")
-  const [editingTransaction, setEditingTransaction] = useState<any>(null)
-  const [deletingTransaction, setDeletingTransaction] = useState<any>(null)
-  const [editForm, setEditForm] = useState({
-    description: '',
-    amount: 0,
-    date: '',
-    category_id: '',
-    contact_id: '',
-    notes: ''
-  })
+  const [responsibleFilter, setResponsibleFilter] = useState('all')
+  const [monthFilter, setMonthFilter] = useState('all')
+  const [monthInitialized, setMonthInitialized] = useState(false)
+  const [editingTx, setEditingTx] = useState<any>(null)
+  const [deletingTx, setDeletingTx] = useState<any>(null)
+  const [editForm, setEditForm] = useState({ description: '', amount: 0, date: '', category_id: '', contact_id: '' })
 
-  // Get invoice month for a transaction
-  const getInvoiceMonth = (transactionDate: Date) => {
-    let invoiceMonth, invoiceYear
-    if (transactionDate.getDate() >= closingDay) {
-      if (transactionDate.getMonth() === 11) {
-        invoiceMonth = 0
-        invoiceYear = transactionDate.getFullYear() + 1
-      } else {
-        invoiceMonth = transactionDate.getMonth() + 1
-        invoiceYear = transactionDate.getFullYear()
-      }
-    } else {
-      invoiceMonth = transactionDate.getMonth()
-      invoiceYear = transactionDate.getFullYear()
+  const getInvoiceMonth = (d: Date) => {
+    if (d.getDate() >= closingDay) {
+      const m = d.getMonth() === 11 ? 0 : d.getMonth() + 1
+      const y = d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear()
+      return { invoiceMonth: m, invoiceYear: y }
     }
-    return { invoiceMonth, invoiceYear }
+    return { invoiceMonth: d.getMonth(), invoiceYear: d.getFullYear() }
   }
 
-  // Get available invoice months from transactions
+  // Current invoice key
+  const currentInvoiceKey = useMemo(() => {
+    const now = new Date()
+    const { invoiceMonth, invoiceYear } = getInvoiceMonth(now)
+    return `${invoiceYear}-${invoiceMonth.toString().padStart(2, '0')}`
+  }, [closingDay])
+
   const availableInvoiceMonths = useMemo(() => {
     const months = new Map<string, { month: number; year: number }>()
-    
-    transactions
-      .filter(t => t.credit_card_id === cardId)
-      .forEach(t => {
-        const tDate = parseLocalDate(t.date)
-        const { invoiceMonth, invoiceYear } = getInvoiceMonth(tDate)
-        const key = `${invoiceYear}-${invoiceMonth.toString().padStart(2, '0')}`
-        if (!months.has(key)) {
-          months.set(key, { month: invoiceMonth, year: invoiceYear })
-        }
-      })
-    
-    return Array.from(months.entries())
-      .sort((a, b) => b[0].localeCompare(a[0]))
+    transactions.filter(t => t.credit_card_id === cardId).forEach(t => {
+      const d = parseLocalDate(t.date)
+      const { invoiceMonth, invoiceYear } = getInvoiceMonth(d)
+      const key = `${invoiceYear}-${invoiceMonth.toString().padStart(2, '0')}`
+      if (!months.has(key)) months.set(key, { month: invoiceMonth, year: invoiceYear })
+    })
+    return Array.from(months.entries()).sort((a, b) => b[0].localeCompare(a[0]))
   }, [transactions, cardId, closingDay])
 
-  const cardTransactions = useMemo(() => {
-    let filtered = transactions
+  useEffect(() => {
+    if (monthInitialized || availableInvoiceMonths.length === 0) return
+    const hasCurrentMonth = availableInvoiceMonths.some(([key]) => key === currentInvoiceKey)
+    setMonthFilter(hasCurrentMonth ? currentInvoiceKey : 'all')
+    setMonthInitialized(true)
+  }, [availableInvoiceMonths, monthInitialized, currentInvoiceKey])
+
+  const filtered = useMemo(() => {
+    let list = transactions
       .filter(t => t.credit_card_id === cardId)
       .sort((a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
-    
-    // Apply month filter (by invoice month)
-    if (monthFilter !== "all") {
-      const [year, month] = monthFilter.split('-').map(Number)
-      filtered = filtered.filter(t => {
-        const tDate = parseLocalDate(t.date)
-        const { invoiceMonth, invoiceYear } = getInvoiceMonth(tDate)
-        return invoiceMonth === month && invoiceYear === year
+
+    if (monthFilter !== 'all') {
+      const [y, m] = monthFilter.split('-').map(Number)
+      list = list.filter(t => {
+        const { invoiceMonth, invoiceYear } = getInvoiceMonth(parseLocalDate(t.date))
+        return invoiceMonth === m && invoiceYear === y
       })
     }
-    
-    // Apply responsible filter
-    if (responsibleFilter === "me") {
-      filtered = filtered.filter(t => t.contact_id === null)
-    } else if (responsibleFilter !== "all") {
-      filtered = filtered.filter(t => t.contact_id === responsibleFilter)
-    }
-    
-    return filtered
-  }, [transactions, cardId, responsibleFilter, monthFilter, closingDay])
+    if (responsibleFilter === 'me')       list = list.filter(t => !t.contact_id)
+    else if (responsibleFilter !== 'all') list = list.filter(t => t.contact_id === responsibleFilter)
+    return list
+  }, [transactions, cardId, monthFilter, responsibleFilter, closingDay])
 
-  // Calculate totals by responsible
-  const totalByResponsible = useMemo(() => {
-    const total = cardTransactions.reduce((sum, t) => sum + Math.abs(t.amount || 0), 0)
-    return total
-  }, [cardTransactions])
+  const total = useMemo(() => filtered.reduce((s, t) => s + Math.abs(t.amount || 0), 0), [filtered])
 
-  const getCategoryName = (categoryId: string | null) => {
-    if (!categoryId) return '-'
-    const category = categories.find(c => c.id === categoryId)
-    return category?.name || '-'
-  }
+  // Group by date
+  const groupedByDate = useMemo(() => {
+    const groups: Record<string, typeof filtered> = {}
+    filtered.forEach(t => {
+      if (!groups[t.date]) groups[t.date] = []
+      groups[t.date].push(t)
+    })
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
+  }, [filtered])
 
-  const getContactName = (contactId: string | null) => {
-    if (!contactId) return 'Eu'
-    const contact = contacts.find(c => c.id === contactId)
-    return contact?.name || '-'
-  }
+  const getCatName = (id: string | null) => categories.find(c => c.id === id)?.name || ''
+  const getContactName = (id: string | null) => id ? (contacts.find(c => c.id === id)?.name || '—') : 'Eu'
 
-  const handleEditClick = (transaction: any) => {
-    setEditingTransaction(transaction)
+  const openEdit = (tx: any) => {
+    setEditingTx(tx)
     setEditForm({
-      description: transaction.description,
-      amount: Math.abs(transaction.amount),
-      date: transaction.date,
-      category_id: transaction.category_id || '',
-      contact_id: transaction.contact_id || '',
-      notes: transaction.notes || ''
+      description: tx.description,
+      amount: Math.abs(tx.amount),
+      date: tx.date,
+      category_id: tx.category_id || '',
+      contact_id: tx.contact_id || '',
     })
   }
 
-  const handleDeleteClick = (transaction: any) => {
-    setDeletingTransaction(transaction)
-  }
-
-  const handleConfirmDelete = async () => {
-    if (!deletingTransaction) return
-
-    try {
-      await deleteTransaction(deletingTransaction.id)
-      toast({
-        title: "Sucesso",
-        description: "Transação excluída com sucesso!"
-      })
-      setDeletingTransaction(null)
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir transação",
-        variant: "destructive"
-      })
-    }
-  }
-
   const handleSaveEdit = async () => {
-    if (!editingTransaction) return
-
+    if (!editingTx) return
     try {
-      await updateTransaction(editingTransaction.id, {
+      await updateTransaction(editingTx.id, {
         description: editForm.description,
-        amount: -Math.abs(editForm.amount), // Credit card transactions are always expenses
+        amount: -Math.abs(editForm.amount),
         date: editForm.date,
         category_id: editForm.category_id || null,
         contact_id: editForm.contact_id || null,
-        notes: editForm.notes || null
       })
-
-      toast({
-        title: "Sucesso",
-        description: "Transação atualizada com sucesso!"
-      })
-      setEditingTransaction(null)
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar transação",
-        variant: "destructive"
-      })
+      toast({ title: 'Transação atualizada com sucesso!' })
+      setEditingTx(null)
+    } catch {
+      toast({ title: 'Erro ao atualizar transação', variant: 'destructive' })
     }
   }
 
-  const expenseCategories = categories.filter(c => c.type === 'expense')
-
-  const ResponsibleFilterText = () => {
-    if (responsibleFilter === "all") return "Todos os responsáveis"
-    if (responsibleFilter === "me") return "Eu"
-    const contact = contacts.find(c => c.id === responsibleFilter)
-    return contact?.name || "Responsável"
+  const handleDelete = async () => {
+    if (!deletingTx) return
+    try {
+      await deleteTransaction(deletingTx.id)
+      toast({ title: 'Transação excluída com sucesso!' })
+      setDeletingTx(null)
+    } catch {
+      toast({ title: 'Erro ao excluir transação', variant: 'destructive' })
+    }
   }
 
-  const MonthFilterText = () => {
-    if (monthFilter === "all") return "Todas as faturas"
-    const [year, month] = monthFilter.split('-').map(Number)
-    return format(new Date(year, month, 1), 'MMMM yyyy', { locale: ptBR })
-  }
+  const expenseCats = categories.filter(c => c.type === 'expense')
 
-  if (isMobile) {
-    return (
-      <>
-        <Card className={className}>
-          <CardHeader>
-            <CardTitle>Transações de {cardName}</CardTitle>
-            <CardDescription>
-              {cardTransactions.length} transação(ões) encontrada(s)
-            </CardDescription>
-            
-            {/* Filters */}
-            <div className="pt-2 space-y-3">
-              <div className="space-y-2">
-                <Label className="text-sm">Fatura</Label>
-                <Select value={monthFilter} onValueChange={setMonthFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as faturas</SelectItem>
-                    {availableInvoiceMonths.map(([key, { month, year }]) => (
-                      <SelectItem key={key} value={key}>
-                        {format(new Date(year, month, 1), 'MMMM yyyy', { locale: ptBR })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+  return (
+    <div className={className}>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 items-center mb-4">
+        <Select value={monthFilter} onValueChange={setMonthFilter}>
+          <SelectTrigger className="h-8 w-[170px] text-sm">
+            <Calendar className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+            <SelectValue placeholder="Todas as faturas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as faturas</SelectItem>
+            {availableInvoiceMonths.map(([key, { month, year }]) => (
+              <SelectItem key={key} value={key}>
+                {format(new Date(year, month, 1), 'MMMM yyyy', { locale: ptBR })}
+                {key === currentInvoiceKey && ' · Atual'}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {contacts.length > 0 && (
+          <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
+            <SelectTrigger className="h-8 w-[140px] text-sm">
+              <SelectValue placeholder="Responsável" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="me">Eu</SelectItem>
+              {contacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+
+        <span className="ml-auto text-sm text-muted-foreground">
+          {filtered.length} lançamento{filtered.length !== 1 ? 's' : ''} · <strong className="text-destructive">{formatCurrency(total)}</strong>
+        </span>
+      </div>
+
+      {/* Transaction list — statement style */}
+      {filtered.length === 0 ? (
+        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+          Nenhum lançamento encontrado
+        </div>
+      ) : (
+        <div className="rounded-xl border overflow-hidden">
+          {groupedByDate.map(([dateKey, txs], gi) => (
+            <div key={dateKey}>
+              <div className="px-4 py-2 bg-muted/30 border-b">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {format(parseLocalDate(dateKey), "dd 'de' MMMM", { locale: ptBR })}
+                </span>
               </div>
-              <div className="space-y-2">
-                <Label className="text-sm">Responsável</Label>
-                <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="me">Eu</SelectItem>
-                    {contacts.map(contact => (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        {contact.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {(responsibleFilter !== "all" || monthFilter !== "all") && (
-                <div className="text-sm font-medium text-primary">
-                  Total: {formatCurrency(totalByResponsible)}
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {cardTransactions.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                Nenhuma transação encontrada
-              </div>
-            ) : (
-              cardTransactions.map((transaction) => (
-                <Card key={transaction.id} className="p-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-medium">{transaction.description}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="text-destructive font-semibold">
-                          {formatCurrency(transaction.amount)}
-                        </div>
-                        <Button size="icon" variant="ghost" onClick={() => handleEditClick(transaction)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(transaction)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap justify-between items-center text-sm gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">{getCategoryName(transaction.category_id)}</span>
-                        <Badge variant="outline" className="text-xs">
-                          <User className="h-3 w-3 mr-1" />
-                          {getContactName(transaction.contact_id)}
+              {txs.map((tx, ti) => (
+                <div
+                  key={tx.id}
+                  className={`flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group ${ti < txs.length - 1 || gi < groupedByDate.length - 1 ? 'border-b border-border/50' : ''}`}
+                >
+                  <TrendingDown className="h-3.5 w-3.5 flex-shrink-0 text-destructive" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{tx.description}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {getCatName(tx.category_id) && (
+                        <span className="text-xs text-muted-foreground">{getCatName(tx.category_id)}</span>
+                      )}
+                      {tx.contact_id && (
+                        <Badge variant="outline" className="text-xs py-0 h-4 px-1">
+                          {getContactName(tx.contact_id)}
                         </Badge>
-                      </div>
+                      )}
                     </div>
                   </div>
-                </Card>
-              ))
-            )}
-          </CardContent>
-        </Card>
+                  <p className="text-sm font-semibold text-destructive whitespace-nowrap">
+                    −{formatCurrency(Math.abs(tx.amount))}
+                  </p>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(tx)}>
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeletingTx(tx)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+          {/* Footer total */}
+          <div className="flex items-center justify-between px-4 py-3 bg-muted/40 border-t">
+            <span className="text-sm font-medium">Total</span>
+            <span className="text-sm font-bold text-destructive">{formatCurrency(total)}</span>
+          </div>
+        </div>
+      )}
 
-        {/* Edit Dialog */}
-        <Dialog open={!!editingTransaction} onOpenChange={() => setEditingTransaction(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Transação</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Descrição</Label>
-                <Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
-              </div>
-              <div>
+      {/* Edit Dialog */}
+      <Dialog open={!!editingTx} onOpenChange={() => setEditingTx(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader><DialogTitle>Editar Lançamento</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>Descrição</Label>
+              <Input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
                 <Label>Valor</Label>
-                <CurrencyInput value={editForm.amount} onChange={(v) => setEditForm({ ...editForm, amount: v })} />
+                <CurrencyInput value={editForm.amount} onChange={v => setEditForm(f => ({ ...f, amount: v }))} />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label>Data</Label>
-                <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
+                <Input type="date" value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))} />
               </div>
-              <div>
-                <Label>Categoria</Label>
-                <Select value={editForm.category_id} onValueChange={(v) => setEditForm({ ...editForm, category_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    {expenseCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Categoria</Label>
+              <Select value={editForm.category_id} onValueChange={v => setEditForm(f => ({ ...f, category_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>{expenseCats.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {contacts.length > 0 && (
+              <div className="space-y-1.5">
                 <Label>Responsável</Label>
-                <Select value={editForm.contact_id || "me"} onValueChange={(v) => setEditForm({ ...editForm, contact_id: v === "me" ? "" : v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <Select value={editForm.contact_id || 'me'} onValueChange={v => setEditForm(f => ({ ...f, contact_id: v === 'me' ? '' : v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="me">Eu</SelectItem>
                     {contacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditingTransaction(null)}>Cancelar</Button>
-              <Button onClick={handleSaveEdit}>Salvar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete Confirmation */}
-        <AlertDialog open={!!deletingTransaction} onOpenChange={() => setDeletingTransaction(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-              <AlertDialogDescription>
-                Tem certeza que deseja excluir a transação "{deletingTransaction?.description}"? Esta ação não pode ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Excluir
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </>
-    )
-  }
-
-  return (
-    <>
-      <Card className={className}>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Transações de {cardName}</CardTitle>
-              <CardDescription>
-                {cardTransactions.length} transação(ões) encontrada(s)
-              </CardDescription>
-            </div>
-            
-            {/* Filters */}
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <Select value={monthFilter} onValueChange={setMonthFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Todas as faturas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as faturas</SelectItem>
-                    {availableInvoiceMonths.map(([key, { month, year }]) => (
-                      <SelectItem key={key} value={key}>
-                        {format(new Date(year, month, 1), 'MMMM yyyy', { locale: ptBR })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-sm whitespace-nowrap">Responsável:</Label>
-                <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="me">Eu</SelectItem>
-                    {contacts.map(contact => (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        {contact.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          
-          {(responsibleFilter !== "all" || monthFilter !== "all") && (
-            <div className="text-sm font-medium text-primary pt-2">
-              Total ({monthFilter !== "all" ? MonthFilterText() : ''} {responsibleFilter !== "all" ? ResponsibleFilterText() : ''}): {formatCurrency(totalByResponsible)}
-            </div>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Responsável</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="w-20">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cardTransactions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      Nenhuma transação encontrada
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  cardTransactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {parseLocalDate(transaction.date).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell>{transaction.description}</TableCell>
-                      <TableCell>{getCategoryName(transaction.category_id)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          <User className="h-3 w-3 mr-1" />
-                          {getContactName(transaction.contact_id)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <TrendingDown className="h-4 w-4 text-destructive" />
-                          <span className="text-destructive font-medium">
-                            {formatCurrency(transaction.amount)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => handleEditClick(transaction)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(transaction)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Edit Dialog */}
-      <Dialog open={!!editingTransaction} onOpenChange={() => setEditingTransaction(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Transação</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Descrição</Label>
-              <Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
-            </div>
-            <div>
-              <Label>Valor</Label>
-              <CurrencyInput value={editForm.amount} onChange={(v) => setEditForm({ ...editForm, amount: v })} />
-            </div>
-            <div>
-              <Label>Data</Label>
-              <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
-            </div>
-            <div>
-              <Label>Categoria</Label>
-              <Select value={editForm.category_id} onValueChange={(v) => setEditForm({ ...editForm, category_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {expenseCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Responsável</Label>
-              <Select value={editForm.contact_id || "me"} onValueChange={(v) => setEditForm({ ...editForm, contact_id: v === "me" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="me">Eu</SelectItem>
-                  {contacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingTransaction(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setEditingTx(null)}>Cancelar</Button>
             <Button onClick={handleSaveEdit}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deletingTransaction} onOpenChange={() => setDeletingTransaction(null)}>
+      {/* Delete Confirm */}
+      <AlertDialog open={!!deletingTx} onOpenChange={() => setDeletingTx(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir a transação "{deletingTransaction?.description}"? Esta ação não pode ser desfeita.
+              Excluir "{deletingTx?.description}"? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   )
 }
