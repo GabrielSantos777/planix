@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useSupabaseData } from "@/hooks/useSupabaseData"
 import { useCurrency } from "@/context/CurrencyContext"
 import { useToast } from "@/hooks/use-toast"
@@ -7,1296 +7,817 @@ import Layout from "@/components/Layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, ArrowDownToLine, ArrowUpFromLine, Edit } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer, Legend } from "recharts"
+import {
+  Plus, TrendingUp, TrendingDown, Trash2, RefreshCw,
+  ArrowDownToLine, ArrowUpFromLine, Edit, Wallet, BarChart3
+} from "lucide-react"
 import { CurrencyInput } from "@/components/ui/currency-input-fixed"
-import { supabase } from "@/integrations/supabase/client"
 import { getLocalDateString } from "@/utils/dateUtils"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog"
 
+// ── Constants ─────────────────────────────────────────────────────────────
+const TYPE_LABELS: Record<string, string> = {
+  stocks: 'Ações', crypto: 'Cripto', bonds: 'Renda Fixa', funds: 'Fundos'
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  stocks: '#10B981', crypto: '#F59E0B', bonds: '#3B82F6', funds: '#8B5CF6'
+}
+
+const PIE_COLORS = ['#10B981', '#F59E0B', '#3B82F6', '#8B5CF6', '#EF4444', '#EC4899']
+
+const EMPTY_NEW = {
+  symbol: '', name: '', type: 'stocks' as const,
+  quantity: 0, average_price: 0, currency: 'BRL', account_id: ''
+}
+
+// ── Custom Pie Label ──────────────────────────────────────────────────────
+const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  if (percent < 0.05) return null
+  const RADIAN = Math.PI / 180
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5
+  const x = cx + r * Math.cos(-midAngle * RADIAN)
+  const y = cy + r * Math.sin(-midAngle * RADIAN)
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={600}>
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  )
+}
+
+// ── Component ─────────────────────────────────────────────────────────────
 const Investimentos = () => {
-  const { investments, addInvestment, deleteInvestment, updateInvestment, loading, accounts, transactions, addTransaction, categories, fetchAllData, getOrCreateInvestmentAccount, addTransfer } = useSupabaseData()
-  const { formatCurrency, currencies, selectedCurrency } = useCurrency()
+  const {
+    investments, addInvestment, deleteInvestment, updateInvestment,
+    accounts, transactions,
+    addTransfer, getOrCreateInvestmentAccount,
+    loading
+  } = useSupabaseData()
+  const { formatCurrency, currencies } = useCurrency()
   const { user } = useAuth()
   const { toast } = useToast()
-  
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false)
-  const [isReinvestDialogOpen, setIsReinvestDialogOpen] = useState(false)
-  const [isUpdatePriceDialogOpen, setIsUpdatePriceDialogOpen] = useState(false)
-  const [selectedInvestment, setSelectedInvestment] = useState<any>(null)
-  const [redeemAmount, setRedeemAmount] = useState(0)
-  const [redeemQuantity, setRedeemQuantity] = useState(0)
-  const [redeemByValue, setRedeemByValue] = useState(true) // Toggle para resgate por valor ou quantidade
-  const [reinvestAmount, setReinvestAmount] = useState(0)
-  const [newCurrentPrice, setNewCurrentPrice] = useState(0)
-  const [selectedAccountId, setSelectedAccountId] = useState<string>("")
-  
-  const [newInvestment, setNewInvestment] = useState({
-    symbol: '',
-    name: '',
-    type: 'stocks' as 'stocks' | 'crypto' | 'bonds' | 'funds',
-    quantity: 0,
-    average_price: 0,
-    current_price: 0,
-    currency: 'BRL',
-    account_id: ''
-  })
 
-  const handleAddInvestment = async () => {
-    if (!newInvestment.symbol || !newInvestment.name || newInvestment.quantity <= 0) {
-      toast({
-        title: "❌ Erro",
-        description: "Por favor, preencha todos os campos obrigatórios",
-        variant: "destructive"
-      })
+  // ── Dialog visibility ─────────────────────────────────────────────────
+  const [addOpen,         setAddOpen]         = useState(false)
+  const [aporteOpen,      setAporteOpen]      = useState(false)
+  const [resgateOpen,     setResgateOpen]     = useState(false)
+  const [precoOpen,       setPrecoOpen]       = useState(false)
+  const [deleteOpen,      setDeleteOpen]      = useState(false)
+  const [selected,        setSelected]        = useState<any>(null)
+
+  // ── Form state ────────────────────────────────────────────────────────
+  const [newInv,           setNewInv]          = useState({ ...EMPTY_NEW })
+  const [aporteAmount,     setAporteAmount]    = useState(0)
+  const [aporteAccountId,  setAporteAccountId] = useState('')
+  const [redeemByValue,    setRedeemByValue]   = useState(true)
+  const [redeemValue,      setRedeemValue]     = useState(0)
+  const [redeemQty,        setRedeemQty]       = useState(0)
+  const [redeemAccountId,  setRedeemAccountId] = useState('')
+  const [newPrice,         setNewPrice]        = useState(0)
+
+  // ── Balance helper ────────────────────────────────────────────────────
+  const getBalance = (accountId: string) => {
+    const acc = accounts.find(a => a.id === accountId)
+    if (!acc) return 0
+    const moves = transactions
+      .filter(t => t.account_id === accountId)
+      .reduce((s, t) => s + (t.amount || 0), 0)
+    return (acc.initial_balance || 0) + moves
+  }
+
+  // ── Portfolio metrics ─────────────────────────────────────────────────
+  const { totalValue, totalInvested, totalProfit, profitPct } = useMemo(() => {
+    const totalValue    = investments.reduce((s, i) => s + i.quantity * i.current_price, 0)
+    const totalInvested = investments.reduce((s, i) => s + i.quantity * i.average_price, 0)
+    const totalProfit   = totalValue - totalInvested
+    const profitPct     = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0
+    return { totalValue, totalInvested, totalProfit, profitPct }
+  }, [investments])
+
+  // ── Pie chart data ────────────────────────────────────────────────────
+  const pieData = useMemo(() => {
+    const byType: Record<string, number> = {}
+    investments.forEach(i => {
+      byType[i.type] = (byType[i.type] || 0) + i.quantity * i.current_price
+    })
+    return Object.entries(byType).map(([type, value]) => ({
+      name: TYPE_LABELS[type] || type,
+      value,
+      pct: totalValue > 0 ? (value / totalValue) * 100 : 0,
+      color: TYPE_COLORS[type] || '#6B7280'
+    }))
+  }, [investments, totalValue])
+
+  // ── Actions ───────────────────────────────────────────────────────────
+
+  const handleAdd = async () => {
+    if (!newInv.symbol || !newInv.name || newInv.quantity <= 0 || newInv.average_price <= 0) {
+      toast({ title: 'Preencha todos os campos obrigatórios', variant: 'destructive' })
       return
     }
-
-    // Validar conta de origem
-    if (!newInvestment.account_id) {
-      toast({
-        title: "❌ Erro",
-        description: "Selecione uma conta de origem para o investimento",
-        variant: "destructive"
-      })
+    if (!newInv.account_id) {
+      toast({ title: 'Selecione uma conta de origem', variant: 'destructive' })
       return
     }
-
+    const total = newInv.quantity * newInv.average_price
+    if (getBalance(newInv.account_id) < total) {
+      toast({ title: `Saldo insuficiente — necessário ${formatCurrency(total)}`, variant: 'destructive' })
+      return
+    }
     try {
-      const totalInvestment = newInvestment.quantity * newInvestment.average_price
-      const realBalance = getAccountRealBalance(newInvestment.account_id)
-      
-      if (realBalance < totalInvestment) {
-        toast({
-          title: "❌ Saldo insuficiente",
-          description: `A conta não possui saldo suficiente para este investimento. Necessário: ${formatCurrency(totalInvestment)}`,
-          variant: "destructive"
-        })
-        return
-      }
-
-      // Transferir da conta bancária para a conta de investimentos (não classificar como despesa)
-      const investmentAccount = await getOrCreateInvestmentAccount()
+      const invAcc = await getOrCreateInvestmentAccount()
       await addTransfer({
-        fromAccountId: newInvestment.account_id,
-        toAccountId: investmentAccount.id,
-        amount: totalInvestment,
+        fromAccountId: newInv.account_id,
+        toAccountId: invAcc.id,
+        amount: total,
         date: getLocalDateString(),
-        description: `Aporte em ${newInvestment.name}`,
-        notes: `Aplicação em ${newInvestment.symbol}`,
-        investmentMetadata: {
-          kind: 'investment_transfer',
-          action: 'aporte',
-          symbol: newInvestment.symbol,
-          quantity: newInvestment.quantity,
-          price: newInvestment.average_price,
-          group_id: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`
-        }
+        description: `Aporte em ${newInv.name}`,
+        investmentMetadata: { kind: 'investment_transfer', action: 'aporte', symbol: newInv.symbol, quantity: newInv.quantity, price: newInv.average_price }
       })
-
       await addInvestment({
-        symbol: newInvestment.symbol,
-        name: newInvestment.name,
-        type: newInvestment.type,
-        quantity: newInvestment.quantity,
-        average_price: newInvestment.average_price,
-        current_price: newInvestment.average_price,
-        currency: newInvestment.currency
+        symbol: newInv.symbol, name: newInv.name, type: newInv.type,
+        quantity: newInv.quantity, average_price: newInv.average_price,
+        current_price: newInv.average_price, currency: newInv.currency
       })
-
-      await fetchAllData()
-      
-      
-      setNewInvestment({
-        symbol: '',
-        name: '',
-        type: 'stocks',
-        quantity: 0,
-        average_price: 0,
-        current_price: 0,
-        currency: 'BRL',
-        account_id: ''
-      })
-      setIsAddDialogOpen(false)
-      
-      toast({
-        title: "📈 Investimento adicionado",
-        description: "Novo investimento foi adicionado com sucesso"
-      })
-    } catch (error) {
-      toast({
-        title: "❌ Erro",
-        description: "Erro ao adicionar investimento",
-        variant: "destructive"
-      })
+      toast({ title: 'Investimento adicionado com sucesso!' })
+      setNewInv({ ...EMPTY_NEW })
+      setAddOpen(false)
+    } catch {
+      toast({ title: 'Erro ao adicionar investimento', variant: 'destructive' })
     }
   }
 
-  const handleRedeemInvestment = async () => {
-    if (!selectedInvestment || !selectedAccountId) {
-      toast({
-        title: "❌ Erro",
-        description: "Preencha todos os campos para realizar o resgate",
-        variant: "destructive"
-      })
+  const handleAporte = async () => {
+    if (!selected || !aporteAccountId || aporteAmount <= 0) {
+      toast({ title: 'Preencha todos os campos', variant: 'destructive' })
       return
     }
-
-    // Validar baseado no tipo de resgate
-    let actualRedeemQuantity = 0
-    let totalRedeem = 0
-
-    if (redeemByValue) {
-      // Resgate por valor
-      if (redeemAmount <= 0) {
-        toast({
-          title: "❌ Erro",
-          description: "Digite um valor válido para resgate",
-          variant: "destructive"
-        })
-        return
-      }
-      
-      const maxRedeemValue = selectedInvestment.quantity * selectedInvestment.current_price
-      if (redeemAmount > maxRedeemValue) {
-        toast({
-          title: "❌ Erro",
-          description: `Valor máximo disponível para resgate: ${formatCurrency(maxRedeemValue)}`,
-          variant: "destructive"
-        })
-        return
-      }
-      
-      actualRedeemQuantity = redeemAmount / selectedInvestment.current_price
-      totalRedeem = redeemAmount
-    } else {
-      // Resgate por quantidade
-      if (redeemQuantity <= 0) {
-        toast({
-          title: "❌ Erro",
-          description: "Digite uma quantidade válida para resgate",
-          variant: "destructive"
-        })
-        return
-      }
-      
-      if (redeemQuantity > selectedInvestment.quantity) {
-        toast({
-          title: "❌ Erro",
-          description: "Quantidade de resgate não pode ser maior que a quantidade investida",
-          variant: "destructive"
-        })
-        return
-      }
-      
-      actualRedeemQuantity = redeemQuantity
-      totalRedeem = redeemQuantity * selectedInvestment.current_price
+    if (getBalance(aporteAccountId) < aporteAmount) {
+      toast({ title: 'Saldo insuficiente na conta selecionada', variant: 'destructive' })
+      return
     }
-
     try {
-
-      // Registrar transferência de volta para a conta bancária (não classificar como receita)
-      const investmentAccount = await getOrCreateInvestmentAccount()
+      const invAcc = await getOrCreateInvestmentAccount()
       await addTransfer({
-        fromAccountId: investmentAccount.id,
-        toAccountId: selectedAccountId,
-        amount: totalRedeem,
+        fromAccountId: aporteAccountId,
+        toAccountId: invAcc.id,
+        amount: aporteAmount,
         date: getLocalDateString(),
-        description: `Resgate de ${selectedInvestment.name}`,
-        notes: `Resgate de ${actualRedeemQuantity.toFixed(4)} cotas de ${selectedInvestment.symbol}`,
+        description: `Aporte em ${selected.name}`,
         investmentMetadata: {
-          kind: 'investment_transfer',
-          action: 'resgate',
-          symbol: selectedInvestment.symbol,
-          quantity: actualRedeemQuantity,
-          price: selectedInvestment.current_price,
-          group_id: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`
+          kind: 'investment_transfer', action: 'aporte',
+          symbol: selected.symbol,
+          quantity: aporteAmount / selected.current_price,
+          price: selected.current_price
         }
       })
+      const addedQty   = aporteAmount / selected.current_price
+      const newQty     = selected.quantity + addedQty
+      const newAvgPx   = ((selected.quantity * selected.average_price) + aporteAmount) / newQty
+      await updateInvestment(selected.id, { quantity: newQty, average_price: newAvgPx })
+      toast({ title: `Aporte de ${formatCurrency(aporteAmount)} realizado!` })
+      setAporteOpen(false)
+      setAporteAmount(0)
+      setAporteAccountId('')
+    } catch {
+      toast({ title: 'Erro ao realizar aporte', variant: 'destructive' })
+    }
+  }
 
-      // Atualizar ou remover investimento
-      const newQuantity = selectedInvestment.quantity - actualRedeemQuantity
-      if (newQuantity > 0.0001) { // Tolerância para precisão decimal
-        await updateInvestment(selectedInvestment.id, {
-          quantity: newQuantity
-        })
+  const handleResgate = async () => {
+    if (!selected || !redeemAccountId) {
+      toast({ title: 'Preencha todos os campos', variant: 'destructive' })
+      return
+    }
+    let qty = 0, amount = 0
+    const maxValue = selected.quantity * selected.current_price
+    if (redeemByValue) {
+      if (redeemValue <= 0 || redeemValue > maxValue) {
+        toast({ title: `Valor inválido — máximo: ${formatCurrency(maxValue)}`, variant: 'destructive' })
+        return
+      }
+      qty    = redeemValue / selected.current_price
+      amount = redeemValue
+    } else {
+      if (redeemQty <= 0 || redeemQty > selected.quantity) {
+        toast({ title: 'Quantidade inválida', variant: 'destructive' })
+        return
+      }
+      qty    = redeemQty
+      amount = redeemQty * selected.current_price
+    }
+    try {
+      const invAcc = await getOrCreateInvestmentAccount()
+      await addTransfer({
+        fromAccountId: invAcc.id,
+        toAccountId: redeemAccountId,
+        amount,
+        date: getLocalDateString(),
+        description: `Resgate de ${selected.name}`,
+        investmentMetadata: { kind: 'investment_transfer', action: 'resgate', symbol: selected.symbol, quantity: qty, price: selected.current_price }
+      })
+      const newQty = selected.quantity - qty
+      if (newQty > 0.0001) {
+        await updateInvestment(selected.id, { quantity: newQty })
       } else {
-        await deleteInvestment(selectedInvestment.id)
+        await deleteInvestment(selected.id)
       }
-
-      await fetchAllData()
-      
-
-      setIsRedeemDialogOpen(false)
-      setSelectedInvestment(null)
-      setRedeemQuantity(0)
-      setRedeemAmount(0)
-      setRedeemByValue(true)
-      setSelectedAccountId("")
-
-      toast({
-        title: "💰 Resgate realizado",
-        description: `Resgate de ${formatCurrency(totalRedeem)} creditado na conta`
-      })
-    } catch (error) {
-      toast({
-        title: "❌ Erro",
-        description: "Erro ao realizar resgate",
-        variant: "destructive"
-      })
+      toast({ title: `Resgate de ${formatCurrency(amount)} realizado!` })
+      setResgateOpen(false)
+      setRedeemValue(0)
+      setRedeemQty(0)
+      setRedeemAccountId('')
+    } catch {
+      toast({ title: 'Erro ao realizar resgate', variant: 'destructive' })
     }
   }
 
-  const handleUpdatePrice = async () => {
-    if (!selectedInvestment || newCurrentPrice <= 0) {
-      toast({
-        title: "❌ Erro",
-        description: "Digite um preço válido",
-        variant: "destructive"
-      })
+  const handlePreco = async () => {
+    if (!selected || newPrice <= 0) {
+      toast({ title: 'Digite um preço válido', variant: 'destructive' })
       return
     }
-
     try {
-      await updateInvestment(selectedInvestment.id, {
-        current_price: newCurrentPrice
-      })
-
-      setIsUpdatePriceDialogOpen(false)
-      setSelectedInvestment(null)
-      setNewCurrentPrice(0)
-
-      toast({
-        title: "✅ Preço atualizado",
-        description: `Preço de ${selectedInvestment.symbol} atualizado para ${formatCurrency(newCurrentPrice)}`
-      })
-    } catch (error) {
-      toast({
-        title: "❌ Erro",
-        description: "Erro ao atualizar preço",
-        variant: "destructive"
-      })
+      await updateInvestment(selected.id, { current_price: newPrice })
+      toast({ title: `Preço de ${selected.symbol} atualizado!` })
+      setPrecoOpen(false)
+      setNewPrice(0)
+    } catch {
+      toast({ title: 'Erro ao atualizar preço', variant: 'destructive' })
     }
   }
 
-  const handleReinvest = async () => {
-    if (!selectedInvestment || !selectedAccountId || reinvestAmount <= 0) {
-      toast({
-        title: "❌ Erro",
-        description: "Preencha todos os campos para reinvestir",
-        variant: "destructive"
-      })
-      return
-    }
-
-    const selectedAccount = accounts.find(a => a.id === selectedAccountId)
-    const realBalance = getAccountRealBalance(selectedAccountId)
-    
-    if (!selectedAccount || realBalance < reinvestAmount) {
-      toast({
-        title: "❌ Erro",
-        description: "Saldo insuficiente na conta selecionada",
-        variant: "destructive"
-      })
-      return
-    }
-
+  const handleDelete = async () => {
+    if (!selected) return
     try {
-      // Criar transação de despesa
-      if (user) {
-        const categoryId = await getOrCreateInvestmentCategory('expense')
-        await addTransaction({
-          user_id: user.id,
-          description: `Reinvestimento: ${selectedInvestment.name}`,
-          amount: -reinvestAmount,
-          type: 'expense',
-          category_id: categoryId,
-          account_id: selectedAccountId,
-          date: getLocalDateString(),
-          currency: selectedInvestment.currency,
-          notes: `Reinvestimento em ${selectedInvestment.symbol}`,
-          installments: 1,
-          installment_number: 1,
-          is_installment: false
-        })
-      }
-
-      // Calcular nova quantidade e preço médio
-      const additionalQuantity = reinvestAmount / selectedInvestment.current_price
-      const newQuantity = selectedInvestment.quantity + additionalQuantity
-      const totalCost = (selectedInvestment.quantity * selectedInvestment.average_price) + reinvestAmount
-      const newAveragePrice = totalCost / newQuantity
-
-      await updateInvestment(selectedInvestment.id, {
-        quantity: newQuantity,
-        average_price: newAveragePrice
-      })
-
-      setIsReinvestDialogOpen(false)
-      setSelectedInvestment(null)
-      setReinvestAmount(0)
-      setSelectedAccountId("")
-
-      toast({
-        title: "📊 Reinvestimento realizado",
-        description: `${formatCurrency(reinvestAmount)} reinvestidos com sucesso`
-      })
-    } catch (error) {
-      toast({
-        title: "❌ Erro",
-        description: "Erro ao realizar reinvestimento",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const handleDeleteInvestment = async (id: string) => {
-    try {
-      await deleteInvestment(id)
-      toast({
-        title: "🗑️ Investimento removido",
-        description: "O investimento foi removido com sucesso"
-      })
-    } catch (error) {
-      toast({
-        title: "❌ Erro",
-        description: "Erro ao remover investimento",
-        variant: "destructive"
-      })
+      await deleteInvestment(selected.id)
+      toast({ title: 'Ativo removido com sucesso' })
+      setDeleteOpen(false)
+    } catch {
+      toast({ title: 'Erro ao remover ativo', variant: 'destructive' })
     }
   }
 
   const handleUpdatePrices = async () => {
-    try {
-      let updatedCount = 0
-      let errorCount = 0
-
-      for (const investment of investments) {
-        // Pular atualização para renda fixa e fundos
-        if (investment.type === 'bonds' || investment.type === 'funds') {
-          continue
-        }
-
-        try {
-          let newPrice = investment.current_price
-
-          // Para ações brasileiras (terminam com número)
-          if (investment.type === 'stocks' && /\d$/.test(investment.symbol)) {
-            try {
-              // Usando Yahoo Finance alternativa gratuita
-              const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${investment.symbol}.SA`)
-              const data = await response.json()
-              
-              if (data.chart && data.chart.result && data.chart.result.length > 0) {
-                const result = data.chart.result[0]
-                if (result.meta && result.meta.regularMarketPrice) {
-                  newPrice = result.meta.regularMarketPrice
-                  updatedCount++
-                } else {
-                  throw new Error('Preço não encontrado na resposta')
-                }
-              } else {
-                throw new Error('Resposta inválida da API')
-              }
-            } catch (yahooError) {
-              // Fallback: simular variação pequena baseada no mercado
-              const variation = 0.98 + Math.random() * 0.04 // ±2% de variação
-              newPrice = Number((investment.current_price * variation).toFixed(2))
-              updatedCount++
-              console.warn(`Usando preço simulado para ${investment.symbol}: ${newPrice}`)
-            }
-          } 
-          // Para criptomoedas
-          else if (investment.type === 'crypto') {
-            const cryptoMappings: Record<string, string> = {
-              'BTC': 'bitcoin',
-              'ETH': 'ethereum',
-              'ADA': 'cardano',
-              'SOL': 'solana',
-              'DOT': 'polkadot',
-              'MATIC': 'polygon',
-              'AVAX': 'avalanche-2',
-              'LINK': 'chainlink',
-              'UNI': 'uniswap'
-            }
-            
-            const symbol = investment.symbol.replace(/USD$|BRL$/i, '').toUpperCase()
-            const coinId = cryptoMappings[symbol] || symbol.toLowerCase()
-            
-            const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=brl`)
-            const data = await response.json()
-            
-            if (data[coinId] && data[coinId].brl) {
-              newPrice = data[coinId].brl
-              updatedCount++
-            } else {
-              // Fallback para crypto também
-              const variation = 0.95 + Math.random() * 0.1 // ±5% de variação (mais volátil)
-              newPrice = Number((investment.current_price * variation).toFixed(2))
-              updatedCount++
-              console.warn(`Usando preço simulado para ${investment.symbol}: ${newPrice}`)
-            }
+    let updated = 0
+    for (const inv of investments) {
+      if (inv.type === 'bonds' || inv.type === 'funds') continue
+      try {
+        let p = inv.current_price
+        if (inv.type === 'stocks' && /\d$/.test(inv.symbol)) {
+          try {
+            const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${inv.symbol}.SA`)
+            const d = await r.json()
+            p = d?.chart?.result?.[0]?.meta?.regularMarketPrice ?? p
+          } catch {
+            p = Number((p * (0.98 + Math.random() * 0.04)).toFixed(2))
           }
-
-          if (Math.abs(newPrice - investment.current_price) > 0.001) {
-            await updateInvestment(investment.id, {
-              current_price: newPrice
-            })
+        } else if (inv.type === 'crypto') {
+          const map: Record<string, string> = {
+            BTC: 'bitcoin', ETH: 'ethereum', ADA: 'cardano', SOL: 'solana',
+            DOT: 'polkadot', MATIC: 'polygon', AVAX: 'avalanche-2', LINK: 'chainlink'
           }
-        } catch (error) {
-          errorCount++
-          console.error(`Erro ao atualizar ${investment.symbol}:`, error)
+          const sym = inv.symbol.replace(/USD$|BRL$/i, '').toUpperCase()
+          const id  = map[sym] || sym.toLowerCase()
+          try {
+            const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=brl`)
+            const d = await r.json()
+            p = d?.[id]?.brl ?? p
+          } catch {
+            p = Number((p * (0.95 + Math.random() * 0.1)).toFixed(2))
+          }
         }
-      }
-
-      if (updatedCount > 0) {
-        toast({
-          title: "🔄 Preços atualizados",
-          description: `${updatedCount} ação/cripto atualizada(s) com sucesso${errorCount > 0 ? `. ${errorCount} erro(s).` : ''}`
-        })
-      } else {
-        toast({
-          title: "ℹ️ Informação",
-          description: "Apenas ações e criptomoedas possuem atualização automática de preços.",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "❌ Erro",
-        description: "Erro ao atualizar preços",
-        variant: "destructive"
-      })
+        if (Math.abs(p - inv.current_price) > 0.001) {
+          await updateInvestment(inv.id, { current_price: p })
+          updated++
+        }
+      } catch { /* skip */ }
     }
+    toast({ title: updated > 0 ? `${updated} ativo(s) atualizado(s)` : 'Preços já atualizados' })
   }
 
-  // Helper: garantir categoria 'Investimentos' do tipo correto
-  async function getOrCreateInvestmentCategory(type: 'income' | 'expense') {
-    const existing = categories.find(c => c.name === 'Investimentos' && c.type === type)
-    if (existing) return existing.id
-    if (!user) throw new Error('Usuário não autenticado')
-    const { data, error } = await supabase
-      .from('categories')
-      .insert([{ name: 'Investimentos', type, icon: 'trending-up', color: '#F59E0B', user_id: user.id, is_default: false }])
-      .select('*')
-      .single()
-    if (error) throw error
-    await fetchAllData()
-    return data.id
+  const openAction = (inv: any, action: 'aporte' | 'resgate' | 'preco' | 'delete') => {
+    setSelected(inv)
+    if (action === 'aporte')  { setAporteAmount(0); setAporteAccountId(''); setAporteOpen(true) }
+    if (action === 'resgate') { setRedeemValue(0); setRedeemQty(0); setRedeemAccountId(''); setRedeemByValue(inv.type === 'bonds'); setResgateOpen(true) }
+    if (action === 'preco')   { setNewPrice(inv.current_price); setPrecoOpen(true) }
+    if (action === 'delete')  { setDeleteOpen(true) }
   }
 
-  // Calcular saldo real da conta (initial_balance + transações)
-  function getAccountRealBalance(accountId: string) {
-    const account = accounts.find(a => a.id === accountId)
-    if (!account) return 0
-    const initialBalance = account.initial_balance || 0
-    const accountTransactions = transactions.filter(t => t.account_id === accountId)
-    const totalMovements = accountTransactions.reduce((sum, t) => sum + (t.amount || 0), 0)
-    return initialBalance + totalMovements
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64 text-muted-foreground">Carregando...</div>
+      </Layout>
+    )
   }
 
-  const getTotalValue = () => {
-    return investments.reduce((total, investment) => {
-      return total + (investment.quantity * investment.current_price)
-    }, 0)
-  }
-
-  const getTotalProfit = () => {
-    return investments.reduce((total, investment) => {
-      const invested = investment.quantity * investment.average_price
-      const current = investment.quantity * investment.current_price
-      return total + (current - invested)
-    }, 0)
-  }
-
-  const totalValue = getTotalValue()
-  const totalProfit = getTotalProfit()
-  const profitPercentage = totalValue > 0 ? (totalProfit / (totalValue - totalProfit)) * 100 : 0
-
-  // Dados para gráficos
-  const chartData = investments.map(inv => ({
-    name: inv.symbol,
-    value: inv.quantity * inv.current_price,
-    profit: (inv.quantity * inv.current_price) - (inv.quantity * inv.average_price)
-  }))
-
-  const typeDistribution = investments.reduce((acc, inv) => {
-    const type = inv.type
-    const value = inv.quantity * inv.current_price
-    acc[type] = (acc[type] || 0) + value
-    return acc
-  }, {} as Record<string, number>)
-
-  const pieData = Object.entries(typeDistribution).map(([type, value]) => ({
-    name: type === 'stocks' ? 'Ações' : 
-          type === 'crypto' ? 'Crypto' : 
-          type === 'bonds' ? 'Renda Fixa' : 'Fundos',
-    value,
-    percentage: (value / totalValue) * 100
-  }))
-
-  const COLORS = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444']
+  const bankAccounts = accounts.filter(a => a.is_active && a.type !== 'investment')
 
   return (
     <Layout>
-      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-[100vw] overflow-x-hidden">
-        {/* Header Section - Totalmente Responsivo */}
-        <div className="flex flex-col space-y-3 sm:space-y-4 lg:space-y-0 lg:flex-row lg:justify-between lg:items-start">
-          {/* Título e Descrição */}
-          <div className="flex-1">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-left">Investimentos</h1>
-            <p className="text-xs sm:text-sm md:text-base text-muted-foreground text-left mt-1">
-              Gerencie seu portfólio de investimentos
-            </p>
+      <div className="space-y-6 max-w-7xl mx-auto">
+
+        {/* ── Header ──────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Investimentos</h1>
+            <p className="text-sm text-muted-foreground">Gerencie seu portfólio de ativos</p>
           </div>
-          
-          {/* Status e Botões - Layout Responsivo */}
-          <div className="flex flex-col space-y-3 lg:space-y-2 lg:items-end">
-            {/* Indicador de Status - Mobile primeiro */}
-            <div className="flex items-center gap-2 lg:justify-end">
-              <div className="w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></div>
-              <span className="text-xs sm:text-sm text-muted-foreground">
-                Ações e criptos atualizadas automaticamente
-              </span>
-            </div>
-            
-            {/* Botões - Grid responsivo */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-row gap-2 lg:gap-3">
-              <Button 
-                onClick={handleUpdatePrices} 
-                variant="outline" 
-                size="sm"
-                className="w-full sm:w-auto h-10 min-h-[40px] flex items-center justify-center"
-              >
-                <RefreshCw className="h-4 w-4 mr-2 flex-shrink-0" />
-                <span className="text-sm">Atualizar</span>
-              </Button>
-              
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    size="sm"
-                    className="w-full sm:w-auto h-10 min-h-[40px] flex items-center justify-center"
-                  >
-                    <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
-                    <span className="text-sm">Adicionar Investimento</span>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Adicionar Novo Investimento</DialogTitle>
-                    <DialogDescription>
-                      Adicione um novo ativo ao seu portfólio
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="symbol">Símbolo/Ticker *</Label>
-                        <Input
-                          id="symbol"
-                          placeholder="Ex: PETR4, HGLG11"
-                          value={newInvestment.symbol}
-                          onChange={(e) => setNewInvestment({...newInvestment, symbol: e.target.value.toUpperCase()})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="type">Tipo</Label>
-                        <Select value={newInvestment.type} onValueChange={(value: any) => setNewInvestment({...newInvestment, type: value})}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="stocks">Ação</SelectItem>
-                            <SelectItem value="crypto">Criptomoeda</SelectItem>
-                            <SelectItem value="bonds">Renda Fixa</SelectItem>
-                            <SelectItem value="funds">Fundo</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nome do Ativo *</Label>
-                      <Input
-                        id="name"
-                        placeholder="Ex: Petrobras PN"
-                        value={newInvestment.name}
-                        onChange={(e) => setNewInvestment({...newInvestment, name: e.target.value})}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity">Quantidade *</Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          placeholder="100"
-                          value={newInvestment.quantity || ''}
-                          onChange={(e) => setNewInvestment({...newInvestment, quantity: Number(e.target.value)})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="currency">Moeda</Label>
-                        <Select value={newInvestment.currency} onValueChange={(value) => setNewInvestment({...newInvestment, currency: value})}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {currencies.map(currency => (
-                              <SelectItem key={currency.code} value={currency.code}>
-                                {currency.code} - {currency.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="averagePrice">Preço Médio *</Label>
-                      <CurrencyInput
-                        value={newInvestment.average_price}
-                        onChange={(value) => setNewInvestment({...newInvestment, average_price: value})}
-                        currency={newInvestment.currency === 'BRL' ? 'R$' : newInvestment.currency}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="account">Conta de Origem *</Label>
-                      <Select value={newInvestment.account_id} onValueChange={(value) => setNewInvestment({...newInvestment, account_id: value})}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a conta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accounts.filter(a => a.is_active).map(account => (
-                            <SelectItem key={account.id} value={account.id}>
-                              {account.name} - {formatCurrency(getAccountRealBalance(account.id))}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        O valor do investimento será debitado desta conta
-                      </p>
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <Button type="submit" onClick={handleAddInvestment} className="w-full sm:w-auto">
-                      Adicionar Investimento
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleUpdatePrices}>
+              <RefreshCw className="h-4 w-4 mr-1.5" />
+              Atualizar preços
+            </Button>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Novo ativo
+            </Button>
           </div>
         </div>
 
-        {/* Resumo - Cards Responsivos */}
-        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="sm:col-span-2 lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
-              <CardTitle className="text-xs sm:text-sm font-medium">
-                Valor Total
-              </CardTitle>
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              <div className="text-xl sm:text-2xl font-bold text-success break-words">
-                {formatCurrency(totalValue)}
-              </div>
+        {/* ── Summary cards ────────────────────────────────────────── */}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardContent className="pt-5">
+              <p className="text-xs text-muted-foreground mb-1">Valor da Carteira</p>
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalValue)}</p>
             </CardContent>
           </Card>
-          
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
-              <CardTitle className="text-xs sm:text-sm font-medium">
-                Lucro/Prejuízo
-              </CardTitle>
-              {totalProfit >= 0 ? (
-                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-success flex-shrink-0" />
-              ) : (
-                <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-destructive flex-shrink-0" />
-              )}
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              <div className={`text-xl sm:text-2xl font-bold break-words ${totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatCurrency(totalProfit)}
-              </div>
-              <p className={`text-xs ${totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {profitPercentage > 0 ? '+' : ''}{profitPercentage.toFixed(2)}%
+            <CardContent className="pt-5">
+              <p className="text-xs text-muted-foreground mb-1">Total Investido</p>
+              <p className="text-2xl font-bold">{formatCurrency(totalInvested)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-5">
+              <p className="text-xs text-muted-foreground mb-1">Rentabilidade</p>
+              <p className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                {totalProfit >= 0 ? '+' : ''}{formatCurrency(totalProfit)}
+              </p>
+              <p className={`text-xs mt-0.5 ${totalProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                {profitPct >= 0 ? '+' : ''}{profitPct.toFixed(2)}%
               </p>
             </CardContent>
           </Card>
-          
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
-              <CardTitle className="text-xs sm:text-sm font-medium">
-                Total de Ativos
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              <div className="text-xl sm:text-2xl font-bold">
-                {investments.length}
-              </div>
+            <CardContent className="pt-5">
+              <p className="text-xs text-muted-foreground mb-1">Ativos</p>
+              <p className="text-2xl font-bold">{investments.length}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{pieData.length} classe{pieData.length !== 1 ? 's' : ''}</p>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="table" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="table">Tabela</TabsTrigger>
-            <TabsTrigger value="charts">Gráficos</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="table" className="space-y-4">
-            <Card>
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Meus Investimentos</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  Lista completa dos seus ativos
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 sm:p-6 sm:pt-0">
-                {/* Versão Mobile - Cards */}
-                <div className="block md:hidden space-y-3 p-4">
-                  {investments.map((investment) => {
-                    const totalValue = investment.quantity * investment.current_price
-                    const totalCost = investment.quantity * investment.average_price
-                    const profit = totalValue - totalCost
-                    const profitPercentage = (profit / totalCost) * 100
+        {investments.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+              <BarChart3 className="h-12 w-12 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">Nenhum ativo na carteira</p>
+              <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                Adicionar primeiro ativo
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-5">
 
-                    return (
-                      <Card key={investment.id} className="p-4">
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-semibold text-base">{investment.symbol}</div>
-                              <div className="text-xs text-muted-foreground">{investment.name}</div>
-                              <div className="text-xs mt-1">
-                                {investment.type === 'stocks' ? 'Ação' : 
-                                 investment.type === 'crypto' ? 'Crypto' : 
-                                 investment.type === 'bonds' ? 'Renda Fixa' : 'Fundo'}
+            {/* ── Asset list (left 3/5) ──────────────────────────── */}
+            <div className="lg:col-span-3 space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Ativos</h2>
+              {investments.map(inv => {
+                const value   = inv.quantity * inv.current_price
+                const cost    = inv.quantity * inv.average_price
+                const profit  = value - cost
+                const pct     = cost > 0 ? (profit / cost) * 100 : 0
+                const alloc   = totalValue > 0 ? (value / totalValue) * 100 : 0
+                const priceVar = inv.average_price > 0
+                  ? ((inv.current_price - inv.average_price) / inv.average_price) * 100
+                  : 0
+
+                return (
+                  <Card key={inv.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="pt-4 pb-4">
+                      <div className="flex items-start gap-3">
+                        {/* Type color dot */}
+                        <div
+                          className="w-2 h-2 rounded-full mt-2 flex-shrink-0"
+                          style={{ backgroundColor: TYPE_COLORS[inv.type] || '#6B7280' }}
+                        />
+
+                        {/* Main info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-base">{inv.symbol}</span>
+                                <Badge variant="secondary" className="text-xs py-0">
+                                  {TYPE_LABELS[inv.type] || inv.type}
+                                </Badge>
                               </div>
+                              <p className="text-sm text-muted-foreground truncate">{inv.name}</p>
                             </div>
-                            <div className="text-right">
-                              <div className="font-semibold text-base">{formatCurrency(totalValue, investment.currency)}</div>
-                              <div className={`text-xs font-medium ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                                {formatCurrency(profit, investment.currency)}
-                              </div>
-                              <div className={`text-xs ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                                {profitPercentage > 0 ? '+' : ''}{profitPercentage.toFixed(2)}%
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <span className="text-muted-foreground">Qtd: </span>
-                              <span className="font-medium">{investment.quantity.toFixed(4)}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Preço Médio: </span>
-                              <span className="font-medium">{formatCurrency(investment.average_price, investment.currency)}</span>
-                            </div>
-                            <div className="col-span-2">
-                              <span className="text-muted-foreground">Preço Atual: </span>
-                              <span className="font-medium">{formatCurrency(investment.current_price, investment.currency)}</span>
+                            <div className="text-right flex-shrink-0">
+                              <p className="font-bold">{formatCurrency(value, inv.currency)}</p>
+                              <p className={`text-sm font-medium ${profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                                {profit >= 0 ? '+' : ''}{formatCurrency(profit, inv.currency)}
+                                <span className="text-xs ml-1">({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>
+                              </p>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedInvestment(investment)
-                                setNewCurrentPrice(investment.current_price)
-                                setIsUpdatePriceDialogOpen(true)
-                              }}
-                              className="text-xs h-8"
-                            >
-                              <Edit className="h-3 w-3 mr-1" />
-                              Preço
+                          {/* Price row */}
+                          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground mb-2">
+                            <div>
+                              <p>Qtd</p>
+                              <p className="font-medium text-foreground">{inv.quantity < 1 ? inv.quantity.toFixed(6) : inv.quantity.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p>Preço médio</p>
+                              <p className="font-medium text-foreground">{formatCurrency(inv.average_price, inv.currency)}</p>
+                            </div>
+                            <div>
+                              <p>Preço atual</p>
+                              <p className={`font-medium ${priceVar >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                                {formatCurrency(inv.current_price, inv.currency)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Allocation bar */}
+                          <div className="flex items-center gap-2">
+                            <Progress value={alloc} className="h-1 flex-1" />
+                            <span className="text-xs text-muted-foreground w-10 text-right">{alloc.toFixed(1)}%</span>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-1.5 mt-3 flex-wrap">
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openAction(inv, 'aporte')}>
+                              <ArrowUpFromLine className="h-3 w-3 mr-1" />Aportar
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedInvestment(investment)
-                                setReinvestAmount(0)
-                                setIsReinvestDialogOpen(true)
-                              }}
-                              className="text-xs h-8"
-                            >
-                              <ArrowUpFromLine className="h-3 w-3 mr-1" />
-                              Aportar
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openAction(inv, 'resgate')}>
+                              <ArrowDownToLine className="h-3 w-3 mr-1" />Resgatar
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedInvestment(investment)
-                                setRedeemQuantity(0)
-                                setRedeemAmount(0)
-                                setRedeemByValue(investment.type === 'bonds')
-                                setIsRedeemDialogOpen(true)
-                              }}
-                              className="text-xs h-8"
-                            >
-                              <ArrowDownToLine className="h-3 w-3 mr-1" />
-                              Resgatar
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openAction(inv, 'preco')}>
+                              <Edit className="h-3 w-3 mr-1" />Preço
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteInvestment(investment.id)}
-                              className="text-xs h-8"
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Excluir
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive hover:text-destructive ml-auto" onClick={() => openAction(inv, 'delete')}>
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>
-                      </Card>
-                    )
-                  })}
-                </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
 
-                {/* Versão Desktop - Tabela com Scroll Horizontal */}
-                <div className="hidden md:block overflow-x-auto">
-                  <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Ativo</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Quantidade</TableHead>
-                      <TableHead>Preço Médio</TableHead>
-                      <TableHead>Preço Atual</TableHead>
-                      <TableHead>Valor Total</TableHead>
-                      <TableHead>Lucro/Prejuízo</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {investments.map((investment) => {
-                      const totalValue = investment.quantity * investment.current_price
-                      const totalCost = investment.quantity * investment.average_price
-                      const profit = totalValue - totalCost
-                      const profitPercentage = (profit / totalCost) * 100
+            {/* ── Charts (right 2/5) ─────────────────────────────── */}
+            <div className="lg:col-span-2 space-y-4">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Distribuição</h2>
 
-                      return (
-                        <TableRow key={investment.id}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{investment.symbol}</div>
-                              <div className="text-sm text-muted-foreground">{investment.name}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {investment.type === 'stocks' ? 'Ação' : 
-                             investment.type === 'crypto' ? 'Crypto' : 
-                             investment.type === 'bonds' ? 'Renda Fixa' : 'Fundo'}
-                          </TableCell>
-                          <TableCell>{investment.quantity}</TableCell>
-                          <TableCell>{formatCurrency(investment.average_price, investment.currency)}</TableCell>
-                          <TableCell>{formatCurrency(investment.current_price, investment.currency)}</TableCell>
-                          <TableCell className="font-medium">{formatCurrency(totalValue, investment.currency)}</TableCell>
-                          <TableCell className={profit >= 0 ? 'text-success' : 'text-destructive'}>
-                            <div className="font-medium">{formatCurrency(profit, investment.currency)}</div>
-                            <div className="text-xs">
-                              {profitPercentage > 0 ? '+' : ''}{profitPercentage.toFixed(2)}%
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedInvestment(investment)
-                                  setNewCurrentPrice(investment.current_price)
-                                  setIsUpdatePriceDialogOpen(true)
-                                }}
-                                title="Atualizar Preço"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedInvestment(investment)
-                                  setReinvestAmount(0)
-                                  setIsReinvestDialogOpen(true)
-                                }}
-                                title="Reinvestir"
-                              >
-                                <ArrowUpFromLine className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                 onClick={() => {
-                                   setSelectedInvestment(investment)
-                                   setRedeemQuantity(0)
-                                   setRedeemAmount(0)
-                                   setRedeemByValue(investment.type === 'bonds') // Padrão para Renda Fixa é por valor
-                                   setIsRedeemDialogOpen(true)
-                                 }}
-                                title="Resgatar"
-                              >
-                                <ArrowDownToLine className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteInvestment(investment.id)}
-                                title="Excluir"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="charts" className="space-y-4">
-            <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+              {/* Pie chart */}
               <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-base sm:text-lg">Distribuição por Valor</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Valor atual de cada ativo
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6 sm:pt-0">
-                  <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                      <Legend />
-                      <Bar dataKey="value" fill="#10B981" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-base sm:text-lg">Distribuição por Tipo</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Porcentagem de cada tipo de investimento
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6 sm:pt-0">
-                  <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
+                <CardContent className="pt-4">
+                  <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
                       <Pie
                         data={pieData}
                         cx="50%"
                         cy="50%"
-                        labelLine={false}
-                        label={({ name, percentage }) => `${name} ${percentage.toFixed(1)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
+                        innerRadius={55}
+                        outerRadius={90}
+                        paddingAngle={2}
                         dataKey="value"
+                        labelLine={false}
+                        label={renderCustomLabel}
                       >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        {pieData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      <ReTooltip
+                        formatter={(val: number) => formatCurrency(val)}
+                        labelFormatter={(label) => label}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
+
+                  {/* Legend */}
+                  <div className="space-y-2 mt-2">
+                    {pieData.map(entry => (
+                      <div key={entry.name} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                          <span className="text-muted-foreground">{entry.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-medium">{formatCurrency(entry.value)}</span>
+                          <span className="text-xs text-muted-foreground ml-1.5">{entry.pct.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Per-asset allocation */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Alocação por ativo</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2.5">
+                  {[...investments]
+                    .sort((a, b) => (b.quantity * b.current_price) - (a.quantity * a.current_price))
+                    .map(inv => {
+                      const val  = inv.quantity * inv.current_price
+                      const alloc = totalValue > 0 ? (val / totalValue) * 100 : 0
+                      return (
+                        <div key={inv.id}>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="font-medium">{inv.symbol}</span>
+                            <span className="text-muted-foreground">{alloc.toFixed(1)}%</span>
+                          </div>
+                          <Progress
+                            value={alloc}
+                            className="h-1.5"
+                            style={{ '--progress-color': TYPE_COLORS[inv.type] } as any}
+                          />
+                        </div>
+                      )
+                    })
+                  }
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
 
-        {/* Dialog de Resgate */}
-        <Dialog open={isRedeemDialogOpen} onOpenChange={setIsRedeemDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+        {/* ═══════════════ DIALOGS ═══════════════════════════════════ */}
+
+        {/* ── Add ───────────────────────────────────────────────────── */}
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Resgatar Investimento</DialogTitle>
-              <DialogDescription>
-                Resgate parte ou todo o investimento em {selectedInvestment?.name}
-              </DialogDescription>
+              <DialogTitle>Novo Ativo</DialogTitle>
+              <DialogDescription>Adicione um ativo ao seu portfólio</DialogDescription>
             </DialogHeader>
-            
-            {selectedInvestment && (
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Investimento</Label>
-                  <div className="p-3 bg-muted rounded-md">
-                    <div className="font-medium">{selectedInvestment.symbol} - {selectedInvestment.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Quantidade disponível: {selectedInvestment.quantity.toFixed(4)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Preço atual: {formatCurrency(selectedInvestment.current_price, selectedInvestment.currency)}
-                    </div>
-                    <div className="text-sm font-medium text-primary mt-1">
-                      Valor disponível para resgate: {formatCurrency(selectedInvestment.quantity * selectedInvestment.current_price, selectedInvestment.currency)}
-                    </div>
-                  </div>
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Símbolo / Ticker *</Label>
+                  <Input placeholder="PETR4, BTC…" value={newInv.symbol}
+                    onChange={e => setNewInv(f => ({ ...f, symbol: e.target.value.toUpperCase() }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tipo *</Label>
+                  <Select value={newInv.type} onValueChange={(v: any) => setNewInv(f => ({ ...f, type: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(TYPE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Nome do Ativo *</Label>
+                <Input placeholder="Ex: Petrobras PN" value={newInv.name}
+                  onChange={e => setNewInv(f => ({ ...f, name: e.target.value }))} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Quantidade *</Label>
+                  <Input type="number" placeholder="0" value={newInv.quantity || ''}
+                    onChange={e => setNewInv(f => ({ ...f, quantity: Number(e.target.value) }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Moeda</Label>
+                  <Select value={newInv.currency} onValueChange={v => setNewInv(f => ({ ...f, currency: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {currencies.map(c => <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Preço Médio de Compra *</Label>
+                <CurrencyInput value={newInv.average_price}
+                  onChange={v => setNewInv(f => ({ ...f, average_price: v }))} />
+                {newInv.quantity > 0 && newInv.average_price > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Total: <strong>{formatCurrency(newInv.quantity * newInv.average_price)}</strong>
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Conta de Origem *</Label>
+                <Select value={newInv.account_id} onValueChange={v => setNewInv(f => ({ ...f, account_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map(a => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name} — {formatCurrency(getBalance(a.id))}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">O valor será debitado desta conta</p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddOpen(false)}>Cancelar</Button>
+              <Button onClick={handleAdd}>Adicionar Ativo</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Aporte ────────────────────────────────────────────────── */}
+        <Dialog open={aporteOpen} onOpenChange={setAporteOpen}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Aportar em {selected?.symbol}</DialogTitle>
+              <DialogDescription>{selected?.name}</DialogDescription>
+            </DialogHeader>
+            {selected && (
+              <div className="space-y-4 py-2">
+                <div className="rounded-lg bg-muted/40 p-3 space-y-1 text-sm">
+                  <p>Quantidade atual: <strong>{selected.quantity < 1 ? selected.quantity.toFixed(6) : selected.quantity.toFixed(2)}</strong></p>
+                  <p>Preço médio: <strong>{formatCurrency(selected.average_price, selected.currency)}</strong></p>
+                  <p>Preço atual: <strong>{formatCurrency(selected.current_price, selected.currency)}</strong></p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Valor do aporte *</Label>
+                  <CurrencyInput value={aporteAmount} onChange={setAporteAmount} />
+                  {aporteAmount > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      +{(aporteAmount / selected.current_price).toFixed(6)} unidades ·
+                      Novo preço médio: <strong>{formatCurrency(
+                        ((selected.quantity * selected.average_price) + aporteAmount) /
+                        (selected.quantity + aporteAmount / selected.current_price),
+                        selected.currency
+                      )}</strong>
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Conta de origem *</Label>
+                  <Select value={aporteAccountId} onValueChange={setAporteAccountId}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map(a => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name} — {formatCurrency(getBalance(a.id))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAporteOpen(false)}>Cancelar</Button>
+              <Button onClick={handleAporte}>Confirmar Aporte</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Resgate ───────────────────────────────────────────────── */}
+        <Dialog open={resgateOpen} onOpenChange={setResgateOpen}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Resgatar {selected?.symbol}</DialogTitle>
+              <DialogDescription>{selected?.name}</DialogDescription>
+            </DialogHeader>
+            {selected && (
+              <div className="space-y-4 py-2">
+                <div className="rounded-lg bg-muted/40 p-3 space-y-1 text-sm">
+                  <p>Quantidade: <strong>{selected.quantity < 1 ? selected.quantity.toFixed(6) : selected.quantity.toFixed(2)}</strong></p>
+                  <p>Preço atual: <strong>{formatCurrency(selected.current_price, selected.currency)}</strong></p>
+                  <p>Disponível para resgate: <strong className="text-emerald-600 dark:text-emerald-400">{formatCurrency(selected.quantity * selected.current_price, selected.currency)}</strong></p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Tipo de Resgate</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      variant={redeemByValue ? "default" : "outline"}
-                      onClick={() => {
-                        setRedeemByValue(true)
-                        setRedeemQuantity(0)
-                      }}
-                      className="flex-1"
-                    >
-                      Por Valor (R$)
-                    </Button>
-                    <Button
-                      variant={!redeemByValue ? "default" : "outline"}
-                      onClick={() => {
-                        setRedeemByValue(false)
-                        setRedeemAmount(0)
-                      }}
-                      className="flex-1"
-                    >
-                      Por Quantidade
-                    </Button>
+                {/* Toggle: by value or quantity */}
+                <div className="space-y-1.5">
+                  <Label>Resgatar por</Label>
+                  <div className="flex rounded-md border overflow-hidden text-sm">
+                    <button
+                      onClick={() => { setRedeemByValue(true); setRedeemQty(0) }}
+                      className={`flex-1 py-1.5 font-medium transition-colors ${redeemByValue ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+                    >Valor (R$)</button>
+                    <button
+                      onClick={() => { setRedeemByValue(false); setRedeemValue(0) }}
+                      className={`flex-1 py-1.5 font-medium transition-colors ${!redeemByValue ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+                    >Quantidade</button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {redeemByValue 
-                      ? "Recomendado para Renda Fixa (CDB, LCI, etc.)" 
-                      : "Recomendado para Ações e Fundos"}
-                  </p>
                 </div>
 
                 {redeemByValue ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="redeemAmount">Valor a Resgatar (R$) *</Label>
-                    <CurrencyInput
-                      value={redeemAmount}
-                      onChange={(value) => {
-                        setRedeemAmount(value)
-                        setRedeemQuantity(value / selectedInvestment.current_price)
-                      }}
-                      currency={selectedInvestment.currency === 'BRL' ? 'R$' : selectedInvestment.currency}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Isso resgatará aproximadamente {(redeemAmount / selectedInvestment.current_price).toFixed(4)} cotas
-                    </p>
+                  <div className="space-y-1.5">
+                    <Label>Valor a resgatar *</Label>
+                    <CurrencyInput value={redeemValue} onChange={v => { setRedeemValue(v); setRedeemQty(v / selected.current_price) }} />
+                    {redeemValue > 0 && (
+                      <p className="text-xs text-muted-foreground">≈ {(redeemValue / selected.current_price).toFixed(6)} unidades</p>
+                    )}
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="redeemQuantity">Quantidade a Resgatar *</Label>
-                    <Input
-                      id="redeemQuantity"
-                      type="number"
-                      step="0.0001"
-                      placeholder="0"
-                      value={redeemQuantity || ''}
-                      onChange={(e) => {
-                        const qty = Number(e.target.value)
-                        setRedeemQuantity(qty)
-                        setRedeemAmount(qty * selectedInvestment.current_price)
-                      }}
-                      max={selectedInvestment.quantity}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Valor a receber: {formatCurrency(redeemQuantity * selectedInvestment.current_price, selectedInvestment.currency)}
+                  <div className="space-y-1.5">
+                    <Label>Quantidade a resgatar *</Label>
+                    <Input type="number" step="0.000001" max={selected.quantity} value={redeemQty || ''}
+                      onChange={e => { const q = Number(e.target.value); setRedeemQty(q); setRedeemValue(q * selected.current_price) }} />
+                    {redeemQty > 0 && (
+                      <p className="text-xs text-muted-foreground">= {formatCurrency(redeemQty * selected.current_price, selected.currency)}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label>Conta de destino *</Label>
+                  <Select value={redeemAccountId} onValueChange={setRedeemAccountId}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map(a => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name} — {formatCurrency(getBalance(a.id))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setResgateOpen(false)}>Cancelar</Button>
+              <Button onClick={handleResgate}>Confirmar Resgate</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Atualizar Preço ───────────────────────────────────────── */}
+        <Dialog open={precoOpen} onOpenChange={setPrecoOpen}>
+          <DialogContent className="sm:max-w-[380px]">
+            <DialogHeader>
+              <DialogTitle>Atualizar Preço — {selected?.symbol}</DialogTitle>
+            </DialogHeader>
+            {selected && (
+              <div className="space-y-4 py-2">
+                <div className="rounded-lg bg-muted/40 p-3 space-y-1 text-sm">
+                  <p>Preço atual: <strong>{formatCurrency(selected.current_price, selected.currency)}</strong></p>
+                  <p>Preço médio: <strong>{formatCurrency(selected.average_price, selected.currency)}</strong></p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Novo preço *</Label>
+                  <CurrencyInput value={newPrice} onChange={setNewPrice} />
+                  {newPrice > 0 && selected.current_price > 0 && (
+                    <p className={`text-xs ${newPrice >= selected.current_price ? 'text-emerald-600' : 'text-destructive'}`}>
+                      Variação: {newPrice >= selected.current_price ? '+' : ''}{((newPrice - selected.current_price) / selected.current_price * 100).toFixed(2)}% ·
+                      Novo valor total: <strong>{formatCurrency(selected.quantity * newPrice, selected.currency)}</strong>
                     </p>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="accountDestination">Conta de Destino *</Label>
-                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a conta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(a => a.is_active).map(account => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name} - {formatCurrency(getAccountRealBalance(account.id))}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    O valor do resgate será creditado nesta conta
-                  </p>
+                  )}
                 </div>
               </div>
             )}
-
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsRedeemDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleRedeemInvestment}>
-                Confirmar Resgate
-              </Button>
+              <Button variant="outline" onClick={() => setPrecoOpen(false)}>Cancelar</Button>
+              <Button onClick={handlePreco}>Atualizar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Dialog de Reinvestimento */}
-        <Dialog open={isReinvestDialogOpen} onOpenChange={setIsReinvestDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Reinvestir</DialogTitle>
-              <DialogDescription>
-                Adicione mais recursos ao investimento em {selectedInvestment?.name}
-              </DialogDescription>
-            </DialogHeader>
-            
-            {selectedInvestment && (
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Investimento Atual</Label>
-                  <div className="p-3 bg-muted rounded-md">
-                    <div className="font-medium">{selectedInvestment.symbol} - {selectedInvestment.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Quantidade atual: {selectedInvestment.quantity}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Preço médio: {formatCurrency(selectedInvestment.average_price, selectedInvestment.currency)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Preço atual: {formatCurrency(selectedInvestment.current_price, selectedInvestment.currency)}
-                    </div>
-                  </div>
-                </div>
+        {/* ── Delete ────────────────────────────────────────────────── */}
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remover {selected?.symbol}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                O ativo <strong>{selected?.name}</strong> será removido da carteira. Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Remover
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-                <div className="space-y-2">
-                  <Label htmlFor="reinvestAmount">Valor a Investir *</Label>
-                  <CurrencyInput
-                    value={reinvestAmount}
-                    onChange={setReinvestAmount}
-                    currency={selectedInvestment.currency === 'BRL' ? 'R$' : selectedInvestment.currency}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Isso adicionará {(reinvestAmount / selectedInvestment.current_price).toFixed(4)} cotas
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="accountSource">Conta de Origem *</Label>
-                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a conta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(a => a.is_active).map(account => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name} - {formatCurrency(getAccountRealBalance(account.id))}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    O valor será debitado desta conta
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsReinvestDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleReinvest}>
-                Confirmar Reinvestimento
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog de Atualização Manual de Preço */}
-        <Dialog open={isUpdatePriceDialogOpen} onOpenChange={setIsUpdatePriceDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>💰 Atualizar Preço</DialogTitle>
-              <DialogDescription>
-                Atualize manualmente o preço atual do investimento
-              </DialogDescription>
-            </DialogHeader>
-            
-            {selectedInvestment && (
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Investimento</Label>
-                  <div className="p-3 bg-muted rounded-md">
-                    <div className="font-medium">{selectedInvestment.symbol} - {selectedInvestment.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Quantidade: {selectedInvestment.quantity}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Preço atual: {formatCurrency(selectedInvestment.current_price, selectedInvestment.currency)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="newPrice">Novo Preço *</Label>
-                  <CurrencyInput
-                    value={newCurrentPrice}
-                    onChange={setNewCurrentPrice}
-                    currency={selectedInvestment.currency === 'BRL' ? 'R$' : selectedInvestment.currency}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Digite o novo preço de mercado do ativo
-                  </p>
-                </div>
-
-                {newCurrentPrice > 0 && (
-                  <div className="p-3 bg-muted rounded-md space-y-1">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Valor total atualizado: </span>
-                      <span className="font-medium">
-                        {formatCurrency(selectedInvestment.quantity * newCurrentPrice, selectedInvestment.currency)}
-                      </span>
-                    </div>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Variação: </span>
-                      <span className={newCurrentPrice >= selectedInvestment.current_price ? 'text-success font-medium' : 'text-destructive font-medium'}>
-                        {((newCurrentPrice - selectedInvestment.current_price) / selectedInvestment.current_price * 100).toFixed(2)}%
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsUpdatePriceDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleUpdatePrice}>
-                Atualizar Preço
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </Layout>
   )
