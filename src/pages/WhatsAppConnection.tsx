@@ -45,15 +45,18 @@ const WhatsAppConnection = () => {
         setIsConnected(true);
         setPhoneNumber(data.phone_number);
       }
-    } catch (error) {
-      console.log('No existing connection found');
+    } catch {
+      // No existing connection — expected for new users
     }
   };
 
   const generateConnectionCode = () => {
-    const code = Math.random().toString(36).substring(2, 15).toUpperCase();
-    setConnectionCode(code);
-    return code;
+    // Use crypto.getRandomValues for a cryptographically secure token
+    const array = new Uint8Array(16)
+    crypto.getRandomValues(array)
+    const code = Array.from(array, b => b.toString(16).padStart(2, '0')).join('').toUpperCase().slice(0, 16)
+    setConnectionCode(code)
+    return code
   };
 
   const formatPhoneNumber = (phone: string) => {
@@ -133,12 +136,11 @@ const WhatsAppConnection = () => {
             }]
           }
         });
-      } catch (webhookError) {
-        console.log('Webhook test failed, but connection is established');
+      } catch {
+        // Webhook test is non-critical; connection is still established
       }
 
-    } catch (error) {
-      console.error('Connection error:', error);
+    } catch {
       toast({
         title: "Erro na conexão",
         description: "Não foi possível conectar o WhatsApp. Tente novamente.",
@@ -166,8 +168,7 @@ const WhatsAppConnection = () => {
         title: "Desconectado",
         description: "WhatsApp desconectado com sucesso.",
       });
-    } catch (error) {
-      console.error('Disconnect error:', error);
+    } catch (error: unknown) {
       toast({
         title: "Erro",
         description: "Erro ao desconectar. Tente novamente.",
@@ -202,42 +203,29 @@ const WhatsAppConnection = () => {
         ? { phone_number: testPhoneNumber }
         : { user_id: user?.id };
 
-      console.log('Testando API com payload:', payload);
-
-      // Teste direto via fetch para debugging do n8n
-      const response = await fetch(`https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
+      // Use supabase.functions.invoke() so the auth JWT is included automatically
+      const { data, error: fnError } = await supabase.functions.invoke('financial-summary', {
+        body: payload,
       });
 
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro na resposta:', response.status, errorText);
-        setApiResponse(`Erro HTTP ${response.status}: ${errorText}`);
+      if (fnError) {
+        setApiResponse(`Erro: ${fnError.message}`);
         toast({
           title: "Erro na API",
-          description: `HTTP ${response.status}: ${errorText}`,
+          description: fnError.message,
           variant: "destructive",
         });
         return;
       }
 
-      const data = await response.json();
-      console.log('Resposta da API:', data);
       setApiResponse(JSON.stringify(data, null, 2));
-      
+
       toast({
         title: "API testada com sucesso!",
-        description: "URL confirmada: https://zdaoeuthpztxonytbcww.supabase.co/functions/v1/financial-summary",
+        description: "Resumo financeiro obtido.",
       });
 
-    } catch (error) {
-      console.error('API test error:', error);
+    } catch (error: unknown) {
       setApiResponse(`Erro: ${error}`);
       toast({
         title: "Erro",
