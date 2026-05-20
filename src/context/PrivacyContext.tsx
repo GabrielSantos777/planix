@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
 interface PrivacyContextType {
   isPrivacyEnabled: boolean
@@ -6,19 +6,36 @@ interface PrivacyContextType {
   hideValue: (value: string) => string
 }
 
+const STORAGE_KEY = 'planix-privacy-enabled'
+
 const PrivacyContext = createContext<PrivacyContextType | undefined>(undefined)
 
 export const PrivacyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isPrivacyEnabled, setIsPrivacyEnabled] = useState(false)
+  const [isPrivacyEnabled, setIsPrivacyEnabled] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY) === 'true'
+    } catch {
+      return false
+    }
+  })
 
-  const togglePrivacy = () => {
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, String(isPrivacyEnabled))
+    } catch {
+      // localStorage unavailable
+    }
+  }, [isPrivacyEnabled])
+
+  const togglePrivacy = useCallback(() => {
     setIsPrivacyEnabled(prev => !prev)
-  }
+  }, [])
 
-  const hideValue = (value: string) => {
+  const hideValue = useCallback((value: string) => {
     if (!isPrivacyEnabled) return value
-    return '•'.repeat(value.length)
-  }
+    // Use fixed-width dots for consistent masking
+    return '• • • • •'
+  }, [isPrivacyEnabled])
 
   return (
     <PrivacyContext.Provider value={{ isPrivacyEnabled, togglePrivacy, hideValue }}>

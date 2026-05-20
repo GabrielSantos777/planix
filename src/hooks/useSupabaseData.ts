@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/context/AuthContext'
 import type { Database } from '@/integrations/supabase/types'
@@ -180,7 +180,7 @@ export const useSupabaseData = () => {
     }
   }
 
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     if (!user) return
     setLoading(true)
     await Promise.all([
@@ -194,11 +194,12 @@ export const useSupabaseData = () => {
       fetchContacts()
     ])
     setLoading(false)
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   useEffect(() => {
     fetchAllData()
-  }, [user])
+  }, [fetchAllData])
 
   // CRUD operations for accounts
   const addAccount = async (account: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
@@ -224,45 +225,47 @@ export const useSupabaseData = () => {
   }
 
   const updateAccount = async (id: string, updates: Partial<Account>) => {
+    if (!user) throw new Error('User not authenticated')
     try {
       const { data, error } = await supabase
         .from('accounts')
         .update(updates)
         .eq('id', id)
+        .eq('user_id', user.id)
         .select()
         .single()
 
       if (error) throw error
       setAccounts(prev => prev.map(acc => acc.id === id ? data : acc))
-      console.log('Account updated:', data)
       return data
     } catch (error) {
-      console.error('Error updating account:', error)
       throw error
     }
   }
 
   const deleteAccount = async (id: string) => {
+    if (!user) throw new Error('User not authenticated')
     try {
-      // First, delete all transactions related to this account
+      // First, delete all transactions belonging to this user related to this account
       await supabase
         .from('transactions')
         .delete()
         .eq('account_id', id)
+        .eq('user_id', user.id)
 
       // Then, completely delete the account from the database
       const { error } = await supabase
         .from('accounts')
         .delete()
         .eq('id', id)
+        .eq('user_id', user.id)
 
       if (error) throw error
       setAccounts(prev => prev.filter(acc => acc.id !== id))
-      
+
       // Refresh transactions to reflect the changes
       await fetchTransactions()
     } catch (error) {
-      console.error('Error deleting account:', error)
       throw error
     }
   }
@@ -287,11 +290,13 @@ export const useSupabaseData = () => {
   }
 
   const updateCreditCard = async (id: string, updates: Partial<CreditCard>) => {
+    if (!user) throw new Error('User not authenticated')
     try {
       const { data, error } = await supabase
         .from('credit_cards')
         .update(updates)
         .eq('id', id)
+        .eq('user_id', user.id)
         .select()
         .single()
 
@@ -299,32 +304,33 @@ export const useSupabaseData = () => {
       setCreditCards(prev => prev.map(card => card.id === id ? data : card))
       return data
     } catch (error) {
-      console.error('Error updating credit card:', error)
       throw error
     }
   }
 
   const deleteCreditCard = async (id: string) => {
+    if (!user) throw new Error('User not authenticated')
     try {
-      // First, delete all transactions related to this credit card
+      // First, delete all transactions belonging to this user related to this credit card
       await supabase
         .from('transactions')
         .delete()
         .eq('credit_card_id', id)
+        .eq('user_id', user.id)
 
       // Then, delete the credit card
       const { error } = await supabase
         .from('credit_cards')
         .delete()
         .eq('id', id)
+        .eq('user_id', user.id)
 
       if (error) throw error
       setCreditCards(prev => prev.filter(card => card.id !== id))
-      
+
       // Refresh transactions to reflect the changes
       await fetchTransactions()
     } catch (error) {
-      console.error('Error deleting credit card:', error)
       throw error
     }
   }
@@ -345,7 +351,7 @@ export const useSupabaseData = () => {
         .single()
 
       if (error) throw error
-      
+
       // Update account balance
       if (transaction.account_id) {
         const account = accounts.find(acc => acc.id === transaction.account_id)
@@ -354,7 +360,7 @@ export const useSupabaseData = () => {
           await updateAccount(transaction.account_id, { current_balance: newBalance })
         }
       }
-      
+
       // Update credit card balance
       if (transaction.credit_card_id) {
         const creditCard = creditCards.find(card => card.id === transaction.credit_card_id)
@@ -363,8 +369,8 @@ export const useSupabaseData = () => {
           await updateCreditCard(transaction.credit_card_id, { current_balance: newBalance })
         }
       }
-      
-      await fetchAllData()
+
+      setTransactions(prev => [data as any, ...prev])
       return data
     } catch (error) {
       console.error('Error adding transaction:', error)
@@ -373,8 +379,8 @@ export const useSupabaseData = () => {
   }
 
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    if (!user) throw new Error('User not authenticated')
     try {
-      // Get the original transaction to calculate balance changes
       const originalTransaction = transactions.find(t => t.id === id)
       if (!originalTransaction) throw new Error('Transaction not found')
 
@@ -385,6 +391,7 @@ export const useSupabaseData = () => {
           amount: updates.type === "expense" && updates.amount ? -Math.abs(updates.amount) : updates.amount
         })
         .eq('id', id)
+        .eq('user_id', user.id)
         .select(`
           *,
           category:categories(*),
@@ -395,32 +402,28 @@ export const useSupabaseData = () => {
         .single()
 
       if (error) throw error
-      
+
       // Update account balance if transaction has an account
       if (originalTransaction.account_id) {
         const account = accounts.find(acc => acc.id === originalTransaction.account_id)
         if (account) {
-          // Reverse the original transaction effect
           let newBalance = (account.current_balance || 0) - (originalTransaction.amount || 0)
-          // Apply the new transaction effect
           newBalance += (data.amount || 0)
           await updateAccount(originalTransaction.account_id, { current_balance: newBalance })
         }
       }
-      
+
       // Update credit card balance if transaction has a credit card
       if (originalTransaction.credit_card_id) {
         const creditCard = creditCards.find(card => card.id === originalTransaction.credit_card_id)
         if (creditCard) {
-          // Reverse the original transaction effect (subtract from balance)
           let newBalance = (creditCard.current_balance || 0) - Math.abs(originalTransaction.amount || 0)
-          // Apply the new transaction effect (add to balance)
           newBalance += Math.abs(data.amount || 0)
           await updateCreditCard(originalTransaction.credit_card_id, { current_balance: newBalance })
         }
       }
-      
-      await fetchAllData()
+
+      setTransactions(prev => prev.map(t => t.id === id ? data as any : t))
       return data
     } catch (error) {
       console.error('Error updating transaction:', error)
@@ -429,17 +432,18 @@ export const useSupabaseData = () => {
   }
 
   const deleteTransaction = async (id: string) => {
+    if (!user) throw new Error('User not authenticated')
     try {
-      // Get the transaction before deleting to update account balance
       const transaction = transactions.find(t => t.id === id)
-      
+
       const { error } = await supabase
         .from('transactions')
         .delete()
         .eq('id', id)
+        .eq('user_id', user.id)
 
       if (error) throw error
-      
+
       // Update account balance if transaction had an account
       if (transaction?.account_id) {
         const account = accounts.find(acc => acc.id === transaction.account_id)
@@ -448,7 +452,7 @@ export const useSupabaseData = () => {
           await updateAccount(transaction.account_id, { current_balance: newBalance })
         }
       }
-      
+
       // Update credit card balance if transaction had a credit card
       if (transaction?.credit_card_id) {
         const creditCard = creditCards.find(card => card.id === transaction.credit_card_id)
@@ -457,8 +461,8 @@ export const useSupabaseData = () => {
           await updateCreditCard(transaction.credit_card_id, { current_balance: newBalance })
         }
       }
-      
-      await fetchAllData()
+
+      setTransactions(prev => prev.filter(t => t.id !== id))
     } catch (error) {
       console.error('Error deleting transaction:', error)
       throw error
@@ -484,11 +488,13 @@ export const useSupabaseData = () => {
   }
 
   const updateGoal = async (id: string, updates: Partial<Goal>) => {
+    if (!user) throw new Error('User not authenticated')
     try {
       const { data, error } = await supabase
         .from('goals')
         .update(updates)
         .eq('id', id)
+        .eq('user_id', user.id)
         .select()
         .single()
 
@@ -496,22 +502,22 @@ export const useSupabaseData = () => {
       setGoals(prev => prev.map(goal => goal.id === id ? data : goal))
       return data
     } catch (error) {
-      console.error('Error updating goal:', error)
       throw error
     }
   }
 
   const deleteGoal = async (id: string) => {
+    if (!user) throw new Error('User not authenticated')
     try {
       const { error } = await supabase
         .from('goals')
         .delete()
         .eq('id', id)
+        .eq('user_id', user.id)
 
       if (error) throw error
       setGoals(prev => prev.filter(goal => goal.id !== id))
     } catch (error) {
-      console.error('Error deleting goal:', error)
       throw error
     }
   }
@@ -604,11 +610,13 @@ export const useSupabaseData = () => {
   }
 
   const updateInvestment = async (id: string, updates: Partial<Investment>) => {
+    if (!user) throw new Error('User not authenticated')
     try {
       const { data, error } = await supabase
         .from('investments')
         .update(updates)
         .eq('id', id)
+        .eq('user_id', user.id)
         .select()
         .single()
 
@@ -616,22 +624,22 @@ export const useSupabaseData = () => {
       setInvestments(prev => prev.map(investment => investment.id === id ? data : investment))
       return data
     } catch (error) {
-      console.error('Error updating investment:', error)
       throw error
     }
   }
 
   const deleteInvestment = async (id: string) => {
+    if (!user) throw new Error('User not authenticated')
     try {
       const { error } = await supabase
         .from('investments')
         .delete()
         .eq('id', id)
+        .eq('user_id', user.id)
 
       if (error) throw error
       setInvestments(prev => prev.filter(investment => investment.id !== id))
     } catch (error) {
-      console.error('Error deleting investment:', error)
       throw error
     }
   }

@@ -15,7 +15,7 @@ interface AuthContextType {
   isAdmin: boolean
   loading: boolean
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: any }>
-  signIn: (email: string, password: string) => Promise<{ error: any }>
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: any }>
   signInWithGoogle: () => Promise<{ error: any }>
   signOut: () => Promise<void>
   isTrialExpired: boolean
@@ -54,14 +54,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .eq('user_id', userId)
         .single()
 
-      if (error) {
-        console.error('Error fetching profile:', error)
-        return null
-      }
-
+      if (error) return null
       return data
-    } catch (error) {
-      console.error('Error in fetchProfile:', error)
+    } catch {
       return null
     }
   }
@@ -73,14 +68,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .select('role')
         .eq('user_id', userId)
 
-      if (error) {
-        console.error('Error fetching user roles:', error)
-        return []
-      }
-
+      if (error) return []
       return (data || []).map(r => r.role as UserRole)
-    } catch (error) {
-      console.error('Error in fetchUserRoles:', error)
+    } catch {
       return []
     }
   }
@@ -93,6 +83,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUserRoles(roles)
     }
   }
+
+  useEffect(() => {
+    // If the user chose NOT to be remembered, sign them out on fresh page load
+    // (sessionStorage is cleared when the browser/tab closes)
+    const sessionOnly = sessionStorage.getItem('planix:session-only')
+    if (sessionOnly) {
+      // The flag survives same-tab reloads but not new tabs / browser close
+      // We use visibilitychange + pagehide to clear on real close
+      const handlePageHide = () => {
+        if (!document.hidden) return
+        supabase.auth.signOut()
+        sessionStorage.removeItem('planix:session-only')
+      }
+      window.addEventListener('pagehide', handlePageHide)
+      return () => window.removeEventListener('pagehide', handlePageHide)
+    }
+  }, [])
 
   useEffect(() => {
     // Set up auth state listener
@@ -179,12 +186,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, rememberMe = true) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+
+      // If "remember me" is unchecked, switch to session-only storage after login
+      if (!error && !rememberMe) {
+        // Supabase persists by default; set a short-lived flag so the app knows
+        // to sign out when the tab/browser is closed
+        sessionStorage.setItem('planix:session-only', '1')
+      } else {
+        sessionStorage.removeItem('planix:session-only')
+      }
 
       if (error) {
         toast({
