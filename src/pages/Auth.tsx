@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/hooks/use-toast'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 
@@ -21,6 +22,7 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false)
   
   const { user, signIn, signUp, signInWithGoogle } = useAuth()
+  const { toast } = useToast()
 
   // Redirect if already authenticated
   if (user) {
@@ -38,15 +40,15 @@ const Auth = () => {
     setIsLoading(true)
 
     if (isLogin) {
-      await signIn(email, password)
+      await signIn(email, password, rememberMe)
     } else {
       if (password !== confirmPassword) {
-        alert('As senhas não coincidem')
+        toast({ title: 'Senhas não coincidem', description: 'Verifique os campos de senha.', variant: 'destructive' })
         setIsLoading(false)
         return
       }
       if (!isPasswordStrong(password)) {
-        alert('A senha deve ter pelo menos 8 caracteres, incluindo maiúscula, minúscula, número e símbolo especial')
+        toast({ title: 'Senha fraca', description: 'Use ao menos 8 caracteres com maiúscula, minúscula, número e símbolo.', variant: 'destructive' })
         setIsLoading(false)
         return
       }
