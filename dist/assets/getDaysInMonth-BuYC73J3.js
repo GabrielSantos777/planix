@@ -1,0 +1,1 @@
+import{t as s}from"./differenceInCalendarDays-BV5Kr9EH.js";import{c as a}from"./format-DIpy1Ntx.js";function u(o){const e=s(o),n=e.getFullYear(),r=e.getMonth(),t=a(o,0);return t.setFullYear(n,r+1,0),t.setHours(0,0,0,0),t.getDate()}export{u as g};

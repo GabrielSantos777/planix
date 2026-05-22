@@ -1,0 +1,1 @@
+import"./vendor-ui-Dafw4UX-.js";const i=(t,r="BRL")=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:r,minimumFractionDigits:2,maximumFractionDigits:2}).format(t),m=t=>{const r=typeof t=="string"?new Date(t):t;return new Intl.DateTimeFormat("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(r)};export{m as a,i as f};
